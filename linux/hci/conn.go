@@ -2,12 +2,11 @@ package hci
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
-
-	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/hci/cmd"

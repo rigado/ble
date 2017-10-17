@@ -1,11 +1,10 @@
 package hci
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/adv"

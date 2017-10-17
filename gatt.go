@@ -1,13 +1,12 @@
 package ble
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/pkg/errors"
-
-	"golang.org/x/net/context"
 )
 
 // ErrDefaultDevice ...

@@ -1,10 +1,10 @@
 package linux
 
 import (
+	"context"
 	"log"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"github.com/currantlabs/ble"
 	"github.com/currantlabs/ble/linux/att"

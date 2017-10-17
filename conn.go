@@ -1,9 +1,8 @@
 package ble
 
 import (
+	"context"
 	"io"
-
-	"golang.org/x/net/context"
 )
 
 // Conn implements a L2CAP connection.

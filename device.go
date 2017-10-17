@@ -1,6 +1,6 @@
 package ble
 
-import "golang.org/x/net/context"
+import "context"
 
 // Device ...
 type Device interface {
