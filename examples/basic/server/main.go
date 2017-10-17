@@ -7,11 +7,10 @@ import (
 	"log"
 	"time"
 
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/examples/lib"
+	"github.com/go-ble/ble/examples/lib/dev"
 	"github.com/pkg/errors"
-
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/examples/lib"
-	"github.com/currantlabs/ble/examples/lib/dev"
 )
 
 var (

@@ -4,12 +4,11 @@ import (
 	"context"
 	"log"
 
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux/att"
+	"github.com/go-ble/ble/linux/gatt"
+	"github.com/go-ble/ble/linux/hci"
 	"github.com/pkg/errors"
-
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux/att"
-	"github.com/currantlabs/ble/linux/gatt"
-	"github.com/currantlabs/ble/linux/hci"
 )
 
 // NewDevice returns the default HCI device.

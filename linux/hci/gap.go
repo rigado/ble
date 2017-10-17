@@ -6,9 +6,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux/adv"
-	"github.com/currantlabs/ble/linux/gatt"
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux/adv"
+	"github.com/go-ble/ble/linux/gatt"
 	"github.com/pkg/errors"
 )
 

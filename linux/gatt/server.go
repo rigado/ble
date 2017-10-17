@@ -4,14 +4,14 @@ import (
 	"log"
 	"sync"
 
-	"github.com/currantlabs/ble"
-	"github.com/currantlabs/ble/linux/att"
+	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/linux/att"
 )
 
 // NewServer ...
 func NewServerWithName(name string) (*Server, error) {
 	return &Server{
-		name:name,
+		name: name,
 		svcs: defaultServices(name),
 		db:   att.NewDB(defaultServices(name), uint16(1)),
 	}, nil

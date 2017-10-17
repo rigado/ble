@@ -8,12 +8,11 @@ import (
 	"log"
 	"time"
 
+	"github.com/go-ble/ble"
 	"github.com/pkg/errors"
 	"github.com/raff/goble/xpc"
 
 	"sync"
-
-	"github.com/currantlabs/ble"
 )
 
 const (

@@ -3,7 +3,7 @@ package hci
 import (
 	"time"
 
-	"github.com/currantlabs/ble/linux/hci/cmd"
+	"github.com/go-ble/ble/linux/hci/cmd"
 )
 
 // An Option is a configuration function, which configures the device.

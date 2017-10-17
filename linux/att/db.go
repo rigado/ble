@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/currantlabs/ble"
+	"github.com/go-ble/ble"
 )
 
 // A DB is a contiguous range of attributes.
