@@ -18,7 +18,7 @@ type conn struct {
 	in   map[uint16]ble.Notifier
 }
 
-// Server implementas an ATT (Attribute Protocol) server.
+// Server implements an ATT (Attribute Protocol) server.
 type Server struct {
 	conn *conn
 	db   *DB
@@ -33,7 +33,7 @@ type Server struct {
 
 	dummyRspWriter ble.ResponseWriter
 
-	// Store a write handler for defer execute once receving ExecuteWriteRequest
+	// Store a write handler for defer execute once receiving ExecuteWriteRequest
 	prepareWriteRequestAttr *attr
 	prepareWriteRequestData bytes.Buffer
 }
@@ -143,7 +143,7 @@ func (s *Server) Loop() {
 				select {
 				case s.chConfirm <- true:
 				default:
-					logger.Error("server", "recieved a spurious confirmation", nil)
+					logger.Error("server", "received a spurious confirmation", nil)
 				}
 				continue
 			}

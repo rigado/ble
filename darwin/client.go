@@ -40,7 +40,7 @@ func (cln *Client) Profile() *ble.Profile {
 	return cln.profile
 }
 
-// DiscoverProfile discovers the whole hierachy of a server.
+// DiscoverProfile discovers the whole hierarchy of a server.
 func (cln *Client) DiscoverProfile(force bool) (*ble.Profile, error) {
 	if cln.profile != nil && !force {
 		return cln.profile, nil

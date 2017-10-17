@@ -50,7 +50,7 @@ func (e ATTError) Error() string {
 	case i >= 0xE0 && i <= 0xFF: // Common profile and service error codes.
 		return "profile or service error"
 	}
-	return "unkown error"
+	return "unknown error"
 }
 
 var errName = map[ATTError]string{

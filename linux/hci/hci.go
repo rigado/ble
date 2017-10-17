@@ -88,9 +88,9 @@ type HCI struct {
 
 	// adHist and adLast track the history of past scannable advertising packets.
 	// Controller delivers AD(Advertising Data) and SR(Scan Response) separately
-	// through HCI. Upon recieving an AD, no matter it's scannable or not, we
-	// pass a Advertisment (AD only) to advHandler immediately.
-	// Upon recieving a SR, we search the AD history for the AD from the same
+	// through HCI. Upon receiving an AD, no matter it's scannable or not, we
+	// pass a Advertisement (AD only) to advHandler immediately.
+	// Upon receiving a SR, we search the AD history for the AD from the same
 	// device, and pass the Advertisiement (AD+SR) to advHandler.
 	// The adHist and adLast are allocated in the Scan().
 	advHandler ble.AdvHandler
@@ -381,9 +381,9 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 					break
 				}
 			}
-			// Got a SR without having recieved an associated AD before?
+			// Got a SR without having received an associated AD before?
 			if a == nil {
-				return fmt.Errorf("recieved scan response %s with no associated Advertising Data packet", sr.Addr())
+				return fmt.Errorf("received scan response %s with no associated Advertising Data packet", sr.Addr())
 			}
 		default:
 			a = newAdvertisement(e, i)

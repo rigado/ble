@@ -121,7 +121,7 @@ func (c *Conn) Read(sdu []byte) (n int, err error) {
 		return 0, errors.Wrap(io.ErrClosedPipe, "input channel closed")
 	}
 	if len(p) == 0 {
-		return 0, errors.Wrap(io.ErrUnexpectedEOF, "recieved empty packet")
+		return 0, errors.Wrap(io.ErrUnexpectedEOF, "received empty packet")
 	}
 
 	// Assume it's a B-Frame.
@@ -133,7 +133,7 @@ func (c *Conn) Read(sdu []byte) (n int, err error) {
 		data = leFrameHdr(p).payload()
 	}
 	if cap(sdu) < slen {
-		return 0, errors.Wrapf(io.ErrShortBuffer, "payload recieved exceeds sdu buffer")
+		return 0, errors.Wrapf(io.ErrShortBuffer, "payload received exceeds sdu buffer")
 	}
 	buf := bytes.NewBuffer(sdu)
 	buf.Reset()

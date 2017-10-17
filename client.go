@@ -12,7 +12,7 @@ type Client interface {
 	// Profile returns discovered profile.
 	Profile() *Profile
 
-	// DiscoverProfile discovers the whole hierachy of a server.
+	// DiscoverProfile discovers the whole hierarchy of a server.
 	DiscoverProfile(force bool) (*Profile, error)
 
 	// DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]

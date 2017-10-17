@@ -498,7 +498,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			logger.Debug("client", "req", fmt.Sprintf("% X", b))
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
-				return nil, errors.Wrap(err, "unexpected ATT response recieved")
+				return nil, errors.Wrap(err, "unexpected ATT response received")
 			}
 		case err := <-c.chErr:
 			return nil, errors.Wrap(err, "ATT request failed")
