@@ -1,0 +1,17 @@
+language: go
+os:
+        - osx
+
+go:
+        - 1.7
+        - 1.8
+        - 1.9
+        - tip
+
+go_import_path: github.com/go-ble/ble
+
+test:
+        - go vet ./...
+        - go test -v ./...
+        - GOOS=darwin go build -v ./...
+        - GOOS=linux go build -v ./...
