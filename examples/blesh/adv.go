@@ -7,11 +7,11 @@ import (
 )
 
 func advHandler(a ble.Advertisement) {
-	curr.addr = a.Address()
+	curr.addr = a.Addr()
 	if a.Connectable() {
-		fmt.Printf("[%s] C %3d:", a.Address(), a.RSSI())
+		fmt.Printf("[%s] C %3d:", a.Addr(), a.RSSI())
 	} else {
-		fmt.Printf("[%s] N %3d:", a.Address(), a.RSSI())
+		fmt.Printf("[%s] N %3d:", a.Addr(), a.RSSI())
 	}
 	comma := ""
 	if len(a.LocalName()) > 0 {

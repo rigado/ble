@@ -24,8 +24,8 @@ func NewClient(c ble.Conn) (*Client, error) {
 	}, nil
 }
 
-// Address returns UUID of the remote peripheral.
-func (cln *Client) Address() ble.Addr {
+// Addr returns UUID of the remote peripheral.
+func (cln *Client) Addr() ble.Addr {
 	return cln.conn.RemoteAddr()
 }
 

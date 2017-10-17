@@ -18,7 +18,7 @@ type Advertisement interface {
 	SolicitedService() []UUID
 
 	RSSI() int
-	Address() Addr
+	Addr() Addr
 }
 
 // ServiceData ...

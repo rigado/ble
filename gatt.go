@@ -144,7 +144,7 @@ func Connect(ctx context.Context, f AdvFilter) (Client, error) {
 		}
 	}
 
-	cln, err := Dial(ctx, (<-ch).Address())
+	cln, err := Dial(ctx, (<-ch).Addr())
 	return cln, errors.Wrap(err, "can't dial")
 }
 

@@ -15,7 +15,7 @@ func filter(c *cli.Context) ble.AdvFilter {
 	}
 	if c.String("addr") != "" {
 		return func(a ble.Advertisement) bool {
-			return a.Address().String() == strings.ToLower(c.String("addr"))
+			return a.Addr().String() == strings.ToLower(c.String("addr"))
 		}
 	}
 	if svc := strings.ToLower(c.String("svc")); svc != "" {

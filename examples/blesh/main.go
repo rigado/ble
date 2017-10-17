@@ -242,7 +242,7 @@ func cmdConnect(c *cli.Context) error {
 	} else if filter(c) != nil {
 		fmt.Printf("Scanning with filter...\n")
 		if cln, err = ble.Connect(ctx, filter(c)); err == nil {
-			curr.addr = cln.Address()
+			curr.addr = cln.Addr()
 			fmt.Printf("Connected to %s\n", curr.addr)
 
 		}
@@ -254,13 +254,13 @@ func cmdConnect(c *cli.Context) error {
 	}
 	if err == nil {
 		curr.client = cln
-		curr.clients[cln.Address().String()] = cln
+		curr.clients[cln.Addr().String()] = cln
 	}
 	go func() {
 		<-cln.Disconnected()
-		delete(curr.clients, cln.Address().String())
+		delete(curr.clients, cln.Addr().String())
 		curr.client = nil
-		fmt.Printf("\n%s disconnected\n", cln.Address().String())
+		fmt.Printf("\n%s disconnected\n", cln.Addr().String())
 	}()
 	return err
 }
@@ -273,12 +273,12 @@ func cmdDisconnect(c *cli.Context) error {
 		return errNotConnected
 	}
 	defer func() {
-		delete(curr.clients, curr.client.Address().String())
+		delete(curr.clients, curr.client.Addr().String())
 		curr.client = nil
 		curr.profile = nil
 	}()
 
-	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", curr.client.Address())
+	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", curr.client.Addr())
 	return curr.client.CancelConnection()
 }
 

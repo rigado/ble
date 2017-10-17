@@ -375,7 +375,7 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 				if h.adHist[idx] == nil {
 					break
 				}
-				if h.adHist[idx].Address().String() == sr.Address().String() {
+				if h.adHist[idx].Addr().String() == sr.Addr().String() {
 					h.adHist[idx].setScanResponse(sr)
 					a = h.adHist[idx]
 					break
@@ -383,7 +383,7 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			}
 			// Got a SR without having recieved an associated AD before?
 			if a == nil {
-				return fmt.Errorf("recieved scan response %s with no associated Advertising Data packet", sr.Address())
+				return fmt.Errorf("recieved scan response %s with no associated Advertising Data packet", sr.Addr())
 			}
 		default:
 			a = newAdvertisement(e, i)

@@ -38,8 +38,8 @@ type Client struct {
 	conn ble.Conn
 }
 
-// Address returns the address of the client.
-func (p *Client) Address() ble.Addr {
+// Addr returns the address of the client.
+func (p *Client) Addr() ble.Addr {
 	p.RLock()
 	defer p.RUnlock()
 	return p.conn.RemoteAddr()

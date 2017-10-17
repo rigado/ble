@@ -97,8 +97,8 @@ func (a *Advertisement) RSSI() int {
 	return int(a.e.RSSI(a.i))
 }
 
-// Address returns the address of the remote peripheral.
-func (a *Advertisement) Address() ble.Addr {
+// Addr returns the address of the remote peripheral.
+func (a *Advertisement) Addr() ble.Addr {
 	b := a.e.Address(a.i)
 	addr := net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
 	if a.e.AddressType(a.i) == 1 {

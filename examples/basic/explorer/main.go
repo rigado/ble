@@ -39,7 +39,7 @@ func main() {
 	// If addr is specified, search for addr instead.
 	if len(*addr) != 0 {
 		filter = func(a ble.Advertisement) bool {
-			return strings.ToUpper(a.Address().String()) == strings.ToUpper(*addr)
+			return strings.ToUpper(a.Addr().String()) == strings.ToUpper(*addr)
 		}
 	}
 
@@ -58,7 +58,7 @@ func main() {
 	// So we wait(detect) the disconnection in the go routine.
 	go func() {
 		<-cln.Disconnected()
-		fmt.Printf("[ %s ] is disconnected \n", cln.Address())
+		fmt.Printf("[ %s ] is disconnected \n", cln.Addr())
 		close(done)
 	}()
 
@@ -72,7 +72,7 @@ func main() {
 	explore(cln, p)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
-	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Address())
+	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())
 	cln.CancelConnection()
 
 	<-done

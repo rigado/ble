@@ -3,7 +3,7 @@ package ble
 // A Client is a GATT client.
 type Client interface {
 	// Address returns platform specific unique ID of the remote peripheral, e.g. MAC on Linux, Client UUID on OS X.
-	Address() Addr
+	Addr() Addr
 
 	// Name returns the name of the remote peripheral.
 	// This can be the advertised name, if exists, or the GAP device name, which takes priority.
