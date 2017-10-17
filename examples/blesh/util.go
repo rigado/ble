@@ -1,12 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/currantlabs/ble"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
-	"golang.org/x/net/context"
 )
 
 func doGetUUID(c *cli.Context) error {

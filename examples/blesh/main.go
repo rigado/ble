@@ -2,13 +2,12 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-
-	"golang.org/x/net/context"
 
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
