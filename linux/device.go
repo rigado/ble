@@ -51,7 +51,7 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		}
 
 		// Initialize the per-connection cccd values.
-		l2c.SetContext(context.WithValue(l2c.Context(), ble.ContextKey("ccc"), make(map[uint16]uint16)))
+		l2c.SetContext(context.WithValue(l2c.Context(), ble.ContextKeyCCC, make(map[uint16]uint16)))
 		l2c.SetRxMTU(mtu)
 
 		s.Lock()

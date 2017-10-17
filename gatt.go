@@ -153,12 +153,12 @@ type NotificationHandler func(req []byte)
 
 // WithSigHandler ...
 func WithSigHandler(ctx context.Context, cancel func()) context.Context {
-	return context.WithValue(ctx, ContextKey("sig"), cancel)
+	return context.WithValue(ctx, ContextKeySig, cancel)
 }
 
 // Cleanup for the interrupted case.
 func trap(ctx context.Context) chan<- os.Signal {
-	v := ctx.Value(ContextKey("sig"))
+	v := ctx.Value(ContextKeySig)
 	if v == nil {
 		return nil
 	}

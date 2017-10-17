@@ -162,7 +162,7 @@ func (s *Server) Loop() {
 	}
 	for h, ccc := range s.conn.cccs {
 		if ccc != 0 {
-			logger.Info("cleanup", ble.ContextKey("ccc"), fmt.Sprintf("0x%02X", ccc))
+			logger.Info("cleanup", ble.ContextKeyCCC, fmt.Sprintf("0x%02X", ccc))
 		}
 		if ccc&cccIndicate != 0 {
 			s.conn.in[h].Close()
