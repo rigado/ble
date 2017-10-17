@@ -8,7 +8,7 @@ import (
 	"github.com/go-ble/ble/linux/att"
 )
 
-// NewServer ...
+// NewServerWithName creates a new Server with the specified name
 func NewServerWithName(name string) (*Server, error) {
 	return &Server{
 		name: name,
