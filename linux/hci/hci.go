@@ -144,7 +144,9 @@ func (h *HCI) Init() error {
 	h.chCmdBufs <- make([]byte, 64)
 
 	go h.sktLoop()
-	h.init()
+	if err := h.init(); err != nil {
+		return err
+	}
 
 	// Pre-allocate buffers with additional head room for lower layer headers.
 	// HCI header (1 Byte) + ACL Data Header (4 bytes) + L2CAP PDU (or fragment)
