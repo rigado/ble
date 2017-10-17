@@ -93,6 +93,16 @@ func (d *Device) Stop() error {
 	return d.HCI.Close()
 }
 
+func (d *Device) Advertise(ctx context.Context, adv ble.Advertisement) error {
+	if err := d.HCI.AdvertiseAdv(adv); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	d.HCI.StopAdvertising()
+	return ctx.Err()
+
+}
+
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.
 // It tres to fit the UUIDs in the advertising packet as much as possible.
 // If name doesn't fit in the advertising packet, it will be put in scan response.

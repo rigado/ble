@@ -39,6 +39,51 @@ func (h *HCI) StopScanning() error {
 	return h.Send(&h.params.scanEnable, nil)
 }
 
+// AdvertiseAdv advertises a given Advertisement
+func (h *HCI) AdvertiseAdv(a ble.Advertisement) error {
+	ad, err := adv.NewPacket(adv.Flags(adv.FlagGeneralDiscoverable | adv.FlagLEOnly))
+	if err != nil {
+		return err
+	}
+	f := adv.AllUUID
+
+	// Current length of ad packet plus two bytes of length and tag.
+	l := ad.Len() + 1 + 1
+	for _, u := range a.Services() {
+		l += u.Len()
+	}
+	if l > adv.MaxEIRPacketLength {
+		f = adv.SomeUUID
+	}
+	for _, u := range a.Services() {
+		if err := ad.Append(f(u)); err != nil {
+			if err == adv.ErrNotFit {
+				break
+			}
+			return err
+		}
+	}
+	sr, _ := adv.NewPacket()
+	switch {
+	case ad.Append(adv.CompleteName(a.LocalName())) == nil:
+	case sr.Append(adv.CompleteName(a.LocalName())) == nil:
+	case sr.Append(adv.ShortName(a.LocalName())) == nil:
+	}
+
+	if a.ManufacturerData() != nil {
+		manufacuturerData := adv.ManufacturerData(1337, a.ManufacturerData())
+		switch {
+		case ad.Append(manufacuturerData) == nil:
+		case sr.Append(manufacuturerData) == nil:
+		}
+	}
+	if err := h.SetAdvertisement(ad.Bytes(), sr.Bytes()); err != nil {
+		return nil
+	}
+	return h.Advertise()
+
+}
+
 // AdvertiseNameAndServices advertises device name, and specified service UUIDs.
 // It tries to fit the UUIDs in the advertising data as much as possible.
 // If name doesn't fit in the advertising data, it will be put in scan response.

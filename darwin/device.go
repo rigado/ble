@@ -121,6 +121,21 @@ func (d *Device) Init() error {
 	return nil
 }
 
+// Advertise advertises the given Advertisement
+func (d *Device) Advertise(ctx context.Context, adv ble.Advertisement) error {
+	if err := d.sendReq(d.pm, 8, xpc.Dict{
+		"kCBAdvDataLocalName":    adv.LocalName(),
+		"kCBAdvDataServiceUUIDs": adv.Services(),
+		"kCBAdvDataAppleMfgData": adv.ManufacturerData(),
+	}).err(); err != nil {
+		return err
+	}
+	<-ctx.Done()
+	d.stopAdvertising()
+	return ctx.Err()
+
+}
+
 // AdvertiseMfgData ...
 func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, md []byte) error {
 	l := len(md)

@@ -17,6 +17,9 @@ type Device interface {
 	// Stop detatch the GATT server from a peripheral device.
 	Stop() error
 
+	// Advertise advertises a given Advertisement
+	Advertise(ctx context.Context, adv Advertisement) error
+
 	// AdvertiseNameAndServices advertises device name, and specified service UUIDs.
 	// It tres to fit the UUIDs in the advertising packet as much as possi
 	// If name doesn't fit in the advertising packet, it will be put in scan response.
