@@ -108,7 +108,7 @@ func open(fd, id int) (*Socket, error) {
 	}
 
 	// poll for 20ms to see if any data becomes available, then clear it
-	pfds := []unix.PollFd{unix.PollFd{Fd: int32(fd), Events: unix.POLLIN}}
+	pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
 	unix.Poll(pfds, 20)
 	if pfds[0].Revents&unix.POLLIN > 0 {
 		b := make([]byte, 100)
