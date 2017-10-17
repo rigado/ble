@@ -2,6 +2,7 @@ package darwin
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -9,10 +10,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/raff/goble/xpc"
-	"golang.org/x/net/context"
+
+	"sync"
 
 	"github.com/currantlabs/ble"
-	"sync"
 )
 
 const (
@@ -52,7 +53,7 @@ type Device struct {
 
 	rspc chan msg
 
-	conns map[string]*conn
+	conns    map[string]*conn
 	connLock sync.Mutex
 
 	// Only used in client/centralManager implementation
