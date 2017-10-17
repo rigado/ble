@@ -18,6 +18,10 @@ func NewDevice() (*Device, error) {
 
 // NewDeviceWithName returns the default HCI device.
 func NewDeviceWithName(name string) (*Device, error) {
+	return NewDeviceWithNameAndHandler(name, nil)
+}
+
+func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler) (*Device, error) {
 	dev, err := hci.NewHCI()
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create hci")
@@ -26,7 +30,7 @@ func NewDeviceWithName(name string) (*Device, error) {
 		return nil, errors.Wrap(err, "can't init hci")
 	}
 
-	srv, err := gatt.NewServerWithName(name)
+	srv, err := gatt.NewServerWithNameAndHandler(name, handler)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create server")
 	}
