@@ -27,41 +27,44 @@ func NewDeviceWithName(name string) (*Device, error) {
 		return nil, errors.Wrap(err, "can't init hci")
 	}
 
-	s, err := gatt.NewServerWithName(name)
+	srv, err := gatt.NewServerWithName(name)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create server")
 	}
 
-	mtu := ble.DefaultMTU
-	mtu = ble.MaxMTU // TODO: get this from user using Option.
+	// mtu := ble.DefaultMTU
+	mtu := ble.MaxMTU // TODO: get this from user using Option.
 	if mtu > ble.MaxMTU {
 		return nil, errors.Wrapf(err, "maximum ATT_MTU is %d", ble.MaxMTU)
 	}
 
-	go func() {
-		for {
-			l2c, err := dev.Accept()
-			if err != nil {
-				log.Printf("can't accept: %s", err)
-				return
-			}
+	go loop(dev, srv, mtu)
 
-			// Initialize the per-connection cccd values.
-			l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
-			l2c.SetRxMTU(mtu)
+	return &Device{HCI: dev, Server: srv}, nil
+}
 
-			s.Lock()
-			as, err := att.NewServer(s.DB(), l2c)
-			s.Unlock()
-			if err != nil {
-				log.Printf("can't create ATT server: %s", err)
-				continue
-
-			}
-			go as.Loop()
+func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
+	for {
+		l2c, err := dev.Accept()
+		if err != nil {
+			log.Printf("can't accept: %s", err)
+			return
 		}
-	}()
-	return &Device{HCI: dev, Server: s}, nil
+
+		// Initialize the per-connection cccd values.
+		l2c.SetContext(context.WithValue(l2c.Context(), "ccc", make(map[uint16]uint16)))
+		l2c.SetRxMTU(mtu)
+
+		s.Lock()
+		as, err := att.NewServer(s.DB(), l2c)
+		s.Unlock()
+		if err != nil {
+			log.Printf("can't create ATT server: %s", err)
+			continue
+
+		}
+		go as.Loop()
+	}
 }
 
 // Device ...
