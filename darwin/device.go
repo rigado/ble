@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	evtStateChanged               = 6
+	evtStateChanged               = 4
+	evtStateChangedPreHighSierra  = 6
 	evtAdvertisingStarted         = 16
 	evtAdvertisingStopped         = 17
 	evtServiceAdded               = 18
@@ -370,6 +371,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	switch m.id() {
 	case // Device event
 		evtStateChanged,
+		evtStateChangedPreHighSierra,
 		evtAdvertisingStarted,
 		evtAdvertisingStopped,
 		evtServiceAdded:
