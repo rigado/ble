@@ -38,6 +38,10 @@ type Device struct {
 
 // NewDevice returns a BLE device.
 func NewDevice(opts ...Option) (*Device, error) {
+	initXpcIDs()
+	var utsname xpc.Utsname
+	xpc.Uname(&utsname)
+
 	d := &Device{
 		rspc:   make(chan msg),
 		conns:  make(map[string]*conn),
@@ -48,10 +52,6 @@ func NewDevice(opts ...Option) (*Device, error) {
 	if err := d.Option(opts...); err != nil {
 		return nil, err
 	}
-
-	initXpcIDs()
-	var utsname xpc.Utsname
-	xpc.Uname(&utsname)
 
 	if utsname.Release < "17." {
 		// yosemite

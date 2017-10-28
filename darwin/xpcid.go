@@ -62,7 +62,7 @@ func initXpcIDs() {
 	var utsname xpc.Utsname
 	xpc.Uname(&utsname)
 
-	xpcID := make(map[int]int)
+	xpcID = make(map[int]int)
 
 	xpcID[cmdInit] = 1
 	xpcID[cmdAdvertiseStart] = 8
