@@ -437,7 +437,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		// characteristic is subscribed by remote central.
 		d.conn(args).subscribed(d.chars[args.attributeID()])
 
-	case xpcID[evtUnubscribe]:
+	case xpcID[evtUnsubscribe]:
 		// characteristic is unsubscribed by remote central.
 		d.conn(args).unsubscribed(d.chars[args.attributeID()])
 
