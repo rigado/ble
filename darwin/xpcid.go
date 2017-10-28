@@ -146,6 +146,19 @@ func initXpcIDs() {
 		xpcID[evtDescriptorRead] = 90
 		xpcID[evtDescriptorWritten] = 91
 
+		// TODO: find out the correct values for the following items.
+		// They have all just been copied from Yosemite values
+		xpcID[evtAdvertisingStarted] = 16
+		xpcID[evtAdvertisingStopped] = 17
+		xpcID[evtServiceAdded] = 18
+		xpcID[evtReadRequest] = 19
+		xpcID[evtWriteRequest] = 20
+		xpcID[evtSubscribe] = 21
+		xpcID[evtUnsubscribe] = 22
+		xpcID[evtConfirmation] = 23
+		xpcID[evtATTMTU] = 53
+		xpcID[evtSlaveConnectionComplete] = 81
+		xpcID[evtMasterConnectionComplete] = 82
 		xpcID[evtIncludedServicesDiscovered] = 87
 	}
 }
