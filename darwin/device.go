@@ -50,7 +50,10 @@ func NewDevice(opts ...Option) (*Device, error) {
 	}
 
 	initXpcIDs()
-	if darwinOSVersion < 17 {
+	var utsname xpc.Utsname
+	xpc.Uname(&utsname)
+
+	if utsname.Release < "17." {
 		// yosemite
 		d.pm = xpc.XpcConnect("com.apple.blued", d)
 		d.cm = xpc.XpcConnect("com.apple.blued", d)

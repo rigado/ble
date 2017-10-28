@@ -1,24 +1,8 @@
 package darwin
 
 import (
-	"fmt"
-	"os/exec"
-	"strconv"
-	"strings"
+	"github.com/raff/goble/xpc"
 )
-
-var darwinOSVersion int
-
-func getDarwinReleaseVersion() int {
-	v, err := exec.Command("uname", "-r").Output()
-	if err != nil {
-		fmt.Println(err)
-		return 0
-	}
-
-	result, _ := strconv.Atoi(strings.Split(string(v), ".")[0])
-	return result
-}
 
 // xpc command IDs are OS X version specific, so we will use a map
 // to be able to handle arbitrary versions
@@ -75,7 +59,8 @@ const (
 var xpcID map[int]int
 
 func initXpcIDs() {
-	darwinOSVersion = getDarwinReleaseVersion()
+	var utsname xpc.Utsname
+	xpc.Uname(&utsname)
 
 	xpcID := make(map[int]int)
 
@@ -85,7 +70,7 @@ func initXpcIDs() {
 	xpcID[cmdServicesAdd] = 10
 	xpcID[cmdServicesRemove] = 12
 
-	if darwinOSVersion < 17 {
+	if utsname.Release < "17." {
 		// yosemite
 		xpcID[cmdSendData] = 13
 		xpcID[cmdSubscribed] = 15
@@ -147,6 +132,7 @@ func initXpcIDs() {
 		xpcID[cmdReadDescriptor] = 88
 		xpcID[cmdWriteDescriptor] = 89
 
+		xpcID[evtStateChanged] = 4
 		xpcID[evtPeripheralDiscovered] = 48
 		xpcID[evtPeripheralConnected] = 49
 		xpcID[evtPeripheralDisconnected] = 50
