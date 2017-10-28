@@ -15,35 +15,6 @@ import (
 	"sync"
 )
 
-const (
-	evtStateChanged               = 4
-	evtStateChangedPreHighSierra  = 6
-	evtAdvertisingStarted         = 16
-	evtAdvertisingStopped         = 17
-	evtServiceAdded               = 18
-	evtReadRequest                = 19
-	evtWriteRequest               = 20
-	evtSubscribe                  = 21
-	evtUnubscribe                 = 22
-	evtConfirmation               = 23
-	evtPeripheralDiscovered       = 37
-	evtPeripheralConnected        = 38
-	evtPeripheralDisconnected     = 40
-	evtATTMTU                     = 53
-	evtRSSIRead                   = 55
-	evtServiceDiscovered          = 56
-	evtIncludedServicesDiscovered = 63
-	evtCharacteristicsDiscovered  = 64
-	evtCharacteristicRead         = 71
-	evtCharacteristicWritten      = 72
-	evtNotificationValueSet       = 74
-	evtDescriptorsDiscovered      = 76
-	evtDescriptorRead             = 79
-	evtDescriptorWritten          = 80
-	evtSleveConnectionComplete    = 81
-	evtMasterConnectionComplete   = 82
-)
-
 // Device is either a Peripheral or Central device.
 type Device struct {
 	pm xpc.XPC // peripheralManager
@@ -67,6 +38,10 @@ type Device struct {
 
 // NewDevice returns a BLE device.
 func NewDevice(opts ...Option) (*Device, error) {
+	initXpcIDs()
+	var utsname xpc.Utsname
+	xpc.Uname(&utsname)
+
 	d := &Device{
 		rspc:   make(chan msg),
 		conns:  make(map[string]*conn),
@@ -78,8 +53,15 @@ func NewDevice(opts ...Option) (*Device, error) {
 		return nil, err
 	}
 
-	d.pm = xpc.XpcConnect("com.apple.blued", d)
-	d.cm = xpc.XpcConnect("com.apple.blued", d)
+	if utsname.Release < "17." {
+		// yosemite
+		d.pm = xpc.XpcConnect("com.apple.blued", d)
+		d.cm = xpc.XpcConnect("com.apple.blued", d)
+	} else {
+		// high sierra
+		d.pm = xpc.XpcConnect("com.apple.bluetoothd", d)
+		d.cm = xpc.XpcConnect("com.apple.bluetoothd", d)
+	}
 
 	return d, errors.Wrap(d.Init(), "can't init")
 }
@@ -95,7 +77,7 @@ func (d *Device) Option(opts ...Option) error {
 
 // Init ...
 func (d *Device) Init() error {
-	rsp := d.sendReq(d.cm, 1, xpc.Dict{
+	rsp := d.sendReq(d.cm, xpcID[cmdInit], xpc.Dict{
 		"kCBMsgArgName": fmt.Sprintf("gopher-%v", time.Now().Unix()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBInitOptionShowPowerAlert": 1,
@@ -107,7 +89,7 @@ func (d *Device) Init() error {
 		return fmt.Errorf("state: %s", s)
 	}
 
-	rsp = d.sendReq(d.pm, 1, xpc.Dict{
+	rsp = d.sendReq(d.pm, xpcID[cmdInit], xpc.Dict{
 		"kCBMsgArgName": fmt.Sprintf("gopher-%v", time.Now().Unix()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBInitOptionShowPowerAlert": 1,
@@ -123,7 +105,7 @@ func (d *Device) Init() error {
 
 // Advertise advertises the given Advertisement
 func (d *Device) Advertise(ctx context.Context, adv ble.Advertisement) error {
-	if err := d.sendReq(d.pm, 8, xpc.Dict{
+	if err := d.sendReq(d.pm, xpcID[cmdAdvertiseStart], xpc.Dict{
 		"kCBAdvDataLocalName":    adv.LocalName(),
 		"kCBAdvDataServiceUUIDs": adv.Services(),
 		"kCBAdvDataAppleMfgData": adv.ManufacturerData(),
@@ -140,7 +122,7 @@ func (d *Device) Advertise(ctx context.Context, adv ble.Advertisement) error {
 func (d *Device) AdvertiseMfgData(ctx context.Context, id uint16, md []byte) error {
 	l := len(md)
 	b := []byte{byte(l + 3), 0xFF, uint8(id), uint8(id >> 8)}
-	if err := d.sendReq(d.pm, 8, xpc.Dict{
+	if err := d.sendReq(d.pm, xpcID[cmdAdvertiseStart], xpc.Dict{
 		"kCBAdvDataAppleMfgData": append(b, md...),
 	}).err(); err != nil {
 		return errors.Wrap(err, "can't advertise")
@@ -156,7 +138,7 @@ func (d *Device) AdvertiseServiceData16(ctx context.Context, id uint16, b []byte
 		0x03, 0x03, uint8(id), uint8(id >> 8),
 		byte(l + 3), 0x16, uint8(id), uint8(id >> 8),
 	}
-	if err := d.sendReq(d.pm, 8, xpc.Dict{
+	if err := d.sendReq(d.pm, xpcID[cmdAdvertiseStart], xpc.Dict{
 		"kCBAdvDataAppleMfgData": append(prefix, b...),
 	}).err(); err != nil {
 		return errors.Wrap(err, "can't advertise")
@@ -167,7 +149,7 @@ func (d *Device) AdvertiseServiceData16(ctx context.Context, id uint16, b []byte
 
 // AdvertiseNameAndServices advertises name and specifid service UUIDs.
 func (d *Device) AdvertiseNameAndServices(ctx context.Context, name string, ss ...ble.UUID) error {
-	if err := d.sendReq(d.pm, 8, xpc.Dict{
+	if err := d.sendReq(d.pm, xpcID[cmdAdvertiseStart], xpc.Dict{
 		"kCBAdvDataLocalName":    name,
 		"kCBAdvDataServiceUUIDs": uuidSlice(ss)},
 	).err(); err != nil {
@@ -187,7 +169,7 @@ func (d *Device) AdvertiseIBeaconData(ctx context.Context, md []byte) error {
 		ibeaconCode := []byte{0x02, 0x15}
 		return d.AdvertiseMfgData(ctx, 0x004C, append(ibeaconCode, md...))
 	}
-	if err := d.sendReq(d.pm, 8, xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err(); err != nil {
+	if err := d.sendReq(d.pm, xpcID[cmdAdvertiseStart], xpc.Dict{"kCBAdvDataAppleBeaconKey": md}).err(); err != nil {
 		return err
 	}
 	<-ctx.Done()
@@ -206,13 +188,13 @@ func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor 
 
 // stopAdvertising stops advertising.
 func (d *Device) stopAdvertising() error {
-	return errors.Wrap(d.sendReq(d.pm, 9, nil).err(), "can't stop advertising")
+	return errors.Wrap(d.sendReq(d.pm, xpcID[cmdAdvertiseStop], nil).err(), "can't stop advertising")
 }
 
 // Scan ...
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
 	d.advHandler = h
-	if err := d.sendCmd(d.cm, 29, xpc.Dict{
+	if err := d.sendCmd(d.cm, xpcID[cmdScanningStart], xpc.Dict{
 		// "kCBMsgArgUUIDs": uuidSlice(ss),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBScanOptionAllowDuplicates": map[bool]int{true: 1, false: 0}[allowDup],
@@ -229,12 +211,12 @@ func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) erro
 
 // stopAdvertising stops advertising.
 func (d *Device) stopScanning() error {
-	return errors.Wrap(d.sendCmd(d.cm, 30, nil), "can't stop scanning")
+	return errors.Wrap(d.sendCmd(d.cm, xpcID[cmdScanningStop], nil), "can't stop scanning")
 }
 
 // RemoveAllServices removes all services of device's
 func (d *Device) RemoveAllServices() error {
-	return d.sendCmd(d.pm, 12, nil)
+	return d.sendCmd(d.pm, xpcID[cmdServicesRemove], nil)
 }
 
 // AddService adds a service to device's database.
@@ -335,7 +317,7 @@ func (d *Device) AddService(s *ble.Service) error {
 	}
 	xs["kCBMsgArgCharacteristics"] = xcs
 
-	return d.sendReq(d.pm, 10, xs).err()
+	return d.sendReq(d.pm, xpcID[cmdServicesAdd], xs).err()
 }
 
 // SetServices ...
@@ -353,7 +335,7 @@ func (d *Device) SetServices(ss []*ble.Service) error {
 
 // Dial ...
 func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
-	d.sendCmd(d.cm, 31, xpc.Dict{
+	d.sendCmd(d.cm, xpcID[cmdConnect], xpc.Dict{
 		"kCBMsgArgDeviceUUID": xpc.MakeUUID(a.String()),
 		"kCBMsgArgOptions": xpc.Dict{
 			"kCBConnectOptionNotifyOnDisconnection": 1,
@@ -385,30 +367,29 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 
 	switch m.id() {
 	case // Device event
-		evtStateChanged,
-		evtStateChangedPreHighSierra,
-		evtAdvertisingStarted,
-		evtAdvertisingStopped,
-		evtServiceAdded:
+		xpcID[evtStateChanged],
+		xpcID[evtAdvertisingStarted],
+		xpcID[evtAdvertisingStopped],
+		xpcID[evtServiceAdded]:
 		d.rspc <- args
 
-	case evtPeripheralDiscovered:
+	case xpcID[evtPeripheralDiscovered]:
 		if d.advHandler == nil {
 			break
 		}
 		a := &adv{args: m.args(), ad: args.advertisementData()}
 		go d.advHandler(a)
 
-	case evtConfirmation:
+	case xpcID[evtConfirmation]:
 		// log.Printf("confirmed: %d", args.attributeID())
 
-	case evtATTMTU:
+	case xpcID[evtATTMTU]:
 		d.conn(args).SetTxMTU(args.attMTU())
 
-	case evtSleveConnectionComplete:
+	case xpcID[evtSlaveConnectionComplete]:
 		// remote peripheral is connected.
 		fallthrough
-	case evtMasterConnectionComplete:
+	case xpcID[evtMasterConnectionComplete]:
 		// remote central is connected.
 
 		// Could be LEConnectionComplete or LEConnectionUpdateComplete.
@@ -417,7 +398,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		c.connLatency = args.connectionLatency()
 		c.supervisionTimeout = args.supervisionTimeout()
 
-	case evtReadRequest:
+	case xpcID[evtReadRequest]:
 		aid := args.attributeID()
 		char := d.chars[aid]
 		v := char.Value
@@ -430,14 +411,14 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			v = buf.Bytes()
 		}
 
-		d.sendCmd(d.pm, 13, xpc.Dict{
+		d.sendCmd(d.pm, xpcID[cmdSendData], xpc.Dict{
 			"kCBMsgArgAttributeID":   aid,
 			"kCBMsgArgData":          v,
 			"kCBMsgArgTransactionID": args.transactionID(),
 			"kCBMsgArgResult":        0,
 		})
 
-	case evtWriteRequest:
+	case xpcID[evtWriteRequest]:
 		for _, xxw := range args.attWrites() {
 			xw := msg(xxw.(xpc.Dict))
 			aid := xw.attributeID()
@@ -447,7 +428,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			if xw.ignoreResponse() == 1 {
 				continue
 			}
-			d.sendCmd(d.pm, 13, xpc.Dict{
+			d.sendCmd(d.pm, xpcID[cmdSendData], xpc.Dict{
 				"kCBMsgArgAttributeID":   aid,
 				"kCBMsgArgData":          nil,
 				"kCBMsgArgTransactionID": args.transactionID(),
@@ -455,18 +436,18 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			})
 		}
 
-	case evtSubscribe:
+	case xpcID[evtSubscribe]:
 		// characteristic is subscribed by remote central.
 		d.conn(args).subscribed(d.chars[args.attributeID()])
 
-	case evtUnubscribe:
+	case xpcID[evtUnsubscribe]:
 		// characteristic is unsubscribed by remote central.
 		d.conn(args).unsubscribed(d.chars[args.attributeID()])
 
-	case evtPeripheralConnected:
+	case xpcID[evtPeripheralConnected]:
 		d.chConn <- d.conn(args)
 
-	case evtPeripheralDisconnected:
+	case xpcID[evtPeripheralDisconnected]:
 		c := d.conn(args)
 		select {
 		case c.rspc <- m:
@@ -479,7 +460,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		d.connLock.Unlock()
 		close(c.done)
 
-	case evtCharacteristicRead:
+	case xpcID[evtCharacteristicRead]:
 		// Notification
 		c := d.conn(args)
 		if args.isNotification() != 0 {
@@ -495,15 +476,15 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 		c.rspc <- m
 
 	case // Peripheral events
-		evtRSSIRead,
-		evtServiceDiscovered,
-		evtIncludedServicesDiscovered,
-		evtCharacteristicsDiscovered,
-		evtCharacteristicWritten,
-		evtNotificationValueSet,
-		evtDescriptorsDiscovered,
-		evtDescriptorRead,
-		evtDescriptorWritten:
+		xpcID[evtRSSIRead],
+		xpcID[evtServiceDiscovered],
+		xpcID[evtIncludedServicesDiscovered],
+		xpcID[evtCharacteristicsDiscovered],
+		xpcID[evtCharacteristicWritten],
+		xpcID[evtNotificationValueSet],
+		xpcID[evtDescriptorsDiscovered],
+		xpcID[evtDescriptorRead],
+		xpcID[evtDescriptorWritten]:
 
 		d.conn(args).rspc <- m
 
