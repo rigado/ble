@@ -102,7 +102,7 @@ func (c *conn) subscribed(char *ble.Characteristic) {
 		return
 	}
 	send := func(b []byte) (int, error) {
-		c.dev.sendCmd(c.dev.pm, 15, xpc.Dict{
+		c.dev.sendCmd(c.dev.pm, xpcID[cmdSubscribed], xpc.Dict{
 			"kCBMsgArgUUIDs":       [][]byte{},
 			"kCBMsgArgAttributeID": h,
 			"kCBMsgArgData":        b,
