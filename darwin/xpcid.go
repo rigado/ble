@@ -113,7 +113,7 @@ func initXpcIDs() {
 		xpcID[evtDescriptorRead] = 79
 		xpcID[evtDescriptorWritten] = 80
 		xpcID[evtSlaveConnectionComplete] = 81
-		xpcID[evtMasterConnectionComplete] = 21
+		xpcID[evtMasterConnectionComplete] = 82
 	} else {
 		// high sierra
 		xpcID[cmdSendData] = 13 // TODO: find out the correct value for this
