@@ -16,13 +16,15 @@ const (
 var darwinOSVersion int
 
 func getDarwinReleaseVersion() int {
-	version, err := exec.Command("uname", "-r").Output()
+	v, err := exec.Command("uname", "-r").Output()
 	if err != nil {
 		fmt.Println(err)
 		return 0
 	}
-	v, _ := strconv.Atoi(strings.Split(version, ".")[0])
-	return v
+	var version string
+	version = v
+	result, _ := strconv.Atoi(strings.Split(version, ".")[0])
+	return result
 }
 
 // xpc command IDs are OS X version specific, so we will use a map
