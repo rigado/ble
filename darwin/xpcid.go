@@ -7,12 +7,6 @@ import (
 	"strings"
 )
 
-const (
-	evtDescriptorWritten        = 80
-	evtSlaveConnectionComplete  = 81
-	evtMasterConnectionComplete = 82
-)
-
 var darwinOSVersion int
 
 func getDarwinReleaseVersion() int {
@@ -21,9 +15,8 @@ func getDarwinReleaseVersion() int {
 		fmt.Println(err)
 		return 0
 	}
-	var version string
-	version = v
-	result, _ := strconv.Atoi(strings.Split(version, ".")[0])
+
+	result, _ := strconv.Atoi(strings.Split(string(v), ".")[0])
 	return result
 }
 
@@ -111,7 +104,7 @@ func initXpcIDs() {
 		xpcID[cmdReadDescriptor] = 77
 		xpcID[cmdWriteDescriptor] = 78
 
-		xpcID[evtStateChanged] = 4
+		xpcID[evtStateChanged] = 6
 		xpcID[evtAdvertisingStarted] = 16
 		xpcID[evtAdvertisingStopped] = 17
 		xpcID[evtServiceAdded] = 18
