@@ -548,13 +548,13 @@ func (c *Client) Loop() {
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.
-			logger.Error("client", "req", "can't enqueue incoming notification.")
+			_ = logger.Error("client", "req", "can't enqueue incoming notification.")
 		}
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
 			logger.Debug("client", "req", fmt.Sprintf("% X", b))
-			c.l2c.Write(confirmation)
+			_, _ = c.l2c.Write(confirmation)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package darwin
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/go-ble/ble"
@@ -27,7 +28,6 @@ type conn struct {
 	sync.RWMutex
 
 	dev   *Device
-	role  int
 	ctx   context.Context
 	rxMTU int
 	txMTU int
@@ -102,12 +102,12 @@ func (c *conn) subscribed(char *ble.Characteristic) {
 		return
 	}
 	send := func(b []byte) (int, error) {
-		c.dev.sendCmd(c.dev.pm, xpcID[cmdSubscribed], xpc.Dict{
+		err := c.dev.sendCmd(c.dev.pm, cmdSubscribed, xpc.Dict{
 			"kCBMsgArgUUIDs":       [][]byte{},
 			"kCBMsgArgAttributeID": h,
 			"kCBMsgArgData":        b,
 		})
-		return len(b), nil
+		return len(b), err
 	}
 	n := ble.NewNotifier(send)
 	c.notifiers[h] = n
@@ -118,17 +118,22 @@ func (c *conn) subscribed(char *ble.Characteristic) {
 // server (peripheral)
 func (c *conn) unsubscribed(char *ble.Characteristic) {
 	if n, found := c.notifiers[char.Handle]; found {
-		n.Close()
+		if err := n.Close(); err != nil {
+			log.Printf("failed to clone notifier: %v", err)
+		}
 		delete(c.notifiers, char.Handle)
 	}
 }
 
-func (c *conn) sendReq(id int, args xpc.Dict) msg {
-	c.dev.sendCmd(c.dev.cm, id, args)
+func (c *conn) sendReq(id int, args xpc.Dict) (msg, error) {
+	err := c.dev.sendCmd(c.dev.cm, id, args)
+	if err != nil {
+		return msg{}, err
+	}
 	m := <-c.rspc
-	return msg(m.args())
+	return msg(m.args()), nil
 }
 
-func (c *conn) sendCmd(id int, args xpc.Dict) {
-	c.dev.sendCmd(c.dev.pm, id, args)
+func (c *conn) sendCmd(id int, args xpc.Dict) error {
+	return c.dev.sendCmd(c.dev.pm, id, args)
 }

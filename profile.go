@@ -38,27 +38,46 @@ type Profile struct {
 // Find searches discovered profile for the specified target's type and UUID.
 // The target must has the type of *Service, *Characteristic, or *Descriptor.
 func (p *Profile) Find(target interface{}) interface{} {
-	switch target.(type) {
+	switch t := target.(type) {
 	case *Service:
+		return p.FindService(t)
 	case *Characteristic:
+		return p.FindCharacteristic(t)
 	case *Descriptor:
+		return p.FindDescriptor(t)
 	default:
 		return nil
 	}
+}
+
+// FindService searches discoverd profile for the specified service and UUID
+func (p *Profile) FindService(service *Service) *Service {
 	for _, s := range p.Services {
-		ts, ok := target.(*Service)
-		if ok && s.UUID.Equal(ts.UUID) {
-			target = s
+		if s.UUID.Equal(service.UUID) {
 			return s
 		}
+	}
+	return nil
+}
+
+// FindCharacteristic searches discoverd profile for the specified characteristic and UUID
+func (p *Profile) FindCharacteristic(char *Characteristic) *Characteristic {
+	for _, s := range p.Services {
 		for _, c := range s.Characteristics {
-			tc, ok := target.(*Characteristic)
-			if ok && c.UUID.Equal(tc.UUID) {
+			if c.UUID.Equal(char.UUID) {
 				return c
 			}
+		}
+	}
+	return nil
+}
+
+// FindDescriptor searches discoverd profile for the specified descriptor and UUID
+func (p *Profile) FindDescriptor(desc *Descriptor) *Descriptor {
+	for _, s := range p.Services {
+		for _, c := range s.Characteristics {
 			for _, d := range c.Descriptors {
-				td, ok := target.(*Descriptor)
-				if ok && d.UUID.Equal(td.UUID) {
+				if d.UUID.Equal(desc.UUID) {
 					return d
 				}
 			}

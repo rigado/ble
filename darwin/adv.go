@@ -69,5 +69,5 @@ func (a *adv) RSSI() int {
 }
 
 func (a *adv) Addr() ble.Addr {
-	return xpc.UUID(a.args.MustGetUUID("kCBMsgArgDeviceUUID"))
+	return a.args.MustGetUUID("kCBMsgArgDeviceUUID")
 }
