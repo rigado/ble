@@ -35,7 +35,7 @@ func (m msg) deviceUUID() xpc.UUID       { return xpc.Dict(m).MustGetUUID("kCBMs
 func (m msg) ignoreResponse() int        { return xpc.Dict(m).MustGetInt("kCBMsgArgIgnoreResponse") }
 func (m msg) offset() int                { return xpc.Dict(m).MustGetInt("kCBMsgArgOffset") }
 func (m msg) isNotification() int        { return xpc.Dict(m).GetInt("kCBMsgArgIsNotification", 0) }
-func (m msg) result() int                { return xpc.Dict(m).MustGetInt("kCBMsgArgResult") }
+func (m msg) result() int                { return xpc.Dict(m).GetInt("kCBMsgArgResult", 0) }
 func (m msg) state() int                 { return xpc.Dict(m).MustGetInt("kCBMsgArgState") }
 func (m msg) rssi() int                  { return xpc.Dict(m).MustGetInt("kCBMsgArgData") }
 func (m msg) transactionID() int         { return xpc.Dict(m).MustGetInt("kCBMsgArgTransactionID") }
