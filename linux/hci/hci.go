@@ -478,7 +478,8 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		return fmt.Errorf("disconnecting an invalid handle %04X", e.ConnectionHandle())
 	}
 	close(c.chInPkt)
-	if c.param.Role() == roleSlave {
+
+	if c.param.Role() == roleMaster {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
