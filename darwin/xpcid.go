@@ -65,13 +65,14 @@ func initXpcIDs() error {
 	}
 
 	cmdInit = 1
-	cmdAdvertiseStart = 8
-	cmdAdvertiseStop = 9
-	cmdServicesAdd = 10
-	cmdServicesRemove = 12
 
 	if utsname.Release < "17." {
 		// yosemite
+		cmdAdvertiseStart = 8
+		cmdAdvertiseStop = 9
+		cmdServicesAdd = 10
+		cmdServicesRemove = 12
+
 		cmdSendData = 13
 		cmdSubscribed = 15
 		cmdScanningStart = 29
@@ -118,7 +119,12 @@ func initXpcIDs() error {
 		serviceID = "com.apple.blued"
 	} else {
 		// high sierra
-		cmdSendData = 13 // TODO: find out the correct value for this
+		cmdSendData = 21
+		cmdSubscribed = 22
+		cmdAdvertiseStart = 16
+		cmdAdvertiseStop = 17
+		cmdServicesAdd = 18
+		cmdServicesRemove = 19
 		cmdScanningStart = 44
 		cmdScanningStop = 45
 		cmdConnect = 46
@@ -147,21 +153,18 @@ func initXpcIDs() error {
 		evtDescriptorsDiscovered = 87
 		evtDescriptorRead = 90
 		evtDescriptorWritten = 91
-
-		// TODO: find out the correct values for the following items.
-		// They have all just been copied from Yosemite values
-		evtAdvertisingStarted = 16
-		evtAdvertisingStopped = 17
-		evtServiceAdded = 18
-		evtReadRequest = 19
-		evtWriteRequest = 20
-		evtSubscribe = 21
-		evtUnsubscribe = 22
-		evtConfirmation = 23
-		evtATTMTU = 53
-		evtSlaveConnectionComplete = 81
-		evtMasterConnectionComplete = 82
-		evtIncludedServicesDiscovered = 87
+		evtAdvertisingStarted = 27
+		evtAdvertisingStopped = 28
+		evtServiceAdded = 29
+		evtReadRequest = 30
+		evtWriteRequest = 31
+		evtSubscribe = 32
+		evtUnsubscribe = 33
+		evtConfirmation = 34
+		evtATTMTU = 57
+		evtSlaveConnectionComplete = 60 // should be called params update
+		evtMasterConnectionComplete = 59 //not confident
+		evtIncludedServicesDiscovered = 76
 
 		serviceID = "com.apple.bluetoothd"
 	}

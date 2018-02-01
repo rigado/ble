@@ -507,17 +507,15 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	case evtCharacteristicRead:
 		// Notification
 		c := d.conn(args)
-		if args.isNotification() != 0 {
-			sub := c.subs[uint16(args.characteristicHandle())]
-			if sub == nil {
-				log.Printf("notified by unsubscribed handle")
-				// FIXME: should terminate the connection?
-			} else {
-				sub.fn(args.data())
-			}
-			break
+
+		sub := c.subs[uint16(args.characteristicHandle())]
+		if sub == nil {
+			log.Printf("notified by unsubscribed handle")
+			// FIXME: should terminate the connection?
+		} else {
+			sub.fn(args.data())
 		}
-		c.rspc <- m
+		break
 
 	case // Peripheral events
 		evtRSSIRead,
