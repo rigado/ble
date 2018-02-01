@@ -2,6 +2,7 @@ package linux
 
 import (
 	"context"
+	"io"
 	"log"
 
 	"github.com/go-ble/ble"
@@ -50,7 +51,11 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 	for {
 		l2c, err := dev.Accept()
 		if err != nil {
-			log.Printf("can't accept: %s", err)
+			// An EOF error indicates that the HCI socket was closed during
+			// the read.  Don't report this as an error.
+			if err != io.EOF {
+				log.Printf("can't accept: %s", err)
+			}
 			return
 		}
 
