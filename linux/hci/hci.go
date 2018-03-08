@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,7 +40,7 @@ func NewHCI(opts ...Option) (*HCI, error) {
 		id: -1,
 
 		chCmdPkt:  make(chan *pkt),
-		chCmdBufs: make(chan []byte, 8),
+		chCmdBufs: make(chan []byte, 16),
 		sent:      make(map[int]*pkt),
 
 		evth: map[int]handlerFn{},
@@ -274,8 +275,14 @@ func (h *HCI) sktLoop() {
 		p := make([]byte, n)
 		copy(p, b)
 		if err := h.handlePkt(p); err != nil {
-			h.err = fmt.Errorf("skt: %s", err)
-			return
+			// Some bluetooth devices may append vendor specific packets at the last,
+			// in this case, simply ignore them.
+			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
+				logger.Error("skt: %v", err)
+			} else {
+				h.err = fmt.Errorf("skt: %v", err)
+				return
+			}
 		}
 	}
 }
@@ -402,7 +409,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 
 	// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
 	if e.CommandOpcode() == 0x0000 {
-		h.chCmdBufs = make(chan []byte, 8)
+		h.chCmdBufs = make(chan []byte, 16)
 		return nil
 	}
 	p, found := h.sent[int(e.CommandOpcode())]
