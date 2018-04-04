@@ -490,7 +490,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	}
 	close(c.chInPkt)
 
-	if c.param.Role() == roleMaster {
+	if c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
