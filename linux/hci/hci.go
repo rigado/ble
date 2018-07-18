@@ -42,6 +42,7 @@ func NewHCI(opts ...Option) (*HCI, error) {
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, 16),
 		sent:      make(map[int]*pkt),
+		muSent:    &sync.Mutex{},
 
 		evth: map[int]handlerFn{},
 		subh: map[int]handlerFn{},
@@ -73,6 +74,7 @@ type HCI struct {
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chCmdPkt  chan *pkt
 	chCmdBufs chan []byte
+	muSent    *sync.Mutex
 	sent      map[int]*pkt
 
 	// evtHub
@@ -248,7 +250,9 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		h.close(fmt.Errorf("hci: failed to marshal cmd"))
 	}
 
-	h.sent[c.OpCode()] = p // TODO: lock
+	h.muSent.Lock()
+	h.sent[c.OpCode()] = p
+	h.muSent.Unlock()
 	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
@@ -412,7 +416,9 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 		h.chCmdBufs = make(chan []byte, 16)
 		return nil
 	}
+	h.muSent.Lock()
 	p, found := h.sent[int(e.CommandOpcode())]
+	h.muSent.Unlock()
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandCompleteEP: % X", e)
 	}
@@ -426,7 +432,9 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 		h.chCmdBufs <- make([]byte, 64)
 	}
 
+	h.muSent.Lock()
 	p, found := h.sent[int(e.CommandOpcode())]
+	h.muSent.Unlock()
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
