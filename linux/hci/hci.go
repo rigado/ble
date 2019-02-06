@@ -542,12 +542,14 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 func (h *HCI) setAllowedCommands(n int) {
 
 	//hard-coded limit to command queue depth
+	//matches make(chan []byte, 16) in NewHCI
+	// TODO make this a constant, decide correct size
 	if n > 16 {
 		n = 16
 	}
 
 	for len(h.chCmdBufs) < n {
-		h.chCmdBufs <- make([]byte, 64)
+		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
 	}
 }
 
