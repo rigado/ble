@@ -144,7 +144,7 @@ func (h *HCI) Init() error {
 	}
 	h.skt = skt
 
-	h.chCmdBufs <- make([]byte, 64)
+	h.setAllowedCommands(1)
 
 	go h.sktLoop()
 	if err := h.init(); err != nil {
@@ -407,13 +407,11 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 
 func (h *HCI) handleCommandComplete(b []byte) error {
 	e := evt.CommandComplete(b)
-	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
-		h.chCmdBufs <- make([]byte, 64)
-	}
+	h.setAllowedCommands(int(e.NumHCICommandPackets()))
 
 	// NOP command, used for flow control purpose [Vol 2, Part E, 4.4]
+	// no handling other than setAllowedCommands needed
 	if e.CommandOpcode() == 0x0000 {
-		h.chCmdBufs = make(chan []byte, 16)
 		return nil
 	}
 	h.muSent.Lock()
@@ -428,9 +426,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 
 func (h *HCI) handleCommandStatus(b []byte) error {
 	e := evt.CommandStatus(b)
-	for i := 0; i < int(e.NumHCICommandPackets()); i++ {
-		h.chCmdBufs <- make([]byte, 64)
-	}
+	h.setAllowedCommands(int(e.NumHCICommandPackets()))
 
 	h.muSent.Lock()
 	p, found := h.sent[int(e.CommandOpcode())]
@@ -542,3 +538,18 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
 }
+
+func (h *HCI) setAllowedCommands(n int) {
+
+	//hard-coded limit to command queue depth
+	//matches make(chan []byte, 16) in NewHCI
+	// TODO make this a constant, decide correct size
+	if n > 16 {
+		n = 16
+	}
+
+	for len(h.chCmdBufs) < n {
+		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
+	}
+}
+
