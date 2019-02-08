@@ -38,3 +38,13 @@ func (d *Device) SetListenerTimeout(dur time.Duration) error {
 func (d *Device) SetConnParams(param cmd.LECreateConnection) error {
 	return errors.New("Not supported")
 }
+
+// SetScanParams overrides default scanning parameters.
+func (d *Device) SetScanParams(param cmd.LESetScanParameters) error {
+	return errors.New("Not supported")
+}
+
+// SetAdvParams overrides default advertising parameters.
+func (d *Device) SetAdvParams(param cmd.LESetAdvertisingParameters) error {
+	return errors.New("Not supported")
+}
