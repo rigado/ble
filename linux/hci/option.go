@@ -31,6 +31,18 @@ func (h *HCI) SetConnParams(param cmd.LECreateConnection) error {
 	return nil
 }
 
+// SetScanParams overrides default scanning parameters.
+func (h *HCI) SetScanParams(param cmd.LESetScanParameters) error {
+	h.params.scanParams = param
+	return nil
+}
+
+// SetAdvParams overrides default advertising parameters.
+func (h *HCI) SetAdvParams(param cmd.LESetAdvertisingParameters) error {
+	h.params.advParams = param
+	return nil
+}
+
 // SetPeripheralRole is not supported
 func (h *HCI) SetPeripheralRole() error {
 	return errors.New("Not supported")

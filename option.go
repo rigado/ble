@@ -12,6 +12,8 @@ type DeviceOption interface {
 	SetDialerTimeout(time.Duration) error
 	SetListenerTimeout(time.Duration) error
 	SetConnParams(cmd.LECreateConnection) error
+	SetScanParams(cmd.LESetScanParameters) error
+	SetAdvParams(cmd.LESetAdvertisingParameters) error
 	SetPeripheralRole() error
 	SetCentralRole() error
 }
@@ -47,6 +49,22 @@ func OptListenerTimeout(d time.Duration) Option {
 func OptConnParams(param cmd.LECreateConnection) Option {
 	return func(opt DeviceOption) error {
 		opt.SetConnParams(param)
+		return nil
+	}
+}
+
+// OptScanParams overrides default scanning parameters.
+func OptScanParams(param cmd.LESetScanParameters) Option {
+	return func(opt DeviceOption) error {
+		opt.SetScanParams(param)
+		return nil
+	}
+}
+
+// OptAdvParams overrides default advertising parameters.
+func OptAdvParams(param cmd.LESetAdvertisingParameters) Option {
+	return func(opt DeviceOption) error {
+		opt.SetAdvParams(param)
 		return nil
 	}
 }
