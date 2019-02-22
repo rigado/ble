@@ -293,7 +293,10 @@ func (h *HCI) sktLoop() {
 
 func (h *HCI) close(err error) error {
 	h.err = err
-	return h.skt.Close()
+	if h.skt != nil {
+		return h.skt.Close()
+	}
+	return err
 }
 
 func (h *HCI) handlePkt(b []byte) error {
