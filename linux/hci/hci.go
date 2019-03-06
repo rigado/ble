@@ -514,7 +514,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recycled. [Vol2, Part E 4.1.1]
 	//
-	// must be done wwith the pool locked to avoid race conditions where
+	// must be done with the pool locked to avoid race conditions where
 	// writePDU is in progress and does a Get from the pool after this completes,
 	// leaking a buffer from the main pool.
 	c.txBuffer.LockPool()
