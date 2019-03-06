@@ -195,6 +195,15 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 	c.txBuffer.LockPool()
 	defer c.txBuffer.UnlockPool()
 
+	// Fail immediately if the connection is already closed
+	// Check this with the pool locked to avoid race conditions
+	// with handleDisconnectionComplete
+	select {
+	case <-c.chDone:
+		return 0, io.ErrClosedPipe
+	default:
+	}
+
 	for len(pdu) > 0 {
 		// Get a buffer from our pre-allocated and flow-controlled pool.
 		pkt := c.txBuffer.Get() // ACL pkt
