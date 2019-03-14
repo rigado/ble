@@ -259,10 +259,18 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		h.close(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
 	}
 
+	// emergency timeout to prevent calls from locking up if the HCI
+	// interface doesn't respond.  Responsed here should normally be fast
+	// a timeout indicates a major problem with HCI.
+	timeout := time.NewTimer(10 * time.Second)
 	select {
+	case <-timeout.C:
+		return nil, fmt.Errorf("hci: no response to command, hci connection failed")
 	case <-h.done:
+		timeout.Stop()
 		return nil, h.err
 	case b := <-p.done:
+		timeout.Stop()
 		return b, nil
 	}
 }
@@ -561,4 +569,3 @@ func (h *HCI) setAllowedCommands(n int) {
 		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
 	}
 }
-
