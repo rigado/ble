@@ -2,6 +2,7 @@ package hci
 
 import (
 	"net"
+	"strings"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/adv"
@@ -108,28 +109,72 @@ func (a *Advertisement) Addr() ble.Addr {
 }
 
 // EventType returns the event type of Advertisement.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) EventType() uint8 {
 	return a.e.EventType(a.i)
 }
 
 // AddressType returns the address type of the Advertisement.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) AddressType() uint8 {
 	return a.e.AddressType(a.i)
 }
 
 // Data returns the advertising data of the packet.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) Data() []byte {
 	return a.e.Data(a.i)
 }
 
 // ScanResponse returns the scan response of the packet, if it presents.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) ScanResponse() []byte {
 	if a.sr == nil {
 		return nil
 	}
 	return a.sr.Data()
+}
+
+func (a *Advertisement) ToMap() *ble.AdvertisementMap {
+	m := make(ble.AdvertisementMap)
+	keys := ble.AdvertisementMapKeys
+
+	addr := a.Addr().String()
+	if len(addr) == 0 {
+		//ignore
+		return nil
+	}
+
+	m[keys.MAC] = strings.Replace(addr, ":", "", -1)
+	m[keys.EventType] = a.EventType()
+	m[keys.Connectable] = a.Connectable()
+
+	//require rssi!
+	if v := a.RSSI(); v != 0 {
+		m[keys.RSSI] = v
+	} else {
+		m[keys.RSSI] = -128
+	}
+
+	if v := a.LocalName(); len(v) != 0 {
+		m[keys.Name] = v
+	}
+
+	if v := a.ManufacturerData(); v != nil {
+		m[keys.MFG] = v
+	}
+
+	if v := a.Services(); v != nil {
+		m[keys.Services] = v
+	}
+
+	if v := a.ServiceData(); v != nil {
+		m[keys.ServiceData] = v
+	}
+
+	if v := a.SolicitedService(); v != nil {
+		m[keys.Solicited] = v
+	}
+
+	return &m
 }

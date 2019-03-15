@@ -96,9 +96,10 @@ type HCI struct {
 	// Upon receiving a SR, we search the AD history for the AD from the same
 	// device, and pass the Advertisiement (AD+SR) to advHandler.
 	// The adHist and adLast are allocated in the Scan().
-	advHandler ble.AdvHandler
-	adHist     []*Advertisement
-	adLast     int
+	advHandlerSync bool
+	advHandler     ble.AdvHandler
+	adHist         []*Advertisement
+	adLast         int
 
 	// Host to Controller Data Flow Control Packet-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// Minimum 27 bytes. 4 bytes of L2CAP Header, and 23 bytes Payload from upper layer (ATT)
@@ -427,8 +428,15 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			}
 		default:
 			a = newAdvertisement(e, i)
+
 		}
-		go h.advHandler(a)
+
+		//dispatch
+		if h.advHandlerSync {
+			h.advHandler(a)
+		} else {
+			go h.advHandler(a)
+		}
 	}
 
 	return nil

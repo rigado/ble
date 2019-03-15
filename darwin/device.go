@@ -28,8 +28,9 @@ type Device struct {
 	connLock sync.Mutex
 
 	// Only used in client/centralManager implementation
-	advHandler ble.AdvHandler
-	chConn     chan *conn
+	advHandlerSync bool
+	advHandler     ble.AdvHandler
+	chConn         chan *conn
 
 	// Only used in server/peripheralManager implementation
 	chars map[int]*ble.Characteristic
@@ -223,6 +224,11 @@ func (d *Device) stopAdvertising() error {
 
 // Scan ...
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
+	return d.ScanSync(ctx, allowDup, h, false)
+}
+
+func (d *Device) ScanSync(ctx context.Context, allowDup bool, h ble.AdvHandler, sync bool) error {
+	d.advHandlerSync = sync
 	d.advHandler = h
 	if err := d.sendCmd(d.cm, cmdScanningStart, xpc.Dict{
 		// "kCBMsgArgUUIDs": uuidSlice(ss),
@@ -415,7 +421,12 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 			break
 		}
 		a := &adv{args: m.args(), ad: args.advertisementData()}
-		go d.advHandler(a)
+
+		if d.advHandlerSync {
+			d.advHandler(a)
+		} else {
+			go d.advHandler(a)
+		}
 
 	case evtConfirmation:
 		// log.Printf("confirmed: %d", args.attributeID())

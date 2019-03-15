@@ -21,6 +21,12 @@ func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
 	return nil
 }
 
+// SetAdvHandlerSync ...
+func (h *HCI) SetAdvHandlerSync(s bool) error {
+	h.advHandlerSync = s
+	return nil
+}
+
 // Scan starts scanning.
 func (h *HCI) Scan(allowDup bool) error {
 	h.params.scanEnable.FilterDuplicates = 1
