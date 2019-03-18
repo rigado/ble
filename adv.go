@@ -16,12 +16,11 @@ type Advertisement interface {
 	TxPowerLevel() int
 	Connectable() bool
 	SolicitedService() []UUID
-
 	RSSI() int
 	Addr() Addr
-}
 
-type AdvertisementMap map[string]interface{}
+	ToMap() map[string]interface{}
+}
 
 var AdvertisementMapKeys = struct {
 	MAC         string

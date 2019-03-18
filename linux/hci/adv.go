@@ -135,8 +135,8 @@ func (a *Advertisement) ScanResponse() []byte {
 	return a.sr.Data()
 }
 
-func (a *Advertisement) ToMap() *ble.AdvertisementMap {
-	m := make(ble.AdvertisementMap)
+func (a *Advertisement) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 	keys := ble.AdvertisementMapKeys
 
 	addr := a.Addr().String()
@@ -176,5 +176,5 @@ func (a *Advertisement) ToMap() *ble.AdvertisementMap {
 		m[keys.Solicited] = v
 	}
 
-	return &m
+	return m
 }
