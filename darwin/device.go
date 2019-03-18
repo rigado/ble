@@ -224,11 +224,6 @@ func (d *Device) stopAdvertising() error {
 
 // Scan ...
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
-	return d.ScanSync(ctx, allowDup, h, false)
-}
-
-func (d *Device) ScanSync(ctx context.Context, allowDup bool, h ble.AdvHandler, sync bool) error {
-	d.advHandlerSync = sync
 	d.advHandler = h
 	if err := d.sendCmd(d.cm, cmdScanningStart, xpc.Dict{
 		// "kCBMsgArgUUIDs": uuidSlice(ss),

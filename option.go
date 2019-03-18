@@ -16,6 +16,7 @@ type DeviceOption interface {
 	SetAdvParams(cmd.LESetAdvertisingParameters) error
 	SetPeripheralRole() error
 	SetCentralRole() error
+	SetAdvHandlerSync(bool) error
 }
 
 // An Option is a configuration function, which configures the device.
@@ -81,6 +82,14 @@ func OptPeripheralRole() Option {
 func OptCentralRole() Option {
 	return func(opt DeviceOption) error {
 		opt.SetCentralRole()
+		return nil
+	}
+}
+
+// OptDeviceID sets HCI device ID.
+func OptAdvHandlerSync(sync bool) Option {
+	return func(opt DeviceOption) error {
+		opt.SetAdvHandlerSync(sync)
 		return nil
 	}
 }

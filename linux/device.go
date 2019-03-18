@@ -168,17 +168,7 @@ func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor 
 }
 
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
-	//default is non-sync mode
-	return d.ScanSync(ctx, allowDup, h, false)
-}
-
-// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
-func (d *Device) ScanSync(ctx context.Context, allowDup bool, h ble.AdvHandler, sync bool) error {
 	if err := d.HCI.SetAdvHandler(h); err != nil {
-		return err
-	}
-
-	if err := d.HCI.SetAdvHandlerSync(sync); err != nil {
 		return err
 	}
 

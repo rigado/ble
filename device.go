@@ -40,9 +40,6 @@ type Device interface {
 	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false, async handling
 	Scan(ctx context.Context, allowDup bool, h AdvHandler) error
 
-	// Same as Scan, but allows setting sync/async handling of advertisements
-	ScanSync(ctx context.Context, allowDup bool, h AdvHandler, sync bool) error
-
 	// Dial ...
 	Dial(ctx context.Context, a Addr) (Client, error)
 }

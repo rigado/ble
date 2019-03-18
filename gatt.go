@@ -83,18 +83,13 @@ func AdvertiseIBeacon(ctx context.Context, u UUID, major, minor uint16, pwr int8
 
 // Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
 func Scan(ctx context.Context, allowDup bool, h AdvHandler, f AdvFilter) error {
-	return ScanSync(ctx, allowDup, h, f, false)
-}
-
-// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
-func ScanSync(ctx context.Context, allowDup bool, h AdvHandler, f AdvFilter, sync bool) error {
 	if defaultDevice == nil {
 		return ErrDefaultDevice
 	}
 	defer untrap(trap(ctx))
 
 	if f == nil {
-		return defaultDevice.ScanSync(ctx, allowDup, h, sync)
+		return defaultDevice.Scan(ctx, allowDup, h)
 	}
 
 	h2 := func(a Advertisement) {
@@ -102,7 +97,7 @@ func ScanSync(ctx context.Context, allowDup bool, h AdvHandler, f AdvFilter, syn
 			h(a)
 		}
 	}
-	return defaultDevice.ScanSync(ctx, allowDup, h2, sync)
+	return defaultDevice.Scan(ctx, allowDup, h2)
 }
 
 // Find ...

@@ -48,3 +48,9 @@ func (d *Device) SetScanParams(param cmd.LESetScanParameters) error {
 func (d *Device) SetAdvParams(param cmd.LESetAdvertisingParameters) error {
 	return errors.New("Not supported")
 }
+
+// SetAdvHandlerSync overrides default advertising handler behavior (async)
+func (d *Device) SetAdvHandlerSync(sync bool) error {
+	d.advHandlerSync = sync
+	return nil
+}

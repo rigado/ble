@@ -52,3 +52,9 @@ func (h *HCI) SetPeripheralRole() error {
 func (h *HCI) SetCentralRole() error {
 	return errors.New("Not supported")
 }
+
+// SetAdvHandlerSync overrides default advertising handler behavior (async)
+func (h *HCI) SetAdvHandlerSync(sync bool) error {
+	h.advHandlerSync = sync
+	return nil
+}
