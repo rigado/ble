@@ -295,7 +295,11 @@ func (h *HCI) sktLoop() {
 	for {
 		n, err := h.skt.Read(b)
 		if n == 0 || err != nil {
-			h.err = fmt.Errorf("skt: %s", err)
+			if err == io.EOF {
+				h.err = err //callers depend on detecting io.EOF, don't wrap it.
+			} else {
+				h.err = fmt.Errorf("skt: %s", err)
+			}
 			return
 		}
 		p := make([]byte, n)
