@@ -259,12 +259,34 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		h.close(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
 	}
 
+	var ret []byte
+	var err error
+
+	// emergency timeout to prevent calls from locking up if the HCI
+	// interface doesn't respond.  Responsed here should normally be fast
+	// a timeout indicates a major problem with HCI.
+	timeout := time.NewTimer(10 * time.Second)
 	select {
+	case <-timeout.C:
+		err = fmt.Errorf("hci: no response to command, hci connection failed")
+		ret = nil
 	case <-h.done:
-		return nil, h.err
+		err = h.err
+		ret = nil
 	case b := <-p.done:
-		return b, nil
+		err = nil
+		ret = b
 	}
+	timeout.Stop()
+
+	// clear sent table when done, we sometimes get command complete or
+	// command status messages with no matching send, which can attempt to
+	// access stale packets in sent and fail or lock up.
+	h.muSent.Lock()
+	delete(h.sent, c.OpCode())
+	h.muSent.Unlock()
+
+	return ret, err
 }
 
 func (h *HCI) sktLoop() {
@@ -273,7 +295,11 @@ func (h *HCI) sktLoop() {
 	for {
 		n, err := h.skt.Read(b)
 		if n == 0 || err != nil {
-			h.err = fmt.Errorf("skt: %s", err)
+			if err == io.EOF {
+				h.err = err //callers depend on detecting io.EOF, don't wrap it.
+			} else {
+				h.err = fmt.Errorf("skt: %s", err)
+			}
 			return
 		}
 		p := make([]byte, n)
@@ -561,4 +587,3 @@ func (h *HCI) setAllowedCommands(n int) {
 		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
 	}
 }
-
