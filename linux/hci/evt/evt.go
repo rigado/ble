@@ -1,22 +1,17 @@
 package evt
 
-import (
-	"encoding/binary"
-	"fmt"
-)
-
 func (e CommandComplete) NumHCICommandPackets() uint8 {
-	v, _ := getByte(e, 0, 0)
+	v, _ := e.NumHCICommandPacketsWErr()
 	return v
 }
 
 func (e CommandComplete) CommandOpcode() uint16 {
-	v, _ := getUint16LE(e, 1, 0xffff)
+	v, _ := e.CommandOpcodeWErr()
 	return v
 }
 
 func (e CommandComplete) ReturnParameters() []byte {
-	v, _ := getBytes(e, 3, -1)
+	v, _ := e.ReturnParametersWErr()
 	return v
 }
 
@@ -29,146 +24,56 @@ func (e CommandComplete) ReturnParameters() []byte {
 //     NumOfHandle, HandleA, CompPktNumA, HandleB, CompPktNumB
 //              02,   40 00,       01 00,   41 00,       01 00
 
-func (e NumberOfCompletedPackets) NumberOfHandles() (uint8, error) {
-	return getByte(e, 0, 0)
-}
-func (e NumberOfCompletedPackets) ConnectionHandle(i int) (uint16, error) {
-	si := 1 + (i * 4)
-	return getUint16LE(e, si, 0xffff)
-}
-func (e NumberOfCompletedPackets) HCNumOfCompletedPackets(i int) (uint16, error) {
-	si := 1 + (i * 4) + 2
-	return getUint16LE(e, si, 0)
-}
-func (e LEAdvertisingReport) SubeventCode() (uint8, error) {
-	return getByte(e, 0, 0xff)
+func (e NumberOfCompletedPackets) NumberOfHandles() uint8 {
+	v, _ := e.NumberOfHandlesWErr()
+	return v
 }
 
-func (e LEAdvertisingReport) NumReports() (uint8, error) {
-	return getByte(e, 1, 0)
+func (e NumberOfCompletedPackets) ConnectionHandle(i int) uint16 {
+	v, _ := e.ConnectionHandleWErr(i)
+	return v
 }
 
-func (e LEAdvertisingReport) EventType(i int) (uint8, error) {
-	return getByte(e, 2+i, 0xff)
+func (e NumberOfCompletedPackets) HCNumOfCompletedPackets(i int) uint16 {
+	v, _ := e.HCNumOfCompletedPacketsWErr(i)
+	return v
 }
-func (e LEAdvertisingReport) AddressType(i int) (uint8, error) {
-	nr, err := e.NumReports()
-	if err != nil {
-		return 0, err
-	}
-
-	si := 2 + int(nr) + i
-	return getByte(e, si, 0xff)
-}
-func (e LEAdvertisingReport) Address(i int) ([6]byte, error) {
-	nr, err := e.NumReports()
-	if err != nil {
-		return [6]byte{}, err
-	}
-
-	si := 2 + int(nr)*2 + (6 * i)
-	bb, err := getBytes(e, si, 6)
-	if err != nil {
-		return [6]byte{}, err
-	}
-
-	out := [6]byte{}
-	copy(out[:], bb)
-	return out, nil
+func (e LEAdvertisingReport) SubeventCode() uint8 {
+	v, _ := e.SubeventCodeWErr()
+	return v
 }
 
-func (e LEAdvertisingReport) LengthData(i int) (uint8, error) {
-	nr, err := e.NumReports()
-	if err != nil {
-		return 0, err
-	}
-
-	si := 2 + int(nr)*8 + i
-	return getByte(e, si, 0)
+func (e LEAdvertisingReport) NumReports() uint8 {
+	v, _ := e.NumReportsWErr()
+	return v
 }
 
-func (e LEAdvertisingReport) Data(i int) ([]byte, error) {
-	nr, err := e.NumReports()
-	if err != nil {
-		return nil, err
-	}
-
-	l := 0
-	for j := 0; j < i; j++ {
-		ll, err := e.LengthData(j)
-
-		if err != nil {
-			return nil, err
-		}
-
-		l += int(ll)
-	}
-
-	ll, err := e.LengthData(i)
-	if err != nil {
-		return nil, err
-	}
-	si := 2 + int(nr)*9 + l
-	b, err := getBytes(e, si, int(ll))
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+func (e LEAdvertisingReport) EventType(i int) uint8 {
+	v, _ := e.EventTypeWErr(i)
+	return v
 }
 
-func (e LEAdvertisingReport) RSSI(i int) (int8, error) {
-	nr, err := e.NumReports()
-	if err != nil {
-		return 0, err
-	}
-
-	l := 0
-	for j := 0; j < int(nr); j++ {
-		ll, err := e.LengthData(j)
-		if err != nil {
-			return 0, err
-		}
-
-		l += int(ll)
-	}
-
-	si := 2 + int(nr)*9 + l + i
-	rssi, err := getByte(e, si, 0)
-	return int8(rssi), err
+func (e LEAdvertisingReport) AddressType(i int) uint8 {
+	v, _ := e.AddressTypeWErr(i)
+	return v
 }
 
-//get or default
-func getByte(b []byte, i int, def byte) (byte, error) {
-	bb, err := getBytes(b, i, 1)
-	if err != nil {
-		return def, err
-	}
-	return bb[0], nil
+func (e LEAdvertisingReport) Address(i int) [6]byte {
+	v, _ := e.AddressWErr(i)
+	return v
 }
 
-//get or default
-func getUint16LE(b []byte, i int, def uint16) (uint16, error) {
-	bb, err := getBytes(b, i, 2)
-	if err != nil {
-		return def, err
-	}
-	return binary.LittleEndian.Uint16(bb), nil
+func (e LEAdvertisingReport) LengthData(i int) uint8 {
+	v, _ := e.LengthDataWErr(i)
+	return v
 }
 
-func getBytes(bytes []byte, start int, count int) ([]byte, error) {
-	if bytes == nil || start >= len(bytes) {
-		return nil, fmt.Errorf("index error")
-	}
+func (e LEAdvertisingReport) Data(i int) []byte {
+	v, _ := e.DataWErr(i)
+	return v
+}
 
-	if count < 0 {
-		return bytes[start:], nil
-	}
-
-	end := start + count
-	//end is non-inclusive
-	if end > len(bytes) {
-		return nil, fmt.Errorf("index error")
-	}
-
-	return bytes[start:end], nil
+func (e LEAdvertisingReport) RSSI(i int) int8 {
+	v, _ := e.RSSIWErr(i)
+	return v
 }
