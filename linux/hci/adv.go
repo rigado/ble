@@ -1,8 +1,9 @@
 package hci
 
 import (
-	"errors"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/adv"
