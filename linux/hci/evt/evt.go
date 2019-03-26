@@ -58,7 +58,7 @@ func (e LEAdvertisingReport) AddressType(i int) (uint8, error) {
 func (e LEAdvertisingReport) Address(i int) ([6]byte, error) {
 	nr, err := e.NumReports()
 	if err != nil {
-		return [6]byte{}, indexError
+		return [6]byte{}, err
 	}
 
 	si := 2 + int(nr)*2 + (6 * i)

@@ -8,16 +8,16 @@ type AdvFilter func(a Advertisement) bool
 
 // Advertisement ...
 type Advertisement interface {
-	LocalName() (string, error)
-	ManufacturerData() ([]byte, error)
-	ServiceData() ([]ServiceData, error)
-	Services() ([]UUID, error)
-	OverflowService() ([]UUID, error)
-	TxPowerLevel() (int, error)
-	Connectable() (bool, error)
-	SolicitedService() ([]UUID, error)
-	RSSI() (int, error)
-	Addr() (Addr, error)
+	LocalName() string
+	ManufacturerData() []byte
+	ServiceData() []ServiceData
+	Services() []UUID
+	OverflowService() []UUID
+	TxPowerLevel() int
+	Connectable() bool
+	SolicitedService() []UUID
+	RSSI() int
+	Addr() Addr
 
 	ToMap() (map[string]interface{}, error)
 }
