@@ -12,12 +12,12 @@ func (a *Advertisement) packetsWErr() (*adv.Packet, error) {
 		return a.p, nil
 	}
 
-	p1, err := a.DataWErr()
+	p1, err := a.dataWErr()
 	if err != nil {
 		return nil, err
 	}
 
-	p2, err := a.ScanResponseWErr()
+	p2, err := a.scanResponseWErr()
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +26,7 @@ func (a *Advertisement) packetsWErr() (*adv.Packet, error) {
 }
 
 func (a *Advertisement) localNameWErr() (string, error) {
-	p, err := a.packets()
+	p, err := a.packetsWErr()
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +85,7 @@ func (a *Advertisement) solicitedServiceWErr() ([]ble.UUID, error) {
 }
 
 func (a *Advertisement) connectableWErr() (bool, error) {
-	t, err := a.EventType()
+	t, err := a.eventTypeWErr()
 	if err != nil {
 		return false, err
 	}
@@ -132,5 +132,5 @@ func (a *Advertisement) ScanResponseWErr() ([]byte, error) {
 	if a.sr == nil {
 		return nil, nil
 	}
-	return a.sr.dataWerr()
+	return a.sr.dataWErr()
 }

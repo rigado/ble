@@ -5,14 +5,19 @@ import (
 	"fmt"
 )
 
-func (e CommandComplete) NumHCICommandPackets() (uint8, error) {
-	return getByte(e, 0, 0)
+func (e CommandComplete) NumHCICommandPackets() uint8 {
+	v, _ := getByte(e, 0, 0)
+	return v
 }
-func (e CommandComplete) CommandOpcode() (uint16, error) {
-	return getUint16LE(e, 1, 0xffff)
+
+func (e CommandComplete) CommandOpcode() uint16 {
+	v, _ := getUint16LE(e, 1, 0xffff)
+	return v
 }
-func (e CommandComplete) ReturnParameters() ([]byte, error) {
-	return getBytes(e, 3, -1)
+
+func (e CommandComplete) ReturnParameters() []byte {
+	v, _ := getBytes(e, 3, -1)
+	return v
 }
 
 // Per-spec [Vol 2, Part E, 7.7.19], the packet structure should be:
