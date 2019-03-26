@@ -5,25 +5,23 @@ import (
 	"github.com/raff/goble/xpc"
 )
 
-//DSC: todo detect/return errors with (type,bool)
-
 type adv struct {
 	args xpc.Dict
 	ad   xpc.Dict
 }
 
-func (a *adv) LocalName() (string, bool) {
-	return a.ad.GetString("kCBAdvDataLocalName", a.args.GetString("kCBMsgArgName", "")), true
+func (a *adv) LocalName() string {
+	return a.ad.GetString("kCBAdvDataLocalName", a.args.GetString("kCBMsgArgName", ""))
 }
 
-func (a *adv) ManufacturerData() ([]byte, bool) {
-	return a.ad.GetBytes("kCBAdvDataManufacturerData", nil), true
+func (a *adv) ManufacturerData() []byte {
+	return a.ad.GetBytes("kCBAdvDataManufacturerData", nil)
 }
 
-func (a *adv) ServiceData() ([]ble.ServiceData, bool) {
+func (a *adv) ServiceData() []ble.ServiceData {
 	xSDs, ok := a.ad["kCBAdvDataServiceData"]
 	if !ok {
-		return nil, true
+		return nil
 	}
 
 	xSD := xSDs.(xpc.Array)
@@ -35,41 +33,41 @@ func (a *adv) ServiceData() ([]ble.ServiceData, bool) {
 				Data: xSD[i+1].([]byte),
 			})
 	}
-	return sd, true
+	return sd
 }
 
-func (a *adv) Services() ([]ble.UUID, bool) {
+func (a *adv) Services() []ble.UUID {
 	xUUIDs, ok := a.ad["kCBAdvDataServiceUUIDs"]
 	if !ok {
-		return nil, nil, true
+		return nil
 	}
 	var uuids []ble.UUID
 	for _, xUUID := range xUUIDs.(xpc.Array) {
 		uuids = append(uuids, ble.UUID(ble.Reverse(xUUID.([]byte))))
 	}
-	return nil, uuids, true
+	return uuids
 }
 
-func (a *adv) OverflowService() ([]ble.UUID, bool) {
-	return nil, nil, true // TODO
+func (a *adv) OverflowService() []ble.UUID {
+	return nil // TODO
 }
 
-func (a *adv) TxPowerLevel() (int, bool) {
-	return a.ad.GetInt("kCBAdvDataTxPowerLevel", 0), true
+func (a *adv) TxPowerLevel() int {
+	return a.ad.GetInt("kCBAdvDataTxPowerLevel", 0)
 }
 
-func (a *adv) SolicitedService() ([]ble.UUID, bool) {
-	return nil, nil, true // TODO
+func (a *adv) SolicitedService() []ble.UUID {
+	return nil // TODO
 }
 
-func (a *adv) Connectable() (bool, bool) {
-	return false, a.ad.GetInt("kCBAdvDataIsConnectable", 0) > 0, true
+func (a *adv) Connectable() bool {
+	return a.ad.GetInt("kCBAdvDataIsConnectable", 0) > 0
 }
 
-func (a *adv) RSSI() (int, bool) {
-	return a.args.GetInt("kCBMsgArgRssi", 0), true
+func (a *adv) RSSI() int {
+	return a.args.GetInt("kCBMsgArgRssi", 0)
 }
 
-func (a *adv) Addr() (ble.Addr, bool) {
-	return a.args.MustGetUUID("kCBMsgArgDeviceUUID"), true
+func (a *adv) Addr() ble.Addr {
+	return a.args.MustGetUUID("kCBMsgArgDeviceUUID")
 }
