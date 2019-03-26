@@ -135,7 +135,7 @@ func (a *Advertisement) Data() []byte {
 // ScanResponse returns the scan response of the packet, if it presents.
 // This is linux specific.
 func (a *Advertisement) ScanResponse() []byte {
-	v, _ := a.ScanResponseWErr()
+	v, _ := a.scanResponseWErr()
 	return v
 }
 
@@ -172,7 +172,7 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 	}
 
 	//build the packets and bail before we try picking stuff out
-	pp, err := a.packetsWErr()
+	_, err = a.packetsWErr()
 	if err != nil {
 		return nil, errors.Wrap(err, "pdu")
 	}
