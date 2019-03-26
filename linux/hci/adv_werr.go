@@ -95,18 +95,18 @@ func (a *Advertisement) connectableWErr() (bool, error) {
 }
 
 func (a *Advertisement) rssiWErr() (int, error) {
-	r, err := a.e.RSSI(a.i)
+	r, err := a.e.RSSIWErr(a.i)
 	return int(r), err
 }
 
 func (a *Advertisement) addrWErr() (ble.Addr, error) {
-	b, err := a.e.Address(a.i)
+	b, err := a.e.AddressWErr(a.i)
 	if err != nil {
 		return nil, err
 	}
 
 	addr := net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
-	at, err := a.e.AddressType(a.i)
+	at, err := a.e.AddressTypeWErr(a.i)
 	if err != nil {
 		return nil, err
 	}
@@ -117,18 +117,18 @@ func (a *Advertisement) addrWErr() (ble.Addr, error) {
 }
 
 func (a *Advertisement) eventTypeWErr() (uint8, error) {
-	return a.e.EventType(a.i)
+	return a.e.EventTypeWErr(a.i)
 }
 
 func (a *Advertisement) addressTypeWErr() (uint8, error) {
-	return a.e.AddressType(a.i)
+	return a.e.AddressTypeWErr(a.i)
 }
 
 func (a *Advertisement) dataWErr() ([]byte, error) {
-	return a.e.Data(a.i)
+	return a.e.DataWErr(a.i)
 }
 
-func (a *Advertisement) ScanResponseWErr() ([]byte, error) {
+func (a *Advertisement) scanResponseWErr() ([]byte, error) {
 	if a.sr == nil {
 		return nil, nil
 	}
