@@ -395,19 +395,41 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 	}
 
 	e := evt.LEAdvertisingReport(b)
-	for i := 0; i < int(e.NumReports()); i++ {
+
+	nr, err := e.NumReportsWErr()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	//DSC: zephyr currently returns 1 report per report wrapper
+	if nr != 1 {
+		err := fmt.Errorf("invalid rep count %v", nr)
+		fmt.Println(err)
+		return err
+	}
+
+	for i := 0; i < int(nr); i++ {
+		et, err := e.EventTypeWErr(i)
+		if err != nil {
+			fmt.Printf("evt type err %v\n", err)
+			continue
+		}
+
 		var a *Advertisement
-		switch e.EventType(i) {
-		case evtTypAdvInd:
+
+		switch et {
+		case evtTypAdvInd: //0x00
 			fallthrough
-		case evtTypAdvScanInd:
+		case evtTypAdvScanInd: //0x02
 			a = newAdvertisement(e, i)
 			h.adHist[h.adLast] = a
 			h.adLast++
 			if h.adLast == len(h.adHist) {
 				h.adLast = 0
 			}
-		case evtTypScanRsp:
+
+		case evtTypScanRsp: //0x04
 			sr := newAdvertisement(e, i)
 			for idx := h.adLast - 1; idx != h.adLast; idx-- {
 				if idx == -1 {
@@ -416,7 +438,23 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 				if h.adHist[idx] == nil {
 					break
 				}
-				if h.adHist[idx].Addr().String() == sr.Addr().String() {
+
+				//bad addr?
+				addrh, err := h.adHist[idx].addrWErr()
+				if err != nil {
+					fmt.Printf("adHist addr: %v\n", err)
+					break
+				}
+
+				//bad addr?
+				addrsr, err := sr.addrWErr()
+				if err != nil {
+					fmt.Printf("sr addr: %v\n", err)
+					break
+				}
+
+				//set the scan response here
+				if addrh.String() == addrsr.String() {
 					h.adHist[idx].setScanResponse(sr)
 					a = h.adHist[idx]
 					break
@@ -424,11 +462,18 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			}
 			// Got a SR without having received an associated AD before?
 			if a == nil {
-				return fmt.Errorf("received scan response %s with no associated Advertising Data packet", sr.Addr())
+				err := fmt.Errorf("received scan response %s with no associated Advertising Data packet", sr.Addr())
+				fmt.Println(err)
+				return err
 			}
-		default:
+
+		case evtTypAdvDirectInd: //0x01
+			fallthrough
+		case evtTypAdvNonconnInd: //0x03
 			a = newAdvertisement(e, i)
 
+		default:
+			fmt.Printf("invalid evtType %v", et)
 		}
 
 		//dispatch
