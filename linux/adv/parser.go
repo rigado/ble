@@ -132,6 +132,11 @@ var pduDecodeMap = map[byte]pduRecord{
 		1,
 		"mfg",
 	},
+	types.flags: pduRecord{
+		0,
+		1,
+		"flags",
+	},
 }
 
 func getArray(size int, bytes []byte) ([]interface{}, error) {
