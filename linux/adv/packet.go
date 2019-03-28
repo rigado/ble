@@ -2,6 +2,8 @@ package adv
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/go-ble/ble"
 )
@@ -191,6 +193,9 @@ func (p *Packet) getUUIDsByType(typ byte, u []ble.UUID, w int) []ble.UUID {
 	for pos < len(p.b) {
 		if b, pos = p.fieldPos(typ, pos); b != nil {
 			u = uuidList(u, b, w)
+		} else {
+			//temporary fix to ensure infinite loop does not occur
+			return u
 		}
 	}
 	return u
@@ -211,6 +216,8 @@ func (p *Packet) fieldPos(typ byte, offset int) ([]byte, int) {
 	for len(b) > 0 {
 		l, t := b[0], b[1]
 		if int(l) < 1 || len(b) < int(1+l) {
+			fmt.Println("detected invalid advertising data: l", l, "t", t, "typ", typ, "offset", offset,
+				"p.b", hex.EncodeToString(p.b))
 			return nil, pos
 		}
 		if t == typ {
