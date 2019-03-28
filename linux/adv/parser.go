@@ -45,6 +45,44 @@ var types = struct {
 	mfgdata:     0xff,
 }
 
+var keys = struct {
+	flags       string
+	uuid16inc   string
+	uuid16comp  string
+	uuid32inc   string
+	uuid32comp  string
+	uuid128inc  string
+	uuid128comp string
+	sol16       string
+	sol32       string
+	sol128      string
+	svc16       string
+	svc32       string
+	svc128      string
+	nameshort   string
+	namecomp    string
+	txpwr       string
+	mfgdata     string
+}{
+	flags:       "flags",
+	uuid16inc:   "uuid16",
+	uuid16comp:  "uuid16",
+	uuid32inc:   "uuid32",
+	uuid32comp:  "uuid32",
+	uuid128inc:  "uuid128",
+	uuid128comp: "uuid128",
+	sol16:       "sol16",
+	sol32:       "sol32",
+	sol128:      "sol128",
+	svc16:       "svc16",
+	svc32:       "svc32",
+	svc128:      "svc128",
+	nameshort:   "name",
+	namecomp:    "name",
+	txpwr:       "txpwr",
+	mfgdata:     "mfg",
+}
+
 type pduRecord struct {
 	arrayElementSz int
 	minSz          int
@@ -55,87 +93,87 @@ var pduDecodeMap = map[byte]pduRecord{
 	types.uuid16inc: pduRecord{
 		2,
 		2,
-		"uuid16",
+		keys.uuid16inc,
 	},
 	types.uuid16comp: pduRecord{
 		2,
 		2,
-		"uuid16",
+		keys.uuid16comp,
 	},
 	types.uuid32inc: pduRecord{
 		4,
 		4,
-		"uuid32",
+		keys.uuid32inc,
 	},
 	types.uuid32comp: pduRecord{
 		4,
 		4,
-		"uuid32",
+		keys.uuid32comp,
 	},
 	types.uuid128inc: pduRecord{
 		16,
 		16,
-		"uuid128",
+		keys.uuid128inc,
 	},
 	types.uuid128comp: pduRecord{
 		16,
 		16,
-		"uuid128",
+		keys.uuid128comp,
 	},
 	types.sol16: pduRecord{
 		2,
 		2,
-		"sol16",
+		keys.sol16,
 	},
 	types.sol32: pduRecord{
 		4,
 		4,
-		"sol32",
+		keys.sol32,
 	},
 	types.sol128: pduRecord{
 		16,
 		16,
-		"sol128",
+		keys.sol128,
 	},
 	types.svc16: pduRecord{
 		2,
 		2,
-		"svc16",
+		keys.svc16,
 	},
 	types.svc32: pduRecord{
 		4,
 		4,
-		"svc32",
+		keys.svc32,
 	},
 	types.svc128: pduRecord{
 		16,
 		16,
-		"svc128",
+		keys.svc128,
 	},
 	types.namecomp: pduRecord{
 		0,
 		1,
-		"name",
+		keys.namecomp,
 	},
 	types.nameshort: pduRecord{
 		0,
 		1,
-		"name",
+		keys.nameshort,
 	},
 	types.txpwr: pduRecord{
 		0,
 		1,
-		"txpwr",
+		keys.txpwr,
 	},
 	types.mfgdata: pduRecord{
 		0,
 		1,
-		"mfg",
+		keys.mfgdata,
 	},
 	types.flags: pduRecord{
 		0,
 		1,
-		"flags",
+		keys.flags,
 	},
 }
 
