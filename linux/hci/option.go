@@ -60,6 +60,7 @@ func (h *HCI) SetAdvHandlerSync(sync bool) error {
 }
 
 // SetErrorHandler ...
-func (h *HCI) SetErrorHandler(handler func(error)) {
+func (h *HCI) SetErrorHandler(handler func(error)) error {
 	h.errorHandler = handler
+	return nil
 }

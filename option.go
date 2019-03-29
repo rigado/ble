@@ -17,6 +17,7 @@ type DeviceOption interface {
 	SetPeripheralRole() error
 	SetCentralRole() error
 	SetAdvHandlerSync(bool) error
+	SetErrorHandler(handler func(error)) error
 }
 
 // An Option is a configuration function, which configures the device.
@@ -86,10 +87,18 @@ func OptCentralRole() Option {
 	}
 }
 
-// OptDeviceID sets HCI device ID.
+// OptAdvHandlerSync sets sync adv handling
 func OptAdvHandlerSync(sync bool) Option {
 	return func(opt DeviceOption) error {
 		opt.SetAdvHandlerSync(sync)
+		return nil
+	}
+}
+
+// OptErrorHandler sets error handler
+func OptErrorHandler(handler func(error)) Option {
+	return func(opt DeviceOption) error {
+		opt.SetErrorHandler(handler)
 		return nil
 	}
 }
