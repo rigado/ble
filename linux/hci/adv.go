@@ -24,8 +24,18 @@ const (
 	evtTypScanRsp       = 0x04 // Scan Response (SCAN_RSP).
 )
 
-func newAdvertisement(e evt.LEAdvertisingReport, i int) *Advertisement {
-	return &Advertisement{e: e, i: i}
+func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) {
+	ad, err := e.DataWErr(i)
+	if err != nil {
+		return nil, err
+	}
+	p, err := adv.NewRawPacket(ad)
+	if err != nil {
+		return nil, err
+	}
+
+	a := &Advertisement{e: e, i: i, p: p}
+	return a, nil
 }
 
 // Advertisement implements ble.Advertisement and other functions that are only
@@ -40,15 +50,28 @@ type Advertisement struct {
 }
 
 // setScanResponse ssociate sca response to the existing advertisement.
-func (a *Advertisement) setScanResponse(sr *Advertisement) {
-	a.sr = sr
-	a.p = nil // clear the cached.
-}
+func (a *Advertisement) setScanResponse(sr *Advertisement) error {
 
-// packets returns the combined advertising packet and scan response (if presents)
-func (a *Advertisement) packets() *adv.Packet {
-	p, _ := a.packetsWErr()
-	return p
+	ad, err := a.e.DataWErr(a.i)
+	if err != nil {
+		return err
+	}
+
+	srd, err := sr.e.DataWErr(sr.i)
+	if err != nil {
+		return err
+	}
+
+	//does this parse ok?
+	p, err := adv.NewRawPacket(ad, srd)
+	if err != nil {
+		return errors.Wrap(err, "setScanResp")
+	}
+
+	a.sr = sr
+	a.p = p
+
+	return nil
 }
 
 // LocalName returns the LocalName of the remote peripheral.
@@ -171,11 +194,11 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 		m[keys.RSSI] = -128
 	}
 
-	//build the packets and bail before we try picking stuff out
-	_, err = a.packetsWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, "pdu")
-	}
+	// //build the packets and bail before we try picking stuff out
+	// _, err = a.packetsWErr()
+	// if err != nil {
+	// 	return nil, errors.Wrap(err, "pdu")
+	// }
 
 	ln, err := a.localNameWErr()
 	if err != nil {

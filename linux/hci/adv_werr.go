@@ -1,87 +1,79 @@
 package hci
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/adv"
 )
 
-func (a *Advertisement) packetsWErr() (*adv.Packet, error) {
-	if a.p != nil {
-		return a.p, nil
-	}
+// func (a *Advertisement) packetsWErr() (*adv.Packet, error) {
+// 	if a.p != nil {
+// 		return a.p, nil
+// 	}
 
-	p1, err := a.dataWErr()
-	if err != nil {
-		return nil, err
-	}
+// 	p1, err := a.dataWErr()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	p2, err := a.scanResponseWErr()
-	if err != nil {
-		return nil, err
-	}
+// 	p2, err := a.scanResponseWErr()
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return adv.NewRawPacket(p1, p2), nil
-}
+// 	return adv.NewRawPacket(p1, p2)
+// }
 
 func (a *Advertisement) localNameWErr() (string, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return "", err
+	if a.p == nil {
+		return "", fmt.Errorf("nil packet")
 	}
-
-	return p.LocalName(), nil
+	return a.p.LocalName(), nil
 }
 
 func (a *Advertisement) manufacturerDataWErr() ([]byte, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return nil, err
+	if a.p == nil {
+		return nil, fmt.Errorf("nil packet")
 	}
-	return p.ManufacturerData(), nil
+	return a.p.ManufacturerData(), nil
 }
 
 func (a *Advertisement) serviceDataWErr() ([]ble.ServiceData, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return nil, err
+	if a.p == nil {
+		return nil, fmt.Errorf("nil packet")
 	}
-	return p.ServiceData(), nil
+	return a.p.ServiceData(), nil
 }
 
 func (a *Advertisement) servicesWErr() ([]ble.UUID, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return nil, err
+	if a.p == nil {
+		return nil, fmt.Errorf("nil packet")
 	}
-	return p.UUIDs(), nil
+	return a.p.UUIDs(), nil
 }
 
 func (a *Advertisement) overflowServiceWErr() ([]ble.UUID, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return nil, err
+	if a.p == nil {
+		return nil, fmt.Errorf("nil packet")
 	}
-	return p.UUIDs(), nil
+	return a.p.UUIDs(), nil
 }
 
 func (a *Advertisement) txPowerLevelWErr() (int, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return 0, err
+	if a.p == nil {
+		return 0, fmt.Errorf("nil packet")
 	}
 
-	pwr, _ := p.TxPower()
+	pwr, _ := a.p.TxPower()
 	return pwr, nil
 }
 
 func (a *Advertisement) solicitedServiceWErr() ([]ble.UUID, error) {
-	p, err := a.packetsWErr()
-	if err != nil {
-		return nil, err
+	if a.p == nil {
+		return nil, fmt.Errorf("nil packet")
 	}
-	return p.ServiceSol(), nil
+	return a.p.ServiceSol(), nil
 }
 
 func (a *Advertisement) connectableWErr() (bool, error) {

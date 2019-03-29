@@ -422,7 +422,11 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		case evtTypAdvInd: //0x00
 			fallthrough
 		case evtTypAdvScanInd: //0x02
-			a = newAdvertisement(e, i)
+			a, err := newAdvertisement(e, i)
+			if err != nil {
+				fmt.Printf("adv error %v, err: %v", et, err)
+				continue
+			}
 			h.adHist[h.adLast] = a
 			h.adLast++
 			if h.adLast == len(h.adHist) {
@@ -430,7 +434,12 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			}
 
 		case evtTypScanRsp: //0x04
-			sr := newAdvertisement(e, i)
+			sr, err := newAdvertisement(e, i)
+			if err != nil {
+				fmt.Printf("adv error %v, err: %v", et, err)
+				continue
+			}
+
 			for idx := h.adLast - 1; idx != h.adLast; idx-- {
 				if idx == -1 {
 					idx = len(h.adHist) - 1
@@ -470,10 +479,19 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		case evtTypAdvDirectInd: //0x01
 			fallthrough
 		case evtTypAdvNonconnInd: //0x03
-			a = newAdvertisement(e, i)
+			a, err = newAdvertisement(e, i)
+			if err != nil {
+				fmt.Printf("adv error %v, err: %v", et, err)
+				continue
+			}
 
 		default:
 			fmt.Printf("invalid evtType %v", et)
+		}
+
+		if a == nil {
+			fmt.Println("nil advertisment")
+			continue
 		}
 
 		//dispatch

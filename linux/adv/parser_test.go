@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/rigado/ble/linux/hci/evt"
 )
 
 type testPdu struct {
@@ -380,7 +382,7 @@ func TestParserCombined(t *testing.T) {
 		}
 
 		if len(mu16.([]interface{})) != 2 {
-			t.Fatalf("uuid128 count != 2")
+			t.Fatalf("uuid16 count != 2")
 		}
 
 	default:
@@ -401,5 +403,36 @@ func TestParserCombined(t *testing.T) {
 
 	default:
 		t.Fatalf("got invalid uuid128 type, %v", reflect.TypeOf(mu16))
+	}
+}
+
+func TestRealAdv(t *testing.T) {
+	e := evt.LEAdvertisingReport{2, 1, 3, 1, 144, 17, 101, 210, 60, 246, 30, 2, 1, 2, 26, 255, 76, 0, 2, 21, 255, 254, 45, 18, 30, 75, 15, 164, 153, 78, 4, 99, 49, 239, 205, 171, 52, 18, 120, 86, 195, 205}
+	b, _ := e.DataWErr(0)
+	m, err := decode(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	md, ok := m[keys.mfgdata].([]byte)
+	if !ok {
+		t.Fatalf("mfgdata missing")
+	}
+
+	mdexp := e[16:]
+	mdok := reflect.DeepEqual(md, mdexp)
+	if !mdok {
+		t.Logf("mfgdata mismatch:\nexp %v\ngot %v", mdexp, md)
+	}
+
+	f, ok := m[keys.flags].([]byte)
+	if !ok {
+		t.Fatalf("flags missing")
+	}
+
+	fexp := e[13]
+	fok := reflect.DeepEqual(f, fexp)
+	if !fok {
+		t.Fatalf("flags mismatch:\nexp %v\ngot %v", fexp, f[0])
 	}
 }
