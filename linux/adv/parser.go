@@ -213,10 +213,6 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 
 	m := make(map[string]interface{})
 	for i := 0; (i + 1) < len(pdu); {
-		//enough bytes for length & type?
-		if (i + 1) >= len(pdu) {
-			return nil, fmt.Errorf("not enough bytes for length+type")
-		}
 
 		//length @ offset 0
 		//type @ offset 1
@@ -237,6 +233,8 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 		start := i + 2
 		end := start + length - 1
 		bytes := pdu[start:end]
+
+		//fmt.Printf("type %v, len %v, cur %v, start %v, end %v, bytes %v\n", typ, length, i, start, end, bytes)
 
 		dec, ok := pduDecodeMap[typ]
 		if !ok {

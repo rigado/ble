@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/rigado/ble/linux/hci/evt"
 )
 
 type testPdu struct {
@@ -195,6 +193,9 @@ func TestParserArrays(t *testing.T) {
 		types.sol16,
 		types.sol32,
 		types.sol128,
+		types.svc16,
+		types.svc32,
+		types.svc128,
 	}
 
 	for _, v := range types {
@@ -407,32 +408,39 @@ func TestParserCombined(t *testing.T) {
 }
 
 func TestRealAdv(t *testing.T) {
-	e := evt.LEAdvertisingReport{2, 1, 3, 1, 144, 17, 101, 210, 60, 246, 30, 2, 1, 2, 26, 255, 76, 0, 2, 21, 255, 254, 45, 18, 30, 75, 15, 164, 153, 78, 4, 99, 49, 239, 205, 171, 52, 18, 120, 86, 195, 205}
-	b, _ := e.DataWErr(0)
+	u128 := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	p, _ := NewPacket(Flags(123), IBeacon(u128, 12345, 45678, 56))
+	b := p.Bytes()
 	m, err := decode(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	if len(m) != 2 {
+		t.Fatalf("map has %v keys, exp %v", len(m), 2)
+	}
+
+	//check flags
+	ff, ok := m[keys.flags].([]byte)
+	if !ok {
+		t.Fatalf("flags missing")
+	}
+
+	fexp := b[2:3] //flags at idx 0 (len), 1 (type 0x01), 3 (data 1 byte)
+	fok := reflect.DeepEqual(ff, fexp)
+	if !fok {
+		t.Fatalf("mismatch:\nexp %v %v\ngot %v %v", fexp, reflect.TypeOf(fexp), ff, reflect.TypeOf(ff))
+	}
+
+	//check mfg
 	md, ok := m[keys.mfgdata].([]byte)
 	if !ok {
 		t.Fatalf("mfgdata missing")
 	}
 
-	mdexp := e[16:]
+	mdexp := b[5:] //flags at idx 0-2, 3 (len), 4 (type 0xff), 5 -... (data)
 	mdok := reflect.DeepEqual(md, mdexp)
 	if !mdok {
-		t.Logf("mfgdata mismatch:\nexp %v\ngot %v", mdexp, md)
-	}
-
-	f, ok := m[keys.flags].([]byte)
-	if !ok {
-		t.Fatalf("flags missing")
-	}
-
-	fexp := e[13]
-	fok := reflect.DeepEqual(f, fexp)
-	if !fok {
-		t.Fatalf("flags mismatch:\nexp %v\ngot %v", fexp, f[0])
+		t.Fatalf("mismatch:\nexp %v %v\ngot %v %v", mdexp, reflect.TypeOf(mdexp), md, reflect.TypeOf(md))
 	}
 }
