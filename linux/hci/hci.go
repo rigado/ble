@@ -114,6 +114,9 @@ type HCI struct {
 	dialerTmo   time.Duration
 	listenerTmo time.Duration
 
+	//error handler
+	errorHandler func(error)
+
 	err  error
 	done chan bool
 }
@@ -389,6 +392,14 @@ func (h *HCI) handleLEMeta(b []byte) error {
 	return fmt.Errorf("unsupported LE event: % X", b)
 }
 
+func (h *HCI) makeAdvError(e error, b []byte, dispatch bool) error {
+	err := fmt.Errorf("%v, bytes %v", e, b)
+	if dispatch {
+		h.dispatchError(err)
+	}
+	return err
+}
+
 func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 	if h.advHandler == nil {
 		return nil
@@ -398,21 +409,20 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 
 	nr, err := e.NumReportsWErr()
 	if err != nil {
-		fmt.Println(err)
-		return err
+		ee := h.makeAdvError(errors.Wrap(err, "advRep numReports"), e, true)
+		return ee
 	}
 
 	//DSC: zephyr currently returns 1 report per report wrapper
 	if nr != 1 {
-		err := fmt.Errorf("invalid rep count %v", nr)
-		fmt.Println(err)
-		return err
+		ee := h.makeAdvError(fmt.Errorf("invalid rep count %v", nr), e, true)
+		return ee
 	}
 
 	for i := 0; i < int(nr); i++ {
 		et, err := e.EventTypeWErr(i)
 		if err != nil {
-			fmt.Printf("evt type err %v\n", err)
+			h.makeAdvError(errors.Wrap(err, "advRep eventType"), e, true)
 			continue
 		}
 
@@ -424,7 +434,7 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		case evtTypAdvScanInd: //0x02
 			a, err := newAdvertisement(e, i)
 			if err != nil {
-				fmt.Printf("adv error %v, err: %v", et, err)
+				h.makeAdvError(errors.Wrap(err, fmt.Sprintf("newAdv (typ %v)", et)), e, true)
 				continue
 			}
 			h.adHist[h.adLast] = a
@@ -436,7 +446,7 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		case evtTypScanRsp: //0x04
 			sr, err := newAdvertisement(e, i)
 			if err != nil {
-				fmt.Printf("adv error %v, err: %v", et, err)
+				h.makeAdvError(errors.Wrap(err, fmt.Sprintf("newAdv (typ %v)", et)), e, true)
 				continue
 			}
 
@@ -451,29 +461,35 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 				//bad addr?
 				addrh, err := h.adHist[idx].addrWErr()
 				if err != nil {
-					fmt.Printf("adHist addr: %v\n", err)
+					h.makeAdvError(errors.Wrap(err, fmt.Sprintf("adHist addr (typ %v)", et)), e, true)
 					break
 				}
 
 				//bad addr?
 				addrsr, err := sr.addrWErr()
 				if err != nil {
-					fmt.Printf("sr addr: %v\n", err)
+					h.makeAdvError(errors.Wrap(err, fmt.Sprintf("srAddr (typ %v)", et)), e, true)
 					break
 				}
 
 				//set the scan response here
 				if addrh.String() == addrsr.String() {
-					h.adHist[idx].setScanResponse(sr)
+
+					//this will leave everything alone if there is an error when we attach the scanresp
+					err = h.adHist[idx].setScanResponse(sr)
+					if err != nil {
+						h.makeAdvError(errors.Wrap(err, fmt.Sprintf("setScanResp (typ %v)", et)), e, true)
+						break
+					}
 					a = h.adHist[idx]
 					break
 				}
 			}
+
 			// Got a SR without having received an associated AD before?
 			if a == nil {
-				err := fmt.Errorf("received scan response %s with no associated Advertising Data packet", sr.Addr())
-				fmt.Println(err)
-				return err
+				ee := h.makeAdvError(errors.Wrap(err, fmt.Sprintf("scanRsp (typ %v) w/o associated advData, srAddr %v", et, sr.Addr())), e, true)
+				return ee
 			}
 
 		case evtTypAdvDirectInd: //0x01
@@ -481,16 +497,17 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		case evtTypAdvNonconnInd: //0x03
 			a, err = newAdvertisement(e, i)
 			if err != nil {
-				fmt.Printf("adv error %v, err: %v", et, err)
+				h.makeAdvError(errors.Wrap(err, fmt.Sprintf("newAdv (typ %v)", et)), e, true)
 				continue
 			}
 
 		default:
-			fmt.Printf("invalid evtType %v", et)
+			h.makeAdvError(fmt.Errorf("invalid eventType %v", et), e, true)
+			continue
 		}
 
 		if a == nil {
-			fmt.Println("nil advertisment")
+			h.makeAdvError(fmt.Errorf("nil advertisement (typ %v)", et), e, true)
 			continue
 		}
 
@@ -656,5 +673,13 @@ func (h *HCI) setAllowedCommands(n int) {
 
 	for len(h.chCmdBufs) < n {
 		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
+	}
+}
+
+func (h *HCI) dispatchError(e error) {
+	if h.errorHandler == nil {
+		fmt.Println(e)
+	} else {
+		h.errorHandler(e)
 	}
 }
