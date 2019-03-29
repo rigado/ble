@@ -307,6 +307,6 @@ func serviceDataList(sd []ble.ServiceData, d []byte, w int) []ble.ServiceData {
 		UUID: ble.UUID(d[:w]),
 		Data: make([]byte, len(d)-w),
 	}
-	copy(serviceData.Data, d[2:])
+	copy(serviceData.Data, d[w:])
 	return append(sd, serviceData)
 }
