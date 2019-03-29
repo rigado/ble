@@ -193,9 +193,6 @@ func TestParserArrays(t *testing.T) {
 		types.sol16,
 		types.sol32,
 		types.sol128,
-		types.svc16,
-		types.svc32,
-		types.svc128,
 	}
 
 	for _, v := range types {
@@ -317,6 +314,9 @@ func TestParserNonArrays(t *testing.T) {
 		types.namecomp,
 		types.txpwr,
 		types.mfgdata,
+		types.svc16,
+		types.svc32,
+		types.svc128,
 	}
 
 	for _, v := range types {
@@ -407,7 +407,7 @@ func TestParserCombined(t *testing.T) {
 	}
 }
 
-func TestRealAdv(t *testing.T) {
+func TestIBeacon(t *testing.T) {
 	u128 := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	p, _ := NewPacket(Flags(123), IBeacon(u128, 12345, 45678, 56))
 	b := p.Bytes()
@@ -442,5 +442,78 @@ func TestRealAdv(t *testing.T) {
 	mdok := reflect.DeepEqual(md, mdexp)
 	if !mdok {
 		t.Fatalf("mismatch:\nexp %v %v\ngot %v %v", mdexp, reflect.TypeOf(mdexp), md, reflect.TypeOf(md))
+	}
+}
+
+func testServiceData(typ byte, dl int, t *testing.T) error {
+	if dl < 0 {
+		return fmt.Errorf("invalid data length")
+	}
+
+	switch typ {
+	case types.svc16:
+	case types.svc32:
+	case types.svc128:
+
+	default:
+		return fmt.Errorf("non-svcData type %v", typ)
+	}
+
+	dec, _ := pduDecodeMap[typ]
+
+	p := testPdu{}
+	uuid := make([]byte, dec.minSz)
+	data := make([]byte, dl)
+	for i := range uuid {
+		uuid[i] = byte(i)
+	}
+	for i := range data {
+		data[i] = byte(255 - i)
+	}
+
+	p.add(typ, append(uuid, data...))
+
+	m, err := decode(p.bytes())
+	if err != nil {
+		return fmt.Errorf("decode error %v", err)
+	}
+
+	if len(m) != 1 {
+		return fmt.Errorf("map has %v keys, exp %v", len(m), 1)
+	}
+
+	t.Logf("%+v", m)
+	//check service data
+	sd, ok := m[dec.key].([]byte)
+	if !ok {
+		return fmt.Errorf("svc data key missing %v", dec.key)
+	}
+
+	//uuid ok?
+	sdu := sd[:dec.minSz]
+	sduexp := uuid
+	sduok := reflect.DeepEqual(sdu, sduexp)
+	if !sduok {
+		return fmt.Errorf("svc uuid mismatch:\nexp %v %v\ngot %v %v", sduexp, reflect.TypeOf(sduexp), sdu, reflect.TypeOf(sdu))
+	}
+
+	//data ok
+	sdd := sd[dec.minSz:]
+	sddexp := data
+	sddok := reflect.DeepEqual(sdd, sddexp)
+	if !sddok {
+		return fmt.Errorf("svc data mismatch:\nexp %v %v\ngot %v %v", sddexp, reflect.TypeOf(sddexp), sdd, reflect.TypeOf(sdd))
+	}
+
+	return nil
+}
+
+func TestServiceData(t *testing.T) {
+	types := []byte{types.svc16, types.svc32, types.svc128}
+	for _, v := range types {
+		err := testServiceData(v, 16, t)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

@@ -136,17 +136,17 @@ var pduDecodeMap = map[byte]pduRecord{
 		keys.sol128,
 	},
 	types.svc16: pduRecord{
-		2,
+		0,
 		2,
 		keys.svc16,
 	},
 	types.svc32: pduRecord{
-		4,
+		0,
 		4,
 		keys.svc32,
 	},
 	types.svc128: pduRecord{
-		16,
+		0,
 		16,
 		keys.svc128,
 	},
