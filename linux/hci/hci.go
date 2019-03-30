@@ -405,6 +405,9 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		return nil
 	}
 
+	var a *Advertisement
+	var err error
+
 	e := evt.LEAdvertisingReport(b)
 
 	nr, err := e.NumReportsWErr()
@@ -420,19 +423,18 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 	}
 
 	for i := 0; i < int(nr); i++ {
-		et, err := e.EventTypeWErr(i)
+		var et byte
+		et, err = e.EventTypeWErr(i)
 		if err != nil {
 			h.makeAdvError(errors.Wrap(err, "advRep eventType"), e, true)
 			continue
 		}
 
-		var a *Advertisement
-
 		switch et {
 		case evtTypAdvInd: //0x00
 			fallthrough
 		case evtTypAdvScanInd: //0x02
-			a, err := newAdvertisement(e, i)
+			a, err = newAdvertisement(e, i)
 			if err != nil {
 				h.makeAdvError(errors.Wrap(err, fmt.Sprintf("newAdv (typ %v)", et)), e, true)
 				continue
@@ -442,6 +444,8 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			if h.adLast == len(h.adHist) {
 				h.adLast = 0
 			}
+
+			//advInd, advScanInd
 
 		case evtTypScanRsp: //0x04
 			sr, err := newAdvertisement(e, i)
@@ -474,7 +478,6 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 
 				//set the scan response here
 				if addrh.String() == addrsr.String() {
-
 					//this will leave everything alone if there is an error when we attach the scanresp
 					err = h.adHist[idx].setScanResponse(sr)
 					if err != nil {
@@ -484,13 +487,14 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 					a = h.adHist[idx]
 					break
 				}
-			}
+			} //for
 
 			// Got a SR without having received an associated AD before?
 			if a == nil {
 				ee := h.makeAdvError(errors.Wrap(err, fmt.Sprintf("scanRsp (typ %v) w/o associated advData, srAddr %v", et, sr.Addr())), e, true)
 				return ee
 			}
+			// sr
 
 		case evtTypAdvDirectInd: //0x01
 			fallthrough
@@ -504,10 +508,10 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		default:
 			h.makeAdvError(fmt.Errorf("invalid eventType %v", et), e, true)
 			continue
-		}
+		} // switch
 
 		if a == nil {
-			h.makeAdvError(fmt.Errorf("nil advertisement (typ %v)", et), e, true)
+			h.makeAdvError(fmt.Errorf("nil advertisement (i %v, typ %v)", i, et), e, true)
 			continue
 		}
 
@@ -517,7 +521,8 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 		} else {
 			go h.advHandler(a)
 		}
-	}
+
+	} //for
 
 	return nil
 }
