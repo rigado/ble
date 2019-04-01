@@ -7,24 +7,6 @@ import (
 	"github.com/go-ble/ble"
 )
 
-// func (a *Advertisement) packetsWErr() (*adv.Packet, error) {
-// 	if a.p != nil {
-// 		return a.p, nil
-// 	}
-
-// 	p1, err := a.dataWErr()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	p2, err := a.scanResponseWErr()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return adv.NewRawPacket(p1, p2)
-// }
-
 func (a *Advertisement) localNameWErr() (string, error) {
 	if a.p == nil {
 		return "", fmt.Errorf("nil packet")

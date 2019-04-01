@@ -194,50 +194,11 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 		m[keys.RSSI] = -128
 	}
 
-	// //build the packets and bail before we try picking stuff out
-	// _, err = a.packetsWErr()
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "pdu")
-	// }
-
-	ln, err := a.localNameWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, keys.Name)
-	}
-	if len(ln) != 0 {
-		m[keys.Name] = ln
-	}
-
-	md, err := a.manufacturerDataWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, keys.MFG)
-	}
-	if md != nil {
-		m[keys.MFG] = md
-	}
-
-	v, err := a.servicesWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, keys.Services)
-	}
-	if v != nil {
-		m[keys.Services] = v
-	}
-
-	sd, err := a.serviceDataWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, keys.ServiceData)
-	}
-	if sd != nil {
-		m[keys.ServiceData] = sd
-	}
-
-	ss, err := a.solicitedServiceWErr()
-	if err != nil {
-		return nil, errors.Wrap(err, keys.Solicited)
-	}
-	if ss != nil {
-		m[keys.Solicited] = ss
+	//join the adv data maps
+	if a.p != nil {
+		for k, v := range a.p.Map() {
+			m[k] = v
+		}
 	}
 
 	return m, nil

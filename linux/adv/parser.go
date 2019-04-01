@@ -3,6 +3,7 @@ package adv
 import (
 	"fmt"
 
+	"github.com/go-ble/ble"
 	"github.com/pkg/errors"
 )
 
@@ -47,45 +48,26 @@ var types = struct {
 
 var keys = struct {
 	flags       string
-	uuid16inc   string
-	uuid16comp  string
-	uuid32inc   string
-	uuid32comp  string
-	uuid128inc  string
-	uuid128comp string
-	sol16       string
-	sol32       string
-	sol128      string
-	svc16       string
-	svc32       string
-	svc128      string
-	nameshort   string
-	namecomp    string
+	services    string
+	solicited   string
+	serviceData string
+	localName   string
 	txpwr       string
 	mfgdata     string
 }{
 	flags:       "flags",
-	uuid16inc:   "uuid16",
-	uuid16comp:  "uuid16",
-	uuid32inc:   "uuid32",
-	uuid32comp:  "uuid32",
-	uuid128inc:  "uuid128",
-	uuid128comp: "uuid128",
-	sol16:       "sol16",
-	sol32:       "sol32",
-	sol128:      "sol128",
-	svc16:       "svc16",
-	svc32:       "svc32",
-	svc128:      "svc128",
-	nameshort:   "name",
-	namecomp:    "name",
-	txpwr:       "txpwr",
+	services:    "services",
+	solicited:   "solicited",
+	serviceData: "serviceData",
+	localName:   "name",
+	txpwr:       "txPower",
 	mfgdata:     "mfg",
 }
 
 type pduRecord struct {
 	arrayElementSz int
 	minSz          int
+	svcDataUUIDSz  int
 	key            string
 }
 
@@ -93,91 +75,108 @@ var pduDecodeMap = map[byte]pduRecord{
 	types.uuid16inc: pduRecord{
 		2,
 		2,
-		keys.uuid16inc,
+		0,
+		keys.services,
 	},
 	types.uuid16comp: pduRecord{
 		2,
 		2,
-		keys.uuid16comp,
+		0,
+		keys.services,
 	},
 	types.uuid32inc: pduRecord{
 		4,
 		4,
-		keys.uuid32inc,
+		0,
+		keys.services,
 	},
 	types.uuid32comp: pduRecord{
 		4,
 		4,
-		keys.uuid32comp,
+		0,
+		keys.services,
 	},
 	types.uuid128inc: pduRecord{
 		16,
 		16,
-		keys.uuid128inc,
+		0,
+		keys.services,
 	},
 	types.uuid128comp: pduRecord{
 		16,
 		16,
-		keys.uuid128comp,
+		0,
+		keys.services,
 	},
 	types.sol16: pduRecord{
 		2,
 		2,
-		keys.sol16,
+		0,
+		keys.solicited,
 	},
 	types.sol32: pduRecord{
 		4,
 		4,
-		keys.sol32,
+		0,
+		keys.solicited,
 	},
 	types.sol128: pduRecord{
 		16,
 		16,
-		keys.sol128,
+		0,
+		keys.solicited,
 	},
 	types.svc16: pduRecord{
 		0,
 		2,
-		keys.svc16,
+		2,
+		keys.serviceData,
 	},
 	types.svc32: pduRecord{
 		0,
 		4,
-		keys.svc32,
+		4,
+		keys.serviceData,
 	},
 	types.svc128: pduRecord{
 		0,
 		16,
-		keys.svc128,
+		16,
+		keys.serviceData,
 	},
 	types.namecomp: pduRecord{
 		0,
 		1,
-		keys.namecomp,
+		0,
+		keys.localName,
 	},
 	types.nameshort: pduRecord{
 		0,
 		1,
-		keys.nameshort,
+		0,
+		keys.localName,
 	},
 	types.txpwr: pduRecord{
 		0,
 		1,
+		0,
 		keys.txpwr,
 	},
 	types.mfgdata: pduRecord{
 		0,
 		1,
+		0,
 		keys.mfgdata,
 	},
 	types.flags: pduRecord{
 		0,
 		1,
+		0,
 		keys.flags,
 	},
 }
 
-func getArray(size int, bytes []byte) ([]interface{}, error) {
+func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 	//valid size?
 	if size <= 0 {
 		return nil, fmt.Errorf("invalid size")
@@ -196,7 +195,7 @@ func getArray(size int, bytes []byte) ([]interface{}, error) {
 	}
 
 	//prealloc
-	arr := make([]interface{}, 0, count)
+	arr := make([]ble.UUID, 0, count)
 
 	for j := 0; j < len(bytes); j += size {
 		o := bytes[j:(j + size)]
@@ -253,11 +252,29 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 				if err != nil {
 					return nil, errors.Wrap(err, fmt.Sprintf("adv type %v", typ))
 				}
-				m[dec.key] = arr
+
+				v, ok := m[dec.key].([]ble.UUID)
+				if !ok {
+					//nx key
+					m[dec.key] = arr
+				} else {
+					m[dec.key] = append(v, arr...)
+				}
+
+			} else if dec.svcDataUUIDSz > 0 {
+				sd := ble.ServiceData{UUID: bytes[:dec.svcDataUUIDSz], Data: bytes[dec.svcDataUUIDSz:]}
+				v, ok := m[dec.key].([]ble.ServiceData)
+				if !ok {
+					//nx key
+					m[dec.key] = []ble.ServiceData{sd}
+				} else {
+					m[dec.key] = append(v, sd)
+				}
 			} else {
 				//we already checked for min length so just copy
 				m[dec.key] = bytes
 			}
+
 		}
 
 		i += (length + 1)

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/go-ble/ble"
 )
 
 type testPdu struct {
@@ -155,7 +157,7 @@ func testArrayGood(typ byte, t *testing.T) error {
 	}
 
 	//check type
-	vv, ok := v.([]interface{})
+	vv, ok := v.([]ble.UUID)
 	if !ok {
 		return fmt.Errorf("wrong type %v", reflect.TypeOf(v))
 	}
@@ -166,15 +168,15 @@ func testArrayGood(typ byte, t *testing.T) error {
 	}
 
 	//check contents
-	ok = reflect.DeepEqual(vv[0], b1)
+	ok = reflect.DeepEqual(vv[0], ble.UUID(b1))
 	if !ok {
 		return fmt.Errorf("mismatch @ 0")
 	}
-	ok = reflect.DeepEqual(vv[1], b2)
+	ok = reflect.DeepEqual(vv[1], ble.UUID(b2))
 	if !ok {
 		return fmt.Errorf("mismatch @ 1")
 	}
-	ok = reflect.DeepEqual(vv[2], b3)
+	ok = reflect.DeepEqual(vv[2], ble.UUID(b3))
 	if !ok {
 		return fmt.Errorf("mismatch @ 2")
 	}
@@ -314,9 +316,9 @@ func TestParserNonArrays(t *testing.T) {
 		types.namecomp,
 		types.txpwr,
 		types.mfgdata,
-		types.svc16,
-		types.svc32,
-		types.svc128,
+		// types.svc16,
+		// types.svc32,
+		// types.svc128,
 	}
 
 	for _, v := range types {
@@ -349,62 +351,40 @@ func TestParserCombined(t *testing.T) {
 	if err != nil {
 		t.Fatalf("combined adv decode err %v", err)
 	}
+	t.Log(m, err)
+	ms, msok := m[keys.services].([]ble.UUID)
+	mf, mfok := m[keys.flags].([]byte)
 
-	mu16, mu16ok := m["uuid16"]
-	mu128, mu128ok := m["uuid128"]
-	mf, mfok := m["flags"]
-
-	if !mu16ok || !mu128ok || !mfok {
-		t.Fatalf("decoded map is missing a key")
+	if !msok || !mfok {
+		t.Fatalf("decoded map is missing key")
 	}
 
-	//check flag
-	switch mf.(type) {
-	case interface{}:
-		ok := reflect.DeepEqual(mf.(interface{}), flags)
-		if !ok {
-			t.Fatalf("flag mismatch at idx 0")
-		}
-
-	default:
-		t.Fatalf("got invalid flag type, %v", reflect.TypeOf(mu16))
+	//flag?
+	if !reflect.DeepEqual(mf, flags) {
+		t.Fatalf("flags mismatch")
 	}
 
-	//check uuid16
-	switch mu16.(type) {
-	case []interface{}:
-		ok0 := reflect.DeepEqual(mu16.([]interface{})[0], u16[0:2])
-		if !ok0 {
-			t.Fatalf("uuid16 mismatch at idx 0")
-		}
-		ok1 := reflect.DeepEqual(mu16.([]interface{})[1], u16[2:])
-		if !ok1 {
-			t.Fatalf("uuid16 mismatch at idx 1")
-		}
-
-		if len(mu16.([]interface{})) != 2 {
-			t.Fatalf("uuid16 count != 2")
-		}
-
-	default:
-		t.Fatalf("got invalid uuid16 type, %v", reflect.TypeOf(mu16))
+	//count?
+	if len(ms) != 3 {
+		t.Fatalf("incorrect service count exp %v, got %v", 3, len(ms))
 	}
 
-	//check uuid128
-	switch mu128.(type) {
-	case []interface{}:
-		ok := reflect.DeepEqual(mu128.([]interface{})[0], u128)
-		if !ok {
-			t.Fatalf("uuid128 mismatch at idx 0")
-		}
-
-		if len(mu128.([]interface{})) != 1 {
-			t.Fatalf("uuid128 count != 1")
-		}
-
-	default:
-		t.Fatalf("got invalid uuid128 type, %v", reflect.TypeOf(mu16))
+	//uuid16
+	ok0 := reflect.DeepEqual(ms[0], ble.UUID(u16[0:2]))
+	if !ok0 {
+		t.Fatalf("uuid16 mismatch at idx 0")
 	}
+	ok1 := reflect.DeepEqual(ms[1], ble.UUID(u16[2:]))
+	if !ok1 {
+		t.Fatalf("uuid16 mismatch at idx 1")
+	}
+
+	//uuid128
+	ok3 := reflect.DeepEqual(ms[2], ble.UUID(u128))
+	if !ok3 {
+		t.Fatalf("uuid128 mismatch at idx 0")
+	}
+
 }
 
 func TestIBeacon(t *testing.T) {
@@ -484,21 +464,21 @@ func testServiceData(typ byte, dl int, t *testing.T) error {
 
 	t.Logf("%+v", m)
 	//check service data
-	sd, ok := m[dec.key].([]byte)
+	sd, ok := m[dec.key].([]ble.ServiceData)
 	if !ok {
 		return fmt.Errorf("svc data key missing %v", dec.key)
 	}
 
 	//uuid ok?
-	sdu := sd[:dec.minSz]
-	sduexp := uuid
+	sdu := sd[0].UUID
+	sduexp := ble.UUID(uuid)
 	sduok := reflect.DeepEqual(sdu, sduexp)
 	if !sduok {
 		return fmt.Errorf("svc uuid mismatch:\nexp %v %v\ngot %v %v", sduexp, reflect.TypeOf(sduexp), sdu, reflect.TypeOf(sdu))
 	}
 
 	//data ok
-	sdd := sd[dec.minSz:]
+	sdd := sd[0].Data
 	sddexp := data
 	sddok := reflect.DeepEqual(sdd, sddexp)
 	if !sddok {
@@ -517,3 +497,23 @@ func TestServiceData(t *testing.T) {
 		}
 	}
 }
+
+// func TestFieldCombo(t *testing.T) {
+// 	p := testPdu{}
+// 	p.add(types.flags, []byte{99})
+// 	p.add(types.uuid16comp, []byte{1, 2, 34, 56})
+// 	p.add(types.uuid16inc, []byte{3, 4})
+// 	p.add(types.uuid32comp, []byte{5, 6, 7, 8})
+// 	p.add(types.uuid32inc, []byte{9, 10, 11, 12, 1, 2, 3, 4})
+// 	p.add(types.uuid128comp, []byte{1, 2, 3, 4, 5, 6, 7, 8, 11, 22, 33, 44, 55, 66, 77, 88})
+// 	p.add(types.uuid128inc, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
+// 	p.add(types.mfgdata, []byte{99, 88, 77, 66, 55, 44})
+// 	p.add(types.svc16, []byte{0x11, 0x22, 33, 44, 55, 66, 77})
+// 	p.add(types.svc32, []byte{0x11, 0x22, 0x33, 0x44, 55, 66, 77, 88, 99, 10, 11})
+// 	p.add(types.svc128, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0xff})
+
+// 	m, err := decode(p.bytes())
+// 	t.Fatal(m, err)
+
+// 	// v, ok := m[keys.uuid128comp].([]interface{})
+// }

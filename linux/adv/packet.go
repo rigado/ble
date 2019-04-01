@@ -2,7 +2,6 @@ package adv
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/go-ble/ble"
 	"github.com/pkg/errors"
@@ -23,6 +22,10 @@ func (p *Packet) Bytes() []byte {
 // Len returns the length of the packet.
 func (p *Packet) Len() int {
 	return len(p.b)
+}
+
+func (p *Packet) Map() map[string]interface{} {
+	return p.m
 }
 
 // NewPacket returns a new advertising Packet.
@@ -177,42 +180,6 @@ func ServiceData16(id uint16, b []byte) Field {
 	}
 }
 
-func (p *Packet) getUUIDsByType(typ byte, u []ble.UUID, w int) []ble.UUID {
-	var k string
-	switch typ {
-	case types.uuid16comp:
-		k = keys.uuid16comp
-	case types.uuid16inc:
-		k = keys.uuid16inc
-	case types.uuid32comp:
-		k = keys.uuid32comp
-	case types.uuid32inc:
-		k = keys.uuid32inc
-	case types.uuid128comp:
-		k = keys.uuid128comp
-	case types.uuid128inc:
-		k = keys.uuid128inc
-	default:
-		fmt.Printf("invalid type %v for UUIDs", typ)
-		return u
-	}
-
-	v, ok := p.m[k].([]interface{})
-	if !ok {
-		return u
-	}
-
-	//v should be [][]byte
-	for _, vv := range v {
-		b, ok := vv.([]byte)
-		if !ok {
-			continue
-		}
-		u = append(u, b)
-	}
-	return u
-}
-
 // Flags returns the flags of the packet.
 func (p *Packet) Flags() (flags byte, present bool) {
 	if b, ok := p.m[keys.flags].([]byte); ok {
@@ -223,15 +190,9 @@ func (p *Packet) Flags() (flags byte, present bool) {
 
 // LocalName returns the ShortName or CompleteName if it presents.
 func (p *Packet) LocalName() string {
-	if b, ok := p.m[keys.namecomp].([]byte); ok {
+	if b, ok := p.m[keys.localName].([]byte); ok {
 		return string(b)
 	}
-
-	//DSC: nameshort/complete both use the same key
-	// if b, ok := p.m[keys.nameshort].([]byte); ok {
-	// 	return string(b)
-	// }
-
 	return ""
 }
 
@@ -246,67 +207,24 @@ func (p *Packet) TxPower() (power int, present bool) {
 
 // UUIDs returns a list of service UUIDs.
 func (p *Packet) UUIDs() []ble.UUID {
-	var u []ble.UUID
-	u = p.getUUIDsByType(someUUID16, u, 2)
-	u = p.getUUIDsByType(allUUID16, u, 2)
-	u = p.getUUIDsByType(someUUID32, u, 4)
-	u = p.getUUIDsByType(allUUID32, u, 4)
-	u = p.getUUIDsByType(someUUID128, u, 16)
-	u = p.getUUIDsByType(allUUID128, u, 16)
-	return u
+	v, _ := p.m[keys.services].([]ble.UUID)
+	return v
 }
 
 // ServiceSol ...
 func (p *Packet) ServiceSol() []ble.UUID {
-	var u []ble.UUID
-	if b, ok := p.m[keys.sol16].([]byte); ok {
-		u = uuidList(u, b, 2)
-	}
-	if b, ok := p.m[keys.sol32].([]byte); ok {
-		u = uuidList(u, b, 4)
-	}
-	if b, ok := p.m[keys.sol128].([]byte); ok {
-		u = uuidList(u, b, 16)
-	}
-	return u
+	v, _ := p.m[keys.solicited].([]ble.UUID)
+	return v
 }
 
 // ServiceData ...
 func (p *Packet) ServiceData() []ble.ServiceData {
-	var s []ble.ServiceData
-
-	if b, ok := p.m[keys.svc16].([]byte); ok {
-		s = serviceDataList(s, b, 2)
-	}
-	if b, ok := p.m[keys.svc32].([]byte); ok {
-		s = serviceDataList(s, b, 4)
-	}
-	if b, ok := p.m[keys.svc128].([]byte); ok {
-		s = serviceDataList(s, b, 16)
-	}
-	return s
+	v, _ := p.m[keys.serviceData].([]ble.ServiceData)
+	return v
 }
 
 // ManufacturerData returns the ManufacturerData field if it presents.
 func (p *Packet) ManufacturerData() []byte {
 	v, _ := p.m[keys.mfgdata].([]byte)
 	return v
-}
-
-// Utility function for creating a list of uuids.
-func uuidList(u []ble.UUID, d []byte, w int) []ble.UUID {
-	for len(d) > 0 {
-		u = append(u, ble.UUID(d[:w]))
-		d = d[w:]
-	}
-	return u
-}
-
-func serviceDataList(sd []ble.ServiceData, d []byte, w int) []ble.ServiceData {
-	serviceData := ble.ServiceData{
-		UUID: ble.UUID(d[:w]),
-		Data: make([]byte, len(d)-w),
-	}
-	copy(serviceData.Data, d[w:])
-	return append(sd, serviceData)
 }
