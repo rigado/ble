@@ -55,13 +55,13 @@ var keys = struct {
 	txpwr       string
 	mfgdata     string
 }{
-	flags:       "flags",
-	services:    "services",
-	solicited:   "solicited",
-	serviceData: "serviceData",
-	localName:   "name",
-	txpwr:       "txPower",
-	mfgdata:     "mfg",
+	flags:       ble.AdvertisementMapKeys.Flags,
+	services:    ble.AdvertisementMapKeys.Services,
+	solicited:   ble.AdvertisementMapKeys.Solicited,
+	serviceData: ble.AdvertisementMapKeys.ServiceData,
+	localName:   ble.AdvertisementMapKeys.Name,
+	txpwr:       ble.AdvertisementMapKeys.TxPower,
+	mfgdata:     ble.AdvertisementMapKeys.MFG,
 }
 
 type pduRecord struct {
@@ -207,7 +207,7 @@ func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 
 func decode(pdu []byte) (map[string]interface{}, error) {
 	if pdu == nil {
-		return nil, fmt.Errorf("nil pdu")
+		return nil, fmt.Errorf("invalid pdu: %v", pdu)
 	}
 
 	m := make(map[string]interface{})
@@ -278,10 +278,6 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 		}
 
 		i += (length + 1)
-	}
-
-	if len(m) == 0 {
-		fmt.Println("parsed adv to empty map")
 	}
 
 	return m, nil

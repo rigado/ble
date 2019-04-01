@@ -32,6 +32,8 @@ var AdvertisementMapKeys = struct {
 	Connectable string
 	Solicited   string
 	EventType   string
+	Flags       string
+	TxPower     string
 }{
 	MAC:         "mac",
 	RSSI:        "rssi",
@@ -42,6 +44,8 @@ var AdvertisementMapKeys = struct {
 	Connectable: "connectable",
 	Solicited:   "solicited",
 	EventType:   "eventType",
+	Flags:       "flags",
+	TxPower:     "txPower",
 }
 
 // ServiceData ...
