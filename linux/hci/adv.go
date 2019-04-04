@@ -197,7 +197,12 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 	//join the adv data maps
 	if a.p != nil {
 		for k, v := range a.p.Map() {
-			m[k] = v
+			//some special processing requirements for certain keys
+			if k == keys.Name {
+				m[k] = string(v)
+			} else {
+				m[k] = v
+			}
 		}
 	}
 
