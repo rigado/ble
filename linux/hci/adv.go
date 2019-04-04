@@ -197,7 +197,23 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 	//join the adv data maps
 	if a.p != nil {
 		for k, v := range a.p.Map() {
-			m[k] = v
+			//some special processing requirements for certain keys
+			//todo: this should be handled better in the parser
+			if k == keys.Name {
+				if bytes, ok := v.([]byte); ok {
+					m[k] = string(bytes)
+				} else {
+					m[k] = v
+				}
+			} else if k == keys.TxPower {
+				if bytes, ok := v.([]byte); ok {
+					m[k] = int(bytes[0])
+				} else {
+					m[k] = v
+				}
+			} else {
+				m[k] = v
+			}
 		}
 	}
 
