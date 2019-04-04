@@ -200,6 +200,8 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 			//some special processing requirements for certain keys
 			if k == keys.Name {
 				m[k] = string(v)
+			} else if k == keys.TxPower {
+				m[k] = int(v)
 			} else {
 				m[k] = v
 			}
