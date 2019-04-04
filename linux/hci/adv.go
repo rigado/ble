@@ -198,10 +198,19 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 	if a.p != nil {
 		for k, v := range a.p.Map() {
 			//some special processing requirements for certain keys
+			//todo: this should be handled better in the parser
 			if k == keys.Name {
-				m[k] = string(v)
+				if bytes, ok := v.([]byte); ok {
+					m[k] = string(bytes)
+				} else {
+					m[k] = v
+				}
 			} else if k == keys.TxPower {
-				m[k] = int(v)
+				if bytes, ok := v.([]byte); ok {
+					m[k] = int(bytes[0])
+				} else {
+					m[k] = v
+				}
 			} else {
 				m[k] = v
 			}

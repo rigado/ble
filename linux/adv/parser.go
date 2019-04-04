@@ -277,7 +277,7 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 
 		}
 
-		i += (length + 1)
+		i += length + 1
 	}
 
 	return m, nil
