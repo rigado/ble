@@ -2,6 +2,7 @@ package hci
 
 import (
 	"fmt"
+	"golang.org/x/sys/unix"
 	"io"
 	"net"
 	"strings"
@@ -53,6 +54,9 @@ func NewHCI(opts ...ble.Option) (*HCI, error) {
 		chSlaveConn:  make(chan *Conn),
 
 		done: make(chan bool),
+
+		//set a default handler here to remove nil check on function
+		toHandler: func(e error) { fmt.Println("skt timeout:", e)},
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -98,6 +102,7 @@ type HCI struct {
 	// The adHist and adLast are allocated in the Scan().
 	advHandlerSync bool
 	advHandler     ble.AdvHandler
+	toHandler	   ble.TimeoutHandler
 	adHist         []*Advertisement
 	adLast         int
 
@@ -299,6 +304,12 @@ func (h *HCI) sktLoop() {
 	for {
 		n, err := h.skt.Read(b)
 		if n == 0 || err != nil {
+			if e, ok := err.(unix.Errno); ok {
+				if e == unix.EAGAIN {
+					h.toHandler(err)
+					continue
+				}
+			}
 			if err == io.EOF {
 				h.err = err //callers depend on detecting io.EOF, don't wrap it.
 			} else {

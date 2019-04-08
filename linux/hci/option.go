@@ -2,6 +2,7 @@ package hci
 
 import (
 	"errors"
+	"github.com/go-ble/ble"
 	"time"
 
 	"github.com/go-ble/ble/linux/hci/cmd"
@@ -62,5 +63,10 @@ func (h *HCI) SetAdvHandlerSync(sync bool) error {
 // SetErrorHandler ...
 func (h *HCI) SetErrorHandler(handler func(error)) error {
 	h.errorHandler = handler
+	return nil
+}
+
+func (h *HCI) SetTimeoutHandler(handler ble.TimeoutHandler) error {
+	h.toHandler = handler
 	return nil
 }

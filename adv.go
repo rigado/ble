@@ -3,6 +3,9 @@ package ble
 // AdvHandler handles advertisement.
 type AdvHandler func(a Advertisement)
 
+// TimeoutHandler handles HCI timeouts.
+type TimeoutHandler func(e error)
+
 // AdvFilter returns true if the advertisement matches specified condition.
 type AdvFilter func(a Advertisement) bool
 

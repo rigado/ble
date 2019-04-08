@@ -71,6 +71,15 @@ func NewSocket(id int) (*Socket, error) {
 		return open(fd, id)
 	}
 
+	//set a reasonable timeout
+	tv := unix.Timeval{
+		Sec:10,
+	}
+	err = unix.SetsockoptTimeval(fd,unix.SOL_SOCKET,unix.SO_RCVTIMEO,&tv)
+	if err != nil {
+		return nil, errors.Wrap(err, "can't set read timeout")
+	}
+
 	req := devListRequest{devNum: hciMaxDevices}
 	if err = ioctl(uintptr(fd), hciGetDeviceList, uintptr(unsafe.Pointer(&req))); err != nil {
 		return nil, errors.Wrap(err, "can't get device list")
