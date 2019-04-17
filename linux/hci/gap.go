@@ -201,7 +201,10 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	h.params.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
 	if _, ok := a.(RandomAddress); ok {
 		h.params.connParams.PeerAddressType = 1
+	}else if (b[0] & byte(0xc0)) == byte(0xc0) {
+		h.params.connParams.PeerAddressType = 1
 	}
+
 	if err = h.Send(&h.params.connParams, nil); err != nil {
 		return nil, err
 	}
