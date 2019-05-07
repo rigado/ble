@@ -262,14 +262,25 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 				}
 
 			} else if dec.svcDataUUIDSz > 0 {
-				sd := ble.ServiceData{UUID: bytes[:dec.svcDataUUIDSz], Data: bytes[dec.svcDataUUIDSz:]}
-				v, ok := m[dec.key].([]ble.ServiceData)
+				su := ble.UUID(bytes[:dec.svcDataUUIDSz]).String()
+				sd := bytes[dec.svcDataUUIDSz:]
+
+				// service data map?
+				msd, ok := m[dec.key].(map[string]interface{})
 				if !ok {
-					//nx key
-					m[dec.key] = []ble.ServiceData{sd}
-				} else {
-					m[dec.key] = append(v, sd)
+					msd = make(map[string]interface{})
 				}
+
+				// add/append
+				arr, ok := msd[su].([]interface{})
+				if !ok {
+					msd[su] = []interface{}{sd}
+				} else {
+					msd[su] = append(arr, sd)
+				}
+
+				//save result
+				m[dec.key] = msd
 			} else {
 				//we already checked for min length so just copy
 				m[dec.key] = bytes
@@ -277,7 +288,7 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 
 		}
 
-		i += (length + 1)
+		i += length + 1
 	}
 
 	return m, nil
