@@ -236,12 +236,10 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 		//fmt.Printf("type %v, len %v, cur %v, start %v, end %v, bytes %v\n", typ, length, i, start, end, bytes)
 
 		dec, ok := pduDecodeMap[typ]
-		if !ok {
-			fmt.Printf("ignored unsupported adv type %v\n", typ)
-		} else {
+		if ok {
 			//have min length?
 			if dec.minSz > len(bytes) {
-				return nil, fmt.Errorf("adv type %v: min length %v, have %v\n", typ, dec.minSz, len(bytes))
+				return nil, fmt.Errorf("adv type %v: min length %v, have %v", typ, dec.minSz, len(bytes))
 			}
 
 			//expecting array?
@@ -285,7 +283,6 @@ func decode(pdu []byte) (map[string]interface{}, error) {
 				//we already checked for min length so just copy
 				m[dec.key] = bytes
 			}
-
 		}
 
 		i += length + 1
