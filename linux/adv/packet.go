@@ -219,8 +219,28 @@ func (p *Packet) ServiceSol() []ble.UUID {
 
 // ServiceData ...
 func (p *Packet) ServiceData() []ble.ServiceData {
-	v, _ := p.m[keys.serviceData].([]ble.ServiceData)
-	return v
+	m, ok := p.m[keys.serviceData].(map[string][]interface{})
+	if !ok {
+		return nil
+	}
+
+	// map -> array
+	out := []ble.ServiceData{}
+	for su, arr := range m {
+		for _, v := range arr {
+			sd, ok := v.([]byte)
+			if !ok {
+				continue
+			}
+			u, err := ble.Parse(su)
+			if err != nil {
+				continue
+			}
+			out = append(out, ble.ServiceData{UUID: u, Data: sd})
+		}
+	}
+
+	return out
 }
 
 // ManufacturerData returns the ManufacturerData field if it presents.
