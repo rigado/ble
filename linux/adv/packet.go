@@ -225,7 +225,7 @@ func (p *Packet) ServiceData() []ble.ServiceData {
 	}
 
 	// map -> array
-	arr := []ble.ServiceData{}
+	out := []ble.ServiceData{}
 	for su, arr := range m {
 		for _, v := range arr {
 			sd, ok := v.([]byte)
@@ -236,11 +236,11 @@ func (p *Packet) ServiceData() []ble.ServiceData {
 			if err != nil {
 				continue
 			}
-			arr = append(arr, ble.ServiceData{UUID: u, Data: sd})
+			out = append(out, ble.ServiceData{UUID: u, Data: sd})
 		}
 	}
 
-	return arr
+	return out
 }
 
 // ManufacturerData returns the ManufacturerData field if it presents.
