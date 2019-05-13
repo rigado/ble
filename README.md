@@ -10,14 +10,14 @@
 
 You may have found your way here from https://github.com/go-ble/ble. Thank you for looking!
 
-Rigado is activitly using this repository for internal development. You are free to use it per the MIT license agreement.
+Rigado is actively using this repository for internal development. You are free to use it per the MIT license agreement.
 
 However, Rigado cannot guarantee API stability. 
 
 Please note that while this package contains support for Mac OS, Rigado is not actively maintaining that portion of
 the codebase.
 
-If you perfer a more stable version, we suggest you fork either this repository or the archived repository at https://github.com/go-ble/ble.
+If you prefer a more stable version, we suggest you fork either this repository or the archived repository at https://github.com/go-ble/ble.
 
 
 
