@@ -40,7 +40,7 @@ func NewHCI(opts ...ble.Option) (*HCI, error) {
 		id: -1,
 
 		chCmdPkt:  make(chan *pkt),
-		chCmdBufs: make(chan []byte, 16),
+		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
 		muSent:    &sync.Mutex{},
 
@@ -245,7 +245,16 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		return nil, h.err
 	}
 	p := &pkt{c, make(chan []byte)}
-	b := <-h.chCmdBufs
+
+	// get buffer w/timeout
+	var b []byte
+	select {
+	case b = <-h.chCmdBufs:
+		//ok
+	case <-time.After(chCmdBufTimeout):
+		return nil, fmt.Errorf("chCmdBufs get timeout")
+	}
+
 	b[0] = byte(pktTypeCommand) // HCI header
 	b[1] = byte(c.OpCode())
 	b[2] = byte(c.OpCode() >> 8)
@@ -548,6 +557,13 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 
 func (h *HCI) handleCommandStatus(b []byte) error {
 	e := evt.CommandStatus(b)
+
+	if !e.Valid() {
+		err := fmt.Errorf("invalid command status: %v", e)
+		h.dispatchError(err)
+		return err
+	}
+
 	h.setAllowedCommands(int(e.NumHCICommandPackets()))
 
 	h.muSent.Lock()
@@ -668,16 +684,20 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 }
 
 func (h *HCI) setAllowedCommands(n int) {
-
-	//hard-coded limit to command queue depth
-	//matches make(chan []byte, 16) in NewHCI
-	// TODO make this a constant, decide correct size
-	if n > 16 {
-		n = 16
+	if n > chCmdBufChanSize {
+		fmt.Println("hci.setAllowedCommands: warning, defaulting %d -> %d", n, chCmdBufChanSize)
+		n = chCmdBufChanSize
 	}
 
+	//put with timeout
 	for len(h.chCmdBufs) < n {
-		h.chCmdBufs <- make([]byte, 64) // TODO make buffer size a constant
+		select {
+		case h.chCmdBufs <- make([]byte, chCmdBufElementSize):
+			//ok
+		case <-time.After(chCmdBufTimeout):
+			h.dispatchError(fmt.Errorf("chCmdBufs put timeout"))
+			break
+		}
 	}
 }
 
