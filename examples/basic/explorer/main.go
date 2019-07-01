@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
+	"github.com/go-ble/ble/linux/hci"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +19,7 @@ var (
 	name   = flag.String("name", "", "name of remote peripheral")
 	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
-	sd     = flag.Duration("sd", 5*time.Second, "scanning duration, 0 for indefinitely")
+	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
 )
 
 func main() {
@@ -33,6 +34,7 @@ func main() {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
+	hci.SmpInit()
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
@@ -65,13 +67,8 @@ func main() {
 		close(done)
 	}()
 
-	<-time.After(5 * time.Second)
-
-	// fmt.Printf("Discovering profile...\n")
-	// p, err := cln.DiscoverProfile(true)
-	// if err != nil {
-	// 	log.Fatalf("can't discover profile: %s", err)
-	// }
+	log.Println("connected!")
+	<-time.After(time.Second)
 
 	log.Println("bonding")
 	err = cln.Bond()
@@ -79,11 +76,18 @@ func main() {
 		log.Println(err)
 	}
 
-	<-time.After(5 * time.Second)
+	// workaround for hanging after send pub key, sometimes works...
+	// fmt.Printf("Discovering profile...\n")
+	// _, err = cln.DiscoverProfile(true)
+	// if err != nil {
+	// 	log.Fatalf("can't discover profile: %s", err)
+	// }
 
 	// log.Println("exploring")
 	// // Start the exploration.
 	// explore(cln, p)
+
+	<-time.After(60 * time.Second)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())

@@ -397,7 +397,7 @@ func (p *Client) HandleNotification(req []byte) {
 }
 
 func (p *Client) Bond() error {
-	return nil
+	return p.conn.Bond()
 }
 
 type sub struct {

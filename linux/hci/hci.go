@@ -3,6 +3,7 @@ package hci
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strings"
 	"sync"
@@ -133,7 +134,7 @@ func (h *HCI) Init() error {
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
 	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
 	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
-	// evt.EncryptionChangeCode:                     todo),
+	h.subh[evt.EncryptionChangeCode] = h.handleUnhandled
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),
@@ -184,6 +185,7 @@ func (h *HCI) Option(opts ...ble.Option) error {
 }
 
 func (h *HCI) init() error {
+	log.Println("hci reset")
 	h.Send(&cmd.Reset{}, nil)
 
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
@@ -681,9 +683,15 @@ func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 
 func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 	e := evt.LELongTermKeyRequest(b)
+	panic(nil)
 	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
+}
+
+func (h *HCI) handleUnhandled(b []byte) error {
+	log.Println("unhandled:", b)
+	return nil
 }
 
 func (h *HCI) setAllowedCommands(n int) {

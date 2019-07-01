@@ -31,6 +31,8 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 		dev.Close()
 		return nil, errors.Wrap(err, "can't init hci")
 	}
+	// _, err = mgmt.NewSocket(1)
+	// log.Println("mgmtskt err:", err)
 
 	srv, err := gatt.NewServerWithNameAndHandler(name, handler)
 	if err != nil {

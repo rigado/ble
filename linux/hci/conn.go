@@ -63,6 +63,8 @@ type Conn struct {
 
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
+
+	pairing *pairingContext
 }
 
 func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
@@ -184,6 +186,27 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 	return sent, nil
 }
 
+func (c *Conn) encrypt() error {
+	if c.pairing == nil {
+		return fmt.Errorf("nil context")
+	}
+
+	if c.pairing.ltk == nil {
+		return fmt.Errorf("nil ltk")
+	}
+
+	m := cmd.LEStartEncryption{}
+	m.ConnectionHandle = c.param.ConnectionHandle()
+
+	for i, v := range c.pairing.ltk {
+		m.LongTermKey[i] = v
+	}
+
+	err := c.hci.Send(&m, nil)
+	fmt.Println("send encrypt:", m, err)
+	return nil
+}
+
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
 func (c *Conn) writePDU(pdu []byte) (int, error) {
 	sent := 0
@@ -244,7 +267,7 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		sent += flen
 
 		flags = (pbfContinuing << 4) // Set "continuing" in the boundary flags for the rest of fragments, if any.
-		pdu = pdu[flen:]             // Advence the point
+		pdu = pdu[flen:]             // Advance the point
 	}
 	return sent, nil
 }
