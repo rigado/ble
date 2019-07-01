@@ -396,6 +396,10 @@ func (p *Client) HandleNotification(req []byte) {
 	}
 }
 
+func (p *Client) Bond() error {
+	return nil
+}
+
 type sub struct {
 	cccdh    uint16
 	ccc      uint16

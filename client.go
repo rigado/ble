@@ -69,4 +69,6 @@ type Client interface {
 
 	// Conn returns the client's current connection.
 	Conn() Conn
+
+	Bond() error
 }

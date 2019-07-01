@@ -9,22 +9,26 @@ import (
 	"time"
 
 	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/examples/lib/dev"
+	"github.com/go-ble/ble/linux"
 	"github.com/pkg/errors"
 )
 
 var (
-	device = flag.String("device", "default", "implementation of ble")
-	name   = flag.String("name", "Gopher", "name of remote peripheral")
-	addr   = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	device = flag.Int("device", 1, "hci index")
+	name   = flag.String("name", "", "name of remote peripheral")
+	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 5*time.Second, "scanning duration, 0 for indefinitely")
 )
 
 func main() {
 	flag.Parse()
+	log.Printf("device: hci%v", *device)
+	log.Printf("name: %v", *name)
+	log.Printf("addr: %v", *addr)
 
-	d, err := dev.NewDevice(*device)
+	optid := ble.OptDeviceID(*device)
+	d, err := linux.NewDeviceWithNameAndHandler("", nil, optid)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
@@ -61,14 +65,25 @@ func main() {
 		close(done)
 	}()
 
-	fmt.Printf("Discovering profile...\n")
-	p, err := cln.DiscoverProfile(true)
+	<-time.After(5 * time.Second)
+
+	// fmt.Printf("Discovering profile...\n")
+	// p, err := cln.DiscoverProfile(true)
+	// if err != nil {
+	// 	log.Fatalf("can't discover profile: %s", err)
+	// }
+
+	log.Println("bonding")
+	err = cln.Bond()
 	if err != nil {
-		log.Fatalf("can't discover profile: %s", err)
+		log.Println(err)
 	}
 
-	// Start the exploration.
-	explore(cln, p)
+	<-time.After(5 * time.Second)
+
+	// log.Println("exploring")
+	// // Start the exploration.
+	// explore(cln, p)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())
