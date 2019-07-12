@@ -219,14 +219,20 @@ func (p *Packet) ServiceSol() []ble.UUID {
 
 // ServiceData ...
 func (p *Packet) ServiceData() []ble.ServiceData {
-	m, ok := p.m[keys.serviceData].(map[string][]interface{})
+	m, ok := p.m[keys.serviceData].(map[string]interface{})
 	if !ok {
 		return nil
 	}
 
 	// map -> array
 	out := []ble.ServiceData{}
-	for su, arr := range m {
+	for su, val := range m {
+
+		arr, ok := val.([]interface{})
+		if !ok {
+			continue
+		}
+
 		for _, v := range arr {
 			sd, ok := v.([]byte)
 			if !ok {
