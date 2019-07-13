@@ -198,9 +198,26 @@ func (c *Conn) encrypt() error {
 	m := cmd.LEStartEncryption{}
 	m.ConnectionHandle = c.param.ConnectionHandle()
 
-	for i, v := range c.pairing.ltk {
+	key := c.pairing.ltk
+	if c.pairing.legacy && len(c.pairing.stk) != 0 {
+		key = c.pairing.stk
+	} else {
+		//expect LTK, EDiv, and Rand to be present
+		if len(c.pairing.ltk) != 16 {
+			return fmt.Errorf("invalid length for ltk")
+		}
+
+		if c.pairing.ediv == 0 || c.pairing.rand == 16 {
+			return fmt.Errorf("ediv and rand must not be 0")
+		}
+	}
+
+	for i, v := range key {
 		m.LongTermKey[i] = v
 	}
+
+	m.EncryptedDiversifier = c.pairing.ediv
+	m.RandomNumber = c.pairing.rand
 
 	err := c.hci.Send(&m, nil)
 	fmt.Println("send encrypt:", m, err)

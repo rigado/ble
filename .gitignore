@@ -2,5 +2,6 @@
 .tags
 .tags1
 
+.idea/
 /examples/bin/*
 vendor/

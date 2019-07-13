@@ -25,6 +25,13 @@ type pairingContext struct {
 	dhkey  []byte
 	ltk    []byte
 	macKey []byte
+	stk []byte
+	ediv uint16
+	rand uint64
+
+	//todo: break into legacy and sc
+	legacyPairingResponse []byte
+	legacy bool
 }
 
 func (p *pairingContext) checkConfirm() error {
@@ -99,5 +106,48 @@ func (p *pairingContext) generateDHKey() error {
 		return err
 	}
 	p.dhkey = dk
+	return nil
+}
+
+func (p *pairingContext) checkLegacyConfirm() error {
+	preq := buildPairingReq(smp.config)
+	pres := p.legacyPairingResponse
+
+
+	la, ok := p.localAddr.([]byte)
+	if !ok {
+		return fmt.Errorf("invalid local address type")
+	}
+
+	ra, ok := p.remoteAddr.([]byte)
+	if !ok {
+		return fmt.Errorf("invalid remote address type")
+	}
+
+	sRand, ok := p.remoteRandom.([]byte)
+	if !ok {
+		return fmt.Errorf("invalid remoate random type")
+	}
+
+	c1, err := smpC1(make([]byte, 16), sRand, preq, pres,
+		la[6],
+		ra[6],
+		la[:6],
+		ra[:6],
+	)
+	if err != nil {
+		return err
+	}
+
+	sConfirm, ok := p.remoteConfirm.([]byte)
+	if !ok {
+		return fmt.Errorf("invalid type for remote confirm")
+	}
+
+	if !bytes.Equal(sConfirm, c1) {
+		return fmt.Errorf("sConfirm does not match: exp %s calc %s",
+			hex.EncodeToString(sConfirm), hex.EncodeToString(c1))
+	}
+
 	return nil
 }

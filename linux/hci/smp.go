@@ -87,3 +87,11 @@ func (c *Conn) handleSMP(p pdu) error {
 func (c *Conn) Bond() error {
 	return c.smpSendPairingRequest()
 }
+
+func isLegacy(authReq byte) bool {
+	if authReq & 0x01 == 0x01 {
+		return false
+	}
+
+	return true
+}

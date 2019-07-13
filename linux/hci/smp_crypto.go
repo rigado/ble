@@ -1,11 +1,8 @@
 package hci
 
 import (
-	"crypto/aes"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/enceve/crypto/cmac"
 )
 
 func smpF4(u, v, x []byte, z uint8) ([]byte, error) {
@@ -104,32 +101,67 @@ func smpG2(u, v, x, y []byte) (uint32, error) {
 	return uint32(out % 1000000), nil
 }
 
-func aesCMAC(key, msg []byte) ([]byte, error) {
-	tmp := swapBuf(key)
-	mCipher, err := aes.NewCipher(tmp)
-	if err != nil {
-		return nil, err
-	}
-
+//smpE: From Bluetooth Core Spec 5.0: Part H, Section 2, 2.2.1
+func smpE(key, msg []byte) ([]byte, error) {
+	tk := swapBuf(key)
 	msgMsb := swapBuf(msg)
 
-	mMac, err := cmac.New(mCipher)
-	if err != nil {
-		return nil, err
+	out := aes128(tk, msgMsb)
+	if out == nil {
+		return nil, fmt.Errorf("failed to encrypt message")
 	}
 
-	mMac.Write(msgMsb)
-
-	return swapBuf(mMac.Sum(nil)), nil
+	return swapBuf(out), nil
 }
 
-func swapBuf(in []byte) []byte {
-	a := make([]byte, 0, len(in))
-	a = append(a, in...)
-	for i := len(a)/2 - 1; i >= 0; i-- {
-		opp := len(a) - 1 - i
-		a[i], a[opp] = a[opp], a[i]
+//smpC1: From Bluetooth Core Spec 5.0: Part H, Section 2, 2.2.3
+func smpC1(k, r, preq, pres []byte, iatP, ratP uint8, la, ra []byte) ([]byte, error) {
+	//p1 = pres || preq || rat’ || iat’
+	p1 := []byte{iatP, ratP}
+	p1 = append(p1, preq...)
+	p1 = append(p1, pres...)
+
+	//p2 = padding || ia || ra
+	p2 := ra
+	p2 = append(p2, la...)
+	p2 = append(p2, []byte{0, 0, 0, 0}...)
+
+	rXorP1 := xorSlice(r, p1)
+	msg1, err := smpE(k, rXorP1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt rxorp1: %s", err)
 	}
 
-	return a
+	msg1XorP2 := xorSlice(msg1, p2)
+
+	out, err := smpE(k, msg1XorP2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt msg1XorP2: %s", err)
+	}
+
+	return out, nil
+}
+
+func smpS1(k, r1, r2 []byte) ([]byte, error) {
+	switch {
+	case len(k) != 16:
+		return nil, fmt.Errorf("s1: invalid length for k: %d", len(k))
+	case len(r1) != 16:
+		return nil, fmt.Errorf("s1: invalid length for r1: %d", len(r1))
+	case len(r2) != 16:
+		return nil, fmt.Errorf("s1: invalid length for r2: %d", len(r2))
+	}
+
+	//r' = r1' || r2'
+	//r1 and r2 are in LE order; concat least 8 sig bytes from each in LE order also
+	r := make([]byte, 0, 16)
+	r = append(r, r2[:8]...)
+	r = append(r, r1[:8]...)
+
+	out, err := smpE(k, r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt r in S1: %s", err)
+	}
+
+	return out, nil
 }

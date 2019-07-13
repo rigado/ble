@@ -85,9 +85,15 @@ func smpOnPairingResponse(c *Conn, in pdu) ([]byte, error) {
 	rx.respKeyDist = in[5]
 	fmt.Printf("pair rsp: %+v\n", rx)
 
-	//send pub key
-	return nil, c.smpSendPublicKey()
-
+	if isLegacy(rx.authReq) {
+		//secure connections
+		//send pub key
+		c.pairing.legacy = true
+		return nil, c.smpSendPublicKey()
+	} else {
+		//legacy pairing
+		return nil, c.smpSendMConfirm(rx)
+	}
 }
 
 func smpOnPairingConfirm(c *Conn, in pdu) ([]byte, error) {
@@ -102,7 +108,11 @@ func smpOnPairingConfirm(c *Conn, in pdu) ([]byte, error) {
 	fmt.Println("pairing confirm:", hex.EncodeToString(in))
 	c.pairing.remoteConfirm = []byte(in)
 
-	return nil, c.smpSendPairingRandom()
+	if c.pairing.legacy {
+		return nil, c.smpSendMRandom()
+	} else {
+		return nil, c.smpSendPairingRandom()
+	}
 }
 
 func smpOnPairingRandom(c *Conn, in pdu) ([]byte, error) {
@@ -118,6 +128,26 @@ func smpOnPairingRandom(c *Conn, in pdu) ([]byte, error) {
 	c.pairing.remoteRandom = []byte(in)
 
 	//conf check
+	if c.pairing.legacy {
+		err := c.pairing.checkLegacyConfirm()
+		if err != nil {
+			return nil, err
+		}
+
+		lRand, ok := c.pairing.localRandom.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for local random")
+		}
+
+		rRand := []byte(in)
+
+		//calculate STK
+		stk, err := smpS1(make([]byte, 16), rRand, lRand)
+		c.pairing.stk = stk
+
+		return nil, c.encrypt()
+	}
+
 	err := c.pairing.checkConfirm()
 	if err != nil {
 		fmt.Println(err)
