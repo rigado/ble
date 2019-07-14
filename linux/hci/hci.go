@@ -129,6 +129,7 @@ func (h *HCI) Init() error {
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
 	h.evth[evt.DisconnectionCompleteCode] = h.handleDisconnectionComplete
 	h.evth[evt.NumberOfCompletedPacketsCode] = h.handleNumberOfCompletedPackets
+	h.evth[evt.EncryptionChangeCode] = h.handleEncryptionChange
 
 	h.subh[evt.LEAdvertisingReportSubCode] = h.handleLEAdvertisingReport
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
@@ -660,6 +661,12 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	c.txBuffer.LockPool()
 	c.txBuffer.PutAll()
 	c.txBuffer.UnlockPool()
+	return nil
+}
+
+func (h *HCI) handleEncryptionChange(b []byte) error {
+	//todo: remove this
+	fmt.Print("encryption enabled")
 	return nil
 }
 

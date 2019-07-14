@@ -3,8 +3,13 @@ package hci
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -88,8 +93,63 @@ func (c *Conn) Bond() error {
 	return c.smpSendPairingRequest()
 }
 
+func (c *Conn) EnableEncryption() error {
+	bondFile := filepath.Join(os.Getenv("SNAP_DATA"), "bonds.json")
+	fileData, err := ioutil.ReadFile(bondFile)
+	if err != nil {
+		return fmt.Errorf("no bond information to load")
+	}
+
+	var bonds bondInfo
+	if len(fileData) > 0 {
+		err = json.Unmarshal(fileData, &bonds)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal current bond info: %s", err)
+		}
+	}
+
+	da := c.RemoteAddr().Bytes()
+	da = swapBuf(da)
+	addr := hex.EncodeToString(da)
+	for _, bond := range bonds.Bonds {
+		if bond.Address == addr {
+			ltk, err := hex.DecodeString(bond.LongTermKey)
+			if err != nil {
+				return fmt.Errorf("failed to decode long term key: %s", err)
+			}
+
+			ediv, err := hex.DecodeString(bond.EncryptionDiversifier)
+			if err != nil {
+				return fmt.Errorf("failed to decode ediv: %s", err)
+			}
+
+			rv, err := hex.DecodeString(bond.RandomValue)
+			if err != nil {
+				return fmt.Errorf("failed to decode random value: %s", err)
+			}
+
+			c.pairing = &pairingContext{
+				ltk: ltk,
+				ediv: binary.LittleEndian.Uint16(ediv),
+				rand: binary.LittleEndian.Uint64(rv),
+			}
+		}
+	}
+
+	if c.pairing == nil {
+		return fmt.Errorf("no encryption information found")
+	}
+
+	err = c.encrypt()
+	if err != nil {
+		return fmt.Errorf("failed to start encryption: %s", err)
+	}
+
+	return nil
+}
+
 func isLegacy(authReq byte) bool {
-	if authReq & 0x01 == 0x01 {
+	if authReq & 0x08 == 0x08 {
 		return false
 	}
 

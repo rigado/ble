@@ -34,3 +34,62 @@ func Test_SMP_Key(t *testing.T) {
 		t.Fatal("unmarshal err")
 	}
 }
+
+func Test_SMP_Legacy_Confirm(t *testing.T) {
+	//request
+	preq := []byte{pairingRequest, 0x03, 0x00, 0x09, 16, 0x05, 0x07}
+	pres := []byte{pairingResponse, 0x03, 0x00, 0x01, 16, 0x01, 0x03}
+
+	la := []byte{0x98, 0x5a, 0x2f, 0x93, 0x54, 0x94}
+	lat := uint8(0x00)
+	lrand, _ := hex.DecodeString("45e39d7a7bb5f81e979b516757ecb2dc")
+
+	ra := []byte{0x98, 0xd3, 0x45, 0x85, 0x47, 0xd8}
+	rat := uint8(0x01)
+	rrand, _ := hex.DecodeString("e6d5505348fa4188acfb209860fd9524")
+
+	expMConfirm, _ := hex.DecodeString("ff5985f3216bb8f0d9812e700a5a6477")
+	expRConfirm, _ := hex.DecodeString("10e6a8b112adf45c47468c6ac0f31294")
+
+	confirm, _ := smpC1(make([]byte,16), lrand, preq, pres, lat, rat, la, ra)
+	if !bytes.Equal(expMConfirm, confirm) {
+		t.Fatalf("failed to generate correct mConfirm value:\n%s\n%s",
+			hex.EncodeToString(expMConfirm), hex.EncodeToString(confirm))
+	}
+
+	confirm, _ = smpC1(make([]byte, 16), rrand, preq, pres, lat, rat, la, ra)
+	if !bytes.Equal(expRConfirm, confirm) {
+		t.Fatalf("failed to generate correct rConfirm value:\n%s\n%s",
+			hex.EncodeToString(expRConfirm), hex.EncodeToString(confirm))
+	}
+}
+
+func Test_SMP_Legacy_Confirm2(t *testing.T) {
+	//request
+	preq := []byte{pairingRequest, 0x03, 0x00, 0x09, 16, 0x01, 0x01}
+	pres := []byte{pairingResponse, 0x03, 0x00, 0x01, 16, 0x01, 0x01}
+
+	la := []byte{0x98, 0x5a, 0x2f, 0x93, 0x54, 0x94}
+	lat := uint8(0x00)
+	lrand, _ := hex.DecodeString("5eb83e928a5ad801d99bd6b9cf339167")
+
+	ra := []byte{0x98, 0xd3, 0x45, 0x85, 0x47, 0xd8}
+	rat := uint8(0x01)
+	rrand, _ := hex.DecodeString("8c101aba0f623e3450dfb817a1e0b425")
+
+	expMConfirm, _ := hex.DecodeString("e2e6907164813041a28b1a399babe1d0")
+	expRConfirm, _ := hex.DecodeString("0acb5b32c7f60851eaa96649b7effcce")
+
+	confirm, _ := smpC1(make([]byte,16), lrand, preq, pres, lat, rat, la, ra)
+	if !bytes.Equal(expMConfirm, confirm) {
+		t.Fatalf("failed to generate correct mConfirm value:\n%s\n%s",
+			hex.EncodeToString(expMConfirm), hex.EncodeToString(confirm))
+	}
+
+	confirm, _ = smpC1(make([]byte, 16), rrand, preq, pres, lat, rat, la, ra)
+	if !bytes.Equal(expRConfirm, confirm) {
+		t.Fatalf("failed to generate correct rConfirm value:\n%s\n%s",
+			hex.EncodeToString(expRConfirm), hex.EncodeToString(confirm))
+	}
+}
+

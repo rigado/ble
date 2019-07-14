@@ -400,6 +400,10 @@ func (p *Client) Bond() error {
 	return p.conn.Bond()
 }
 
+func (p *Client) EnableEncryption() error {
+	return p.conn.EnableEncryption()
+}
+
 type sub struct {
 	cccdh    uint16
 	ccc      uint16

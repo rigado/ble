@@ -2,6 +2,7 @@ package hci
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 )
@@ -15,6 +16,31 @@ func buildPairingRsp(p smpConfig) []byte {
 }
 
 func (c *Conn) smpSendPairingRequest() error {
+	//todo: create a new pairing context function
+	ra := make([]byte, 0)
+	for _, v := range c.param.PeerAddress() {
+		ra = append(ra, v)
+	}
+	ra = append(ra, c.param.PeerAddressType())
+
+	laBE := c.LocalAddr().Bytes()
+	la := make([]byte, 0, 7)
+	la = append(la, uint8(0))
+	for _, v := range laBE {
+		la = append(la, v)
+	}
+	la = swapBuf(la)
+
+	// todo get local addr!!!
+	c.pairing = &pairingContext{
+		localKeys: nil,
+		//94:54:93:2F:5D:62 (mac of -00169)
+		// localAddr:  []byte{0x62, 0x5d, 0x2f, 0x93, 0x54, 0x94, 0}, //type at the end!!!
+
+		localAddr:  la, //type at the end!!!
+		remoteAddr: ra,
+	}
+
 	cmd := buildPairingReq(smp.config)
 	return c.sendSMP(pdu(cmd))
 }
@@ -34,28 +60,7 @@ func (c *Conn) smpSendPublicKey() error {
 		fmt.Printf("discarding pairing context: %+v\n", *c.pairing)
 	}
 
-	ra := make([]byte, 0)
-	for _, v := range c.param.PeerAddress() {
-		ra = append(ra, v)
-	}
-	ra = append(ra, c.param.PeerAddressType())
-
-	laBE := c.LocalAddr().Bytes()
-	la := make([]byte, 0, 7)
-	for _, v := range laBE {
-		la = append(la, v)
-	}
-	la = append(la, uint8(0))
-
-	// todo get local addr!!!
-	c.pairing = &pairingContext{
-		localKeys: kp,
-		//94:54:93:2F:5D:62 (mac of -00169)
-		// localAddr:  []byte{0x62, 0x5d, 0x2f, 0x93, 0x54, 0x94, 0}, //type at the end!!!
-
-		localAddr:  la, //type at the end!!!
-		remoteAddr: ra,
-	}
+	c.pairing.localKeys = kp
 
 	return nil
 }
@@ -132,6 +137,9 @@ func (c *Conn) smpSendMConfirm(rsp smpConfig) error {
 	if !ok {
 		return fmt.Errorf("invalid remote address type")
 	}
+	fmt.Println("preq: ", hex.EncodeToString(preq))
+	fmt.Println("pres: ", hex.EncodeToString(pres))
+	fmt.Println("la: ", hex.EncodeToString(la))
 
 	c1, err := smpC1(make([]byte, 16), r, preq, pres,
 		la[6],

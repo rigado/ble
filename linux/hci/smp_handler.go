@@ -2,7 +2,11 @@ package hci
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 )
 
 type smpConfig struct {
@@ -22,8 +26,8 @@ var dispatcher = map[byte]smpDispatcher{
 	pairingConfirm:          smpDispatcher{"pairing confirm", smpOnPairingConfirm},
 	pairingRandom:           smpDispatcher{"pairing random", smpOnPairingRandom},
 	pairingFailed:           smpDispatcher{"pairing failed", smpOnPairingFailed},
-	encryptionInformation:   smpDispatcher{"encryption info", nil},
-	masterIdentification:    smpDispatcher{"master id", nil},
+	encryptionInformation:   smpDispatcher{"encryption info", smpOnEncryptionInformation},
+	masterIdentification:    smpDispatcher{"master id", smpOnMasterIdentification},
 	identityInformation:     smpDispatcher{"id info", nil},
 	identityAddrInformation: smpDispatcher{"id addr info", nil},
 	signingInformation:      smpDispatcher{"signing info", nil},
@@ -39,6 +43,7 @@ func SmpInit() error {
 		oobFlag:     0,             //no oob
 		authReq:     (1<<0 | 1<<3), //bond+sc
 		maxKeySz:    16,
+		initKeyDist: 0,
 		respKeyDist: 1,
 	}
 
@@ -85,13 +90,13 @@ func smpOnPairingResponse(c *Conn, in pdu) ([]byte, error) {
 	rx.respKeyDist = in[5]
 	fmt.Printf("pair rsp: %+v\n", rx)
 
-	if isLegacy(rx.authReq) {
+	if !isLegacy(rx.authReq) {
 		//secure connections
 		//send pub key
-		c.pairing.legacy = true
 		return nil, c.smpSendPublicKey()
 	} else {
 		//legacy pairing
+		c.pairing.legacy = true
 		return nil, c.smpSendMConfirm(rx)
 	}
 }
@@ -133,6 +138,8 @@ func smpOnPairingRandom(c *Conn, in pdu) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		fmt.Println("remote confirm OK!")
 
 		lRand, ok := c.pairing.localRandom.([]byte)
 		if !ok {
@@ -236,6 +243,93 @@ func smpOnSecurityRequest(c *Conn, in pdu) ([]byte, error) {
 	fmt.Printf("sec req: %+v\n", rx)
 
 	// if known, encrypt, otherwise pair
+	//try to encrypt
+	//todo: this is very hacky
+	err := c.EnableEncryption()
+	if err != nil {
+		fmt.Print(err)
+		_ = c.Bond()
+	}
 
+	return nil, nil
+}
+
+type bondInfo struct {
+	Bonds []remoteKeyInfo `json:"bonds"`
+}
+
+type remoteKeyInfo struct {
+	Address string `json:"address"`
+	LongTermKey string `json:"longTermKey"`
+	EncryptionDiversifier string `json:"encryptionDiversifier"`
+	RandomValue string `json:"randomValue"`
+}
+
+/*todo: this is a bit of a hack at the moment
+	usually, enc info and master id come back to back
+	should probably write ltk to file and then the ediv and rand
+	after they are received */
+var rki = remoteKeyInfo{}
+func smpOnEncryptionInformation(c *Conn, in pdu) ([]byte, error) {
+	//need to save the ltk, ediv, and rand to a file
+	rki.Address = hex.EncodeToString(c.pairing.remoteAddr.([]byte)[:6])
+	rki.LongTermKey = hex.EncodeToString([]byte(in))
+
+	fmt.Print("got LTK message")
+	return nil, nil
+}
+
+func smpOnMasterIdentification(c *Conn, in pdu) ([]byte, error) {
+	fmt.Print("got master id message")
+	data := []byte(in)
+	rki.EncryptionDiversifier = hex.EncodeToString(data[:2])
+	rki.RandomValue = hex.EncodeToString(data[2:])
+
+	//todo: move this somewhere more useful
+
+	//open local file
+	bondFile := filepath.Join(os.Getenv("SNAP_DATA"), "bonds.json")
+	_, err := os.Stat(bondFile)
+	var f *os.File
+	if os.IsNotExist(err) {
+		f, err = os.Create(bondFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create bond file: %s",err)
+		}
+		_ = f.Close()
+	}
+
+	fileData, err := ioutil.ReadFile(bondFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read bond file information: %s", err)
+	}
+
+	var bonds bondInfo
+	if len(fileData) > 0 {
+		err = json.Unmarshal(fileData, &bonds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal current bond info: %s", err)
+		}
+	}
+
+	if len(bonds.Bonds) == 0 {
+		bonds.Bonds = make([]remoteKeyInfo, 0, 1)
+	}
+
+	bonds.Bonds = append(bonds.Bonds, rki)
+
+	out, err := json.Marshal(bonds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal bonds to json: %s", err)
+	}
+
+	err = ioutil.WriteFile(bondFile, out, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update bond information: %s", err)
+	}
+
+	//todo: send central LTK??
+
+	//todo: return something useful
 	return nil, nil
 }

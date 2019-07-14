@@ -20,6 +20,7 @@ var (
 	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
+	bond = flag.Bool("bond", false, "attempt to bond on connection")
 )
 
 func main() {
@@ -70,10 +71,12 @@ func main() {
 	log.Println("connected!")
 	<-time.After(time.Second)
 
-	log.Println("bonding")
-	err = cln.Bond()
-	if err != nil {
-		log.Println(err)
+	if *bond {
+		log.Println("creating a new bond")
+		err = cln.Bond()
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
 	// workaround for hanging after send pub key, sometimes works...

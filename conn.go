@@ -37,4 +37,6 @@ type Conn interface {
 	Disconnected() <-chan struct{}
 
 	Bond() error
+
+	EnableEncryption() error
 }

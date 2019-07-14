@@ -191,8 +191,8 @@ func (c *Conn) encrypt() error {
 		return fmt.Errorf("nil context")
 	}
 
-	if c.pairing.ltk == nil {
-		return fmt.Errorf("nil ltk")
+	if c.pairing.ltk == nil && c.pairing.stk == nil {
+		return fmt.Errorf("nil ltk or stk")
 	}
 
 	m := cmd.LEStartEncryption{}
@@ -207,7 +207,7 @@ func (c *Conn) encrypt() error {
 			return fmt.Errorf("invalid length for ltk")
 		}
 
-		if c.pairing.ediv == 0 || c.pairing.rand == 16 {
+		if c.pairing.ediv == 0 || c.pairing.rand == 0 {
 			return fmt.Errorf("ediv and rand must not be 0")
 		}
 	}
@@ -358,7 +358,7 @@ func (c *Conn) LocalAddr() ble.Addr { return c.hci.Addr() }
 // RemoteAddr returns remote device's MAC address.
 func (c *Conn) RemoteAddr() ble.Addr {
 	a := c.param.PeerAddress()
-	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
+	return ble.NewAddr(net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]}).String())
 }
 
 // RxMTU returns the MTU which the upper layer is capable of accepting.
