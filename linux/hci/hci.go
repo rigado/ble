@@ -36,10 +36,10 @@ type pkt struct {
 }
 
 // NewHCI returns a hci device.
-func NewHCI(opts ...ble.Option) (*HCI, error) {
+func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
 		id: -1,
-
+		smp: smp,
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
@@ -68,6 +68,8 @@ type HCI struct {
 	sync.Mutex
 
 	params params
+
+	smp SmpManagerFactory
 
 	skt io.ReadWriteCloser
 	id  int
@@ -666,7 +668,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
 	//todo: remove this
-	fmt.Print("encryption enabled")
+	fmt.Println("encryption enabled")
 	return nil
 }
 

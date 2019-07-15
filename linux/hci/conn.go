@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
-	"net"
-
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/pkg/errors"
+	"io"
+	"net"
 )
 
 // Conn ...
@@ -64,10 +63,15 @@ type Conn struct {
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
-	pairing *pairingContext
+	smp SmpManager
+}
+
+type Encrypter interface {
+	Encrypt() error
 }
 
 func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
+
 	c := &Conn{
 		hci:   h,
 		ctx:   context.Background(),
@@ -87,7 +91,12 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		txBuffer: NewClient(h.pool),
 
 		chDone: make(chan struct{}),
+		smp: h.smp.Create(defaultSmpConfig, nil),
 	}
+
+	c.initPairingContext()
+	c.smp.SetWritePDUFunc(c.writePDU)
+	c.smp.SetEncryptFunc(c.encrypt)
 
 	go func() {
 		for {
@@ -113,6 +122,10 @@ func (c *Conn) Context() context.Context {
 // SetContext sets the context that is used by this Conn.
 func (c *Conn) SetContext(ctx context.Context) {
 	c.ctx = ctx
+}
+
+func (c *Conn) Bond() error {
+	return c.smp.Bond()
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
@@ -186,42 +199,81 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 	return sent, nil
 }
 
-func (c *Conn) encrypt() error {
-	if c.pairing == nil {
-		return fmt.Errorf("nil context")
+func (c *Conn) initPairingContext() {
+	smp := c.smp
+
+	la := c.LocalAddr().Bytes()
+	//assume la is public address for now
+	//todo: figure out a better way
+	lat := uint8(0x00)
+	ra := c.RemoteAddr().Bytes()
+	rat := c.param.PeerAddressType()
+
+	fmt.Printf("init pairing context\n")
+	smp.InitContext(la, ra, lat, rat)
+}
+
+//todo: how does this get kicked off??
+
+func (c *Conn) encrypt(bi BondInfo) error {
+	legacy, stk := c.smp.LegacyPairingInfo()
+	//if a short term key is present, use it as the long term key
+	if legacy && len(stk) > 0 {
+		fmt.Println("encrypting with short term key")
+		return c.stkEncrypt(stk)
 	}
 
-	if c.pairing.ltk == nil && c.pairing.stk == nil {
-		return fmt.Errorf("nil ltk or stk")
+	if bi == nil {
+		return fmt.Errorf("no bond information")
+	}
+
+	ltk := bi.LongTermKey()
+	if ltk == nil {
+		return fmt.Errorf("no ltk present")
 	}
 
 	m := cmd.LEStartEncryption{}
 	m.ConnectionHandle = c.param.ConnectionHandle()
 
-	key := c.pairing.ltk
-	if c.pairing.legacy && len(c.pairing.stk) != 0 {
-		key = c.pairing.stk
-	} else {
+	eDiv := bi.EDiv()
+	randVal := bi.Random()
+
+	if bi.Legacy() {
 		//expect LTK, EDiv, and Rand to be present
-		if len(c.pairing.ltk) != 16 {
+		if len(ltk) != 16 {
 			return fmt.Errorf("invalid length for ltk")
 		}
 
-		if c.pairing.ediv == 0 || c.pairing.rand == 0 {
-			return fmt.Errorf("ediv and rand must not be 0")
+		if eDiv == 0 || randVal == 0 {
+			return fmt.Errorf("ediv and random must not be 0 for legacy pairing")
 		}
 	}
 
-	for i, v := range key {
+	for i, v := range ltk {
 		m.LongTermKey[i] = v
 	}
 
-	m.EncryptedDiversifier = c.pairing.ediv
-	m.RandomNumber = c.pairing.rand
+	m.EncryptedDiversifier = eDiv
+	m.RandomNumber = randVal
 
 	err := c.hci.Send(&m, nil)
 	fmt.Println("send encrypt:", m, err)
 	return nil
+}
+
+func (c *Conn) stkEncrypt(key []byte) error {
+	m := cmd.LEStartEncryption{}
+	m.ConnectionHandle = c.param.ConnectionHandle()
+	for i, v := range key {
+		m.LongTermKey[i] = v
+	}
+
+	m.EncryptedDiversifier = 0
+	m.RandomNumber = 0
+
+	err := c.hci.Send(&m, nil)
+	fmt.Println("send encrypt:", m, err)
+	return nil //why not return err here??
 }
 
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
@@ -323,9 +375,9 @@ func (c *Conn) recombine() error {
 	case cidLEAtt:
 		c.chInPDU <- p
 	case cidLESignal:
-		c.handleSignal(p)
-	case cidSMP:
-		c.handleSMP(p)
+		_ = c.handleSignal(p)
+	case CidSMP:
+		_ = c.smp.Handle(p)
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}

@@ -71,6 +71,4 @@ type Client interface {
 	Conn() Conn
 
 	Bond() error
-
-	EnableEncryption() error
 }

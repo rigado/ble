@@ -1,4 +1,4 @@
-package hci
+package smp
 
 import (
 	"crypto"
@@ -6,18 +6,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-
-	ecdh "github.com/wsddn/go-ecdh"
+	"github.com/wsddn/go-ecdh"
 )
 
-type Keys struct {
+type ECDHKeys struct {
 	public  crypto.PublicKey
 	private crypto.PrivateKey
 }
 
-func GenerateKeys() (*Keys, error) {
+func GenerateKeys() (*ECDHKeys, error) {
 	var err error
-	kp := Keys{}
+	kp := ECDHKeys{}
 	e := ecdh.NewEllipticECDH(elliptic.P256())
 
 	kp.private, kp.public, err = e.GenerateKey(rand.Reader)

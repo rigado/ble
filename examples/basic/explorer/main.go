@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
-	"github.com/go-ble/ble/linux/hci"
 	"github.com/pkg/errors"
 )
 
@@ -35,7 +34,6 @@ func main() {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
-	hci.SmpInit()
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
@@ -79,12 +77,11 @@ func main() {
 		}
 	}
 
-	// workaround for hanging after send pub key, sometimes works...
-	// fmt.Printf("Discovering profile...\n")
-	// _, err = cln.DiscoverProfile(true)
-	// if err != nil {
-	// 	log.Fatalf("can't discover profile: %s", err)
-	// }
+	fmt.Printf("Discovering profile...\n")
+	_, err = cln.DiscoverProfile(true)
+	if err != nil {
+		log.Fatalf("can't discover profile: %s", err)
+	}
 
 	// log.Println("exploring")
 	// // Start the exploration.

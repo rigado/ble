@@ -1,4 +1,4 @@
-package hci
+package smp
 
 import (
 	"encoding/binary"

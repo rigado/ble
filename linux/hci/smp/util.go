@@ -1,4 +1,4 @@
-package hci
+package smp
 
 import (
 	"crypto/aes"
@@ -52,4 +52,12 @@ func swapBuf(in []byte) []byte {
 	}
 
 	return a
+}
+
+func isLegacy(authReq byte) bool {
+	if authReq & 0x08 == 0x08 {
+		return false
+	}
+
+	return true
 }
