@@ -23,7 +23,8 @@ type smpDispatcher struct {
 }
 
 type SmpManagerFactory interface {
-	Create(SmpConfig, BondManager) SmpManager
+	Create(SmpConfig) SmpManager
+	SetBondManager(BondManager)
 }
 
 type SmpManager interface {

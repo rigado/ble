@@ -70,6 +70,7 @@ type HCI struct {
 	params params
 
 	smp SmpManagerFactory
+	smpEnabled bool
 
 	skt io.ReadWriteCloser
 	id  int
@@ -667,8 +668,6 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
-	//todo: remove this
-	fmt.Println("encryption enabled")
 	return nil
 }
 
@@ -691,6 +690,7 @@ func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 }
 
 func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
+	//todo: probably need to support this
 	e := evt.LELongTermKeyRequest(b)
 	panic(nil)
 	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{

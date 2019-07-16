@@ -2,6 +2,7 @@ package hci
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-ble/ble/linux/hci/cmd"
@@ -28,6 +29,18 @@ func (h *HCI) SetListenerTimeout(d time.Duration) error {
 // SetConnParams overrides default connection parameters.
 func (h *HCI) SetConnParams(param cmd.LECreateConnection) error {
 	h.params.connParams = param
+	return nil
+}
+
+func (h *HCI) EnableSecurity(bm interface{}) error {
+	bondManager, ok := bm.(BondManager)
+	if !ok {
+		return fmt.Errorf("unknown bond manager type")
+	}
+	h.smpEnabled = true
+	if h.smp != nil {
+		h.smp.SetBondManager(bondManager)
+	}
 	return nil
 }
 

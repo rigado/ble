@@ -8,20 +8,16 @@ import (
 	"github.com/go-ble/ble/linux/hci"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"sync"
 )
 
 type manager struct {
+	filePath string
 	lock sync.RWMutex
+	bonds map[string]bondData
 }
 
-type bondInfo struct {
-	Bonds []remoteKeyInfo `json:"bonds"`
-}
-
-type remoteKeyInfo struct {
-	Address string `json:"address"`
+type bondData struct {
 	LongTermKey string `json:"longTermKey"`
 	EncryptionDiversifier string `json:"encryptionDiversifier"`
 	RandomValue string `json:"randomValue"`
@@ -29,11 +25,16 @@ type remoteKeyInfo struct {
 }
 
 const (
-	bondFilename = "bonds.json"
+	defaultBondFilename = "bonds.json"
 )
 
-func NewBondManager() hci.BondManager {
-	return &manager{}
+func NewBondManager(bondFilePath string) hci.BondManager {
+	if len(bondFilePath) == 0 {
+		bondFilePath = defaultBondFilename
+	}
+	return &manager{
+		filePath: bondFilePath,
+	}
 }
 
 //todo: is this function really needed?
@@ -45,14 +46,14 @@ func (m *manager) Exists(addr string) bool {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	bonds, err := loadBonds()
+	bonds, err := m.loadBonds()
 	if err != nil {
 		fmt.Print(err)
 		return false
 	}
 
-	for _, b := range bonds.Bonds {
-		if b.Address == addr {
+	for k := range bonds {
+		if k == addr {
 			return true
 		}
 	}
@@ -68,36 +69,25 @@ func (m *manager) Find(addr string) (hci.BondInfo, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	bonds, err := loadBonds()
+	bonds, err := m.loadBonds()
 	if err != nil {
 		return nil, err
 	}
 
-	var bi hci.BondInfo
-	for _, bond := range bonds.Bonds {
-		if bond.Address == addr {
-			//todo: if any of this is invalid, it should be deleted
-			ltk, err := hex.DecodeString(bond.LongTermKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decode long term key: %s", err)
-			}
-
-			eDiv, err := hex.DecodeString(bond.EncryptionDiversifier)
-			if err != nil {
-				return nil, fmt.Errorf("invalid ediv in bond file")
-			}
-
-			randVal, err := hex.DecodeString(bond.RandomValue)
-			if err != nil {
-				return nil, fmt.Errorf("invalid random value in bond file")
-			}
-
-			bi = hci.NewBondInfo(ltk, binary.LittleEndian.Uint16(eDiv), binary.LittleEndian.Uint64(randVal), bond.Legacy)
-		}
+	bd, ok := bonds[addr]
+	if !ok {
+		return nil, fmt.Errorf("bond information not found for %s", addr)
 	}
 
-	if bi == nil {
-		return nil, fmt.Errorf("bond information not found for %s", addr)
+	//validate bondData information; if any of it is invalid, delete the bondData
+	bi, bondErr := createBondInfo(bd)
+	if bondErr != nil {
+		delete(bonds, addr)
+		err := m.storeBonds(bonds)
+		if err != nil {
+			fmt.Printf("bondData manager err: %s\n", err)
+		}
+		return nil, fmt.Errorf("found invalid bondData information: %s\n", bondErr)
 	}
 
 	return bi, nil
@@ -109,88 +99,118 @@ func (m *manager) Save(addr string, bond hci.BondInfo) error {
 	}
 
 	if bond == nil {
-		return fmt.Errorf("empty bond information")
+		return fmt.Errorf("empty bondData information")
 	}
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	bonds, err := loadBonds()
+	bonds, err := m.loadBonds()
 	if err != nil {
 		return err
 	}
 
-	rki := createRemoteKeyInfo(bond)
-	rki.Address = addr
+	bd := createBondData(bond)
 
-	bonds.Bonds = append(bonds.Bonds, rki)
+	//check to see if this address already exists
+	if _, ok := bonds[addr]; ok {
+		fmt.Printf("replacing existing bondData")
+	}
 
-	return storeBonds(bonds)
+	bonds[addr] = bd
+
+	return m.storeBonds(bonds)
 }
 
-func createRemoteKeyInfo(bond hci.BondInfo) remoteKeyInfo {
-	rki := remoteKeyInfo{}
-
-	rki.LongTermKey = hex.EncodeToString(bond.LongTermKey())
-
-	eDiv := make([]byte, 2)
-	binary.LittleEndian.PutUint16(eDiv, bond.EDiv())
-
-	randVal := make([]byte, 8)
-	binary.LittleEndian.PutUint64(randVal, bond.Random())
-
-	rki.EncryptionDiversifier = hex.EncodeToString(eDiv)
-	rki.RandomValue = hex.EncodeToString(randVal)
-	rki.Legacy = bond.Legacy()
-
-	return rki
-}
-
-func loadBonds() (*bondInfo, error) {
+//this is mutex protected at the public function level
+func (m *manager) loadBonds() (map[string]bondData, error) {
 	//open local file
-	bondFile := filepath.Join(os.Getenv("SNAP_DATA"), bondFilename)
-	_, err := os.Stat(bondFile)
+	_, err := os.Stat(m.filePath)
 	var f *os.File
 	if os.IsNotExist(err) {
-		f, err = os.Create(bondFile)
+		f, err = os.Create(m.filePath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create bond file: %s",err)
+			return nil, fmt.Errorf("unable to create bondData file: %s",err)
 		}
 		_ = f.Close()
 	}
 
-	fileData, err := ioutil.ReadFile(bondFile)
+	fileData, err := ioutil.ReadFile(m.filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read bond file information: %s", err)
+		return nil, fmt.Errorf("failed to read bondData file information: %s", err)
 	}
 
-	var bonds bondInfo
+	var bonds map[string]bondData
 	if len(fileData) > 0 {
 		err = json.Unmarshal(fileData, &bonds)
 		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal current bond info: %s", err)
+			return nil, fmt.Errorf("failed to unmarshal current bondData info: %s", err)
 		}
 	}
 
-	if len(bonds.Bonds) == 0 {
-		bonds.Bonds = make([]remoteKeyInfo, 0, 1)
+	if len(bonds) == 0 {
+		bonds = make(map[string]bondData)
 	}
 
-	return &bonds, nil
+	return bonds, nil
 }
 
-func storeBonds(bonds *bondInfo) error {
-	bondFile := filepath.Join(os.Getenv("SNAP_DATA"), bondFilename)
+//this is mutex protected at the public function level
+func (m *manager) storeBonds(bonds map[string]bondData) error {
 	out, err := json.Marshal(bonds)
 	if err != nil {
 		return fmt.Errorf("failed to marshal bonds to json: %s", err)
 	}
 
-	err = ioutil.WriteFile(bondFile, out, 0644)
+	err = ioutil.WriteFile(m.filePath, out, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to update bond information: %s", err)
+		return fmt.Errorf("failed to update bondData information: %s", err)
 	}
 
 	return nil
+}
+
+//bondData is a local structure
+func createBondData(bi hci.BondInfo) bondData {
+	b := bondData{}
+
+	b.LongTermKey = hex.EncodeToString(bi.LongTermKey())
+
+	eDiv := make([]byte, 2)
+	binary.LittleEndian.PutUint16(eDiv, bi.EDiv())
+
+	randVal := make([]byte, 8)
+	binary.LittleEndian.PutUint64(randVal, bi.Random())
+
+	b.EncryptionDiversifier = hex.EncodeToString(eDiv)
+	b.RandomValue = hex.EncodeToString(randVal)
+	b.Legacy = bi.Legacy()
+
+	return b
+}
+
+//BondInfo is defined in the HCI packaged an used internally to enable
+//encryption after a connect has been established with a device
+func createBondInfo(b bondData) (hci.BondInfo, error) {
+	ltk, err := hex.DecodeString(b.LongTermKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode long term key: %s", err)
+	}
+	if len(ltk) == 0 {
+		return nil, fmt.Errorf("invalid long term key length")
+	}
+
+	eDiv, err := hex.DecodeString(b.EncryptionDiversifier)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ediv in bondData file")
+	}
+
+	randVal, err := hex.DecodeString(b.RandomValue)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random value in bondData file")
+	}
+
+	bi := hci.NewBondInfo(ltk, binary.LittleEndian.Uint16(eDiv), binary.LittleEndian.Uint64(randVal), b.Legacy)
+	return bi, nil
 }
 

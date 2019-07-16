@@ -54,3 +54,7 @@ func (d *Device) SetAdvHandlerSync(sync bool) error {
 	d.advHandlerSync = sync
 	return nil
 }
+
+func (d *Device) EnableSecurity(bondManager interface{}) error {
+	return errors.New("Not supported")
+}

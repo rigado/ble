@@ -2,12 +2,18 @@ package smp
 
 import "github.com/go-ble/ble/linux/hci"
 
-type factory struct {}
-
-func NewSmpFactory() *factory {
-	return &factory{}
+type factory struct {
+	bm hci.BondManager
 }
 
-func (f *factory) Create(config hci.SmpConfig, bm hci.BondManager) hci.SmpManager {
-	return NewSmpManager(config, bm)
+func NewSmpFactory(bm hci.BondManager) *factory {
+	return &factory{bm}
+}
+
+func (f *factory) Create(config hci.SmpConfig) hci.SmpManager {
+	return NewSmpManager(config, f.bm)
+}
+
+func (f *factory) SetBondManager(bm hci.BondManager) {
+	f.bm = bm
 }

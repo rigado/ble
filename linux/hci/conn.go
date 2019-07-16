@@ -91,9 +91,11 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		txBuffer: NewClient(h.pool),
 
 		chDone: make(chan struct{}),
-		smp: h.smp.Create(defaultSmpConfig, nil),
 	}
 
+	if c.hci.smpEnabled {
+		c.smp = c.hci.smp.Create(defaultSmpConfig)
+	}
 	c.initPairingContext()
 	c.smp.SetWritePDUFunc(c.writePDU)
 	c.smp.SetEncryptFunc(c.encrypt)
@@ -212,8 +214,6 @@ func (c *Conn) initPairingContext() {
 	fmt.Printf("init pairing context\n")
 	smp.InitContext(la, ra, lat, rat)
 }
-
-//todo: how does this get kicked off??
 
 func (c *Conn) encrypt(bi BondInfo) error {
 	legacy, stk := c.smp.LegacyPairingInfo()

@@ -3,7 +3,6 @@ package smp
 import (
 	"fmt"
 	"github.com/go-ble/ble/linux/hci"
-	"github.com/go-ble/ble/linux/hci/bond"
 	"log"
 )
 
@@ -17,11 +16,9 @@ type manager struct {
 
 //todo: need to have on instance per connection which requires a mutex in the bond manager
 //todo: remove bond manager from input parameters?
-func NewSmpManager(config hci.SmpConfig, bondManager hci.BondManager) *manager {
-
-	bm := bond.NewBondManager()
+func NewSmpManager(config hci.SmpConfig, bm hci.BondManager) *manager {
 	p := &pairingContext{request: config}
-	m := &manager{config:config, pairing:p, bondManager:bm}
+	m := &manager{config:config, pairing:p, bondManager: bm}
 	t := NewSmpTransport(p, bm, m, nil)
 	m.t = t
 	return m

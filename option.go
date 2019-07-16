@@ -18,6 +18,7 @@ type DeviceOption interface {
 	SetCentralRole() error
 	SetAdvHandlerSync(bool) error
 	SetErrorHandler(handler func(error)) error
+	EnableSecurity(interface{}) error
 }
 
 // An Option is a configuration function, which configures the device.
@@ -99,6 +100,14 @@ func OptAdvHandlerSync(sync bool) Option {
 func OptErrorHandler(handler func(error)) Option {
 	return func(opt DeviceOption) error {
 		opt.SetErrorHandler(handler)
+		return nil
+	}
+}
+
+// OptEnableSecurity enables bonding with devices
+func OptEnableSecurity(bondManager interface{}) Option {
+	return func(opt DeviceOption) error {
+		opt.EnableSecurity(bondManager)
 		return nil
 	}
 }

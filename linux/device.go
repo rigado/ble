@@ -24,7 +24,7 @@ func NewDeviceWithName(name string, opts ...ble.Option) (*Device, error) {
 }
 
 func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ...ble.Option) (*Device, error) {
-	dev, err := hci.NewHCI(smp2.NewSmpFactory(), opts...)
+	dev, err := hci.NewHCI(smp2.NewSmpFactory(nil), opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create hci")
 	}
