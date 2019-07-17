@@ -1,7 +1,7 @@
-native: clean dep
+native: clean
 	go build -o explorer
 
-arm: clean dep
+arm: clean
 	env GOOS=linux GOARCH=arm go build -o explorer-arm
 	scp explorer-arm admin@192.168.2.107:~
 

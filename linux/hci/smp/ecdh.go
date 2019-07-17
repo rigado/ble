@@ -4,8 +4,6 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"github.com/wsddn/go-ecdh"
 )
 
@@ -37,7 +35,7 @@ func UnmarshalPublicKey(b []byte) (crypto.PublicKey, bool) {
 	r = append(r, ys...)
 
 	pk, ok := e.Unmarshal(r)
-	fmt.Printf("unmarshalKey: x %v, y %v\n\tin %v, ok %v\n", hex.EncodeToString(b[:32]), hex.EncodeToString(b[32:]), hex.EncodeToString(b), ok)
+
 	return pk, ok
 }
 
@@ -51,7 +49,6 @@ func MarshalPublicKeyXY(k crypto.PublicKey) []byte {
 
 	out := append(x, y...)
 
-	fmt.Printf("marshalKeyXY: x %v, y %v\n\txy %v\n", hex.EncodeToString(x), hex.EncodeToString(y), hex.EncodeToString(out))
 	return out
 }
 
@@ -62,7 +59,6 @@ func MarshalPublicKeyX(k crypto.PublicKey) []byte {
 	ba = ba[1:] //remove header
 	x := swapBuf(ba[:32])
 
-	fmt.Printf("marshalKeyX: x %v\n", hex.EncodeToString(x))
 	return x
 }
 

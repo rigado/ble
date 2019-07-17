@@ -24,7 +24,7 @@ func NewSmpManager(config hci.SmpConfig, bm hci.BondManager) *manager {
 	return m
 }
 
-func (m *manager) SetConfg(config hci.SmpConfig) {
+func (m *manager) SetConfig(config hci.SmpConfig) {
 	m.config = config
 }
 
@@ -48,14 +48,9 @@ func (m *manager) InitContext(localAddr, remoteAddr []byte,
 	m.pairing.remoteAddrType = remoteAddrType
 
 	m.t.pairing = m.pairing
-
-	fmt.Printf("inited pairing ctx: %+v\n", m.t.pairing)
 }
 
 func (m *manager) Handle(in []byte) error {
-	fmt.Printf("enter handleSMP ====================\n")
-	defer fmt.Printf("exit handleSMP ====================\n")
-
 	p := pdu(in)
 	payload := p.payload()
 	code := payload[0]
@@ -66,16 +61,11 @@ func (m *manager) Handle(in []byte) error {
 		return m.t.send([]byte{pairingFailed, 0x05})
 	}
 
-	fmt.Println("smp", "rx type:", v.desc)
 	if v.handler != nil {
 		_, err := v.handler(m.t, data)
 		if err != nil {
 			log.Println(err)
 			return err
-		}
-
-		if m.pairing != nil {
-			fmt.Printf("%+v\n", *m.pairing)
 		}
 
 		return nil
@@ -85,7 +75,7 @@ func (m *manager) Handle(in []byte) error {
 	fmt.Println("no smp handler...")
 	// FIXME: work around to the lack of SMP implementation - always return non-supported.
 	// C.5.1 Pairing Not Supported by Slave
-	return nil //c.sendSMP([]byte{pairingFailed, 0x05})
+	return m.t.send([]byte{pairingFailed, 0x05})
 }
 
 func (m *manager) Bond() error {

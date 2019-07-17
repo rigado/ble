@@ -114,7 +114,7 @@ func (m *manager) Save(addr string, bond hci.BondInfo) error {
 
 	//check to see if this address already exists
 	if _, ok := bonds[addr]; ok {
-		fmt.Printf("replacing existing bondData")
+		fmt.Printf("replacing existing bondData for %s\n", addr)
 	}
 
 	bonds[addr] = bd

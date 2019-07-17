@@ -32,8 +32,6 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 		dev.Close()
 		return nil, errors.Wrap(err, "can't init hci")
 	}
-	// _, err = mgmt.NewSocket(1)
-	// log.Println("mgmtskt err:", err)
 
 	srv, err := gatt.NewServerWithNameAndHandler(name, handler)
 	if err != nil {
@@ -41,7 +39,6 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 		return nil, errors.Wrap(err, "can't create server")
 	}
 
-	// mtu := ble.DefaultMTU
 	mtu := ble.MaxMTU // TODO: get this from user using Option.
 	if mtu > ble.MaxMTU {
 		dev.Close()

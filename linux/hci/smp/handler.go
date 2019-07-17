@@ -20,10 +20,6 @@ import (
 //	rx.initKeyDist = in[4]
 //	rx.respKeyDist = in[5]
 //
-//	fmt.Printf("pair req: %+v\n", rx)
-//
-//	//reply with pairing resp
-//
 //	return nil, nil
 //}
 
@@ -39,7 +35,6 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	rx.MaxKeySize = in[3]
 	rx.InitKeyDist = in[4]
 	rx.RespKeyDist = in[5]
-	fmt.Printf("pair rsp: %+v\n", rx)
 	t.pairing.response = rx
 
 	if isLegacy(rx.AuthReq) {
@@ -60,7 +55,6 @@ func smpOnPairingConfirm(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("invalid length")
 	}
 
-	fmt.Println("pairing confirm:", hex.EncodeToString(in))
 	t.pairing.remoteConfirm = []byte(in)
 
 	err := t.sendPairingRandom()
@@ -80,7 +74,6 @@ func smpOnPairingRandom(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("invalid length")
 	}
 
-	fmt.Println("pairing random:", hex.EncodeToString(in))
 	t.pairing.remoteRandom = []byte(in)
 
 	//conf check
@@ -161,8 +154,6 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("no pairing context")
 	}
 
-	fmt.Println("dhkey check")
-
 	//todo: checkDHKeyCheck not implemented
 	t.pairing.scRemoteDHKeyCheck = []byte(in)
 	err := t.pairing.checkDHKeyCheck()
@@ -197,7 +188,6 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 	//todo: clean this up
 	rx := hci.SmpConfig{}
 	rx.AuthReq = in[0]
-	fmt.Printf("sec req: %+v\n", rx)
 
 	//match the incoming request parameters
 	t.pairing.request.AuthReq = rx.AuthReq
@@ -209,12 +199,10 @@ func smpOnEncryptionInformation(t *transport, in pdu) ([]byte, error) {
 	//need to save the ltk, ediv, and rand to a file
 	t.pairing.bond = hci.NewBondInfo([]byte(in), 0, 0, true)
 
-	fmt.Print("got LTK message")
 	return nil, nil
 }
 
 func smpOnMasterIdentification(t *transport, in pdu) ([]byte, error) {
-	fmt.Print("got master id message")
 	data := []byte(in)
 	ediv := binary.LittleEndian.Uint16(data[:2])
 	randVal := binary.LittleEndian.Uint64(data[2:])

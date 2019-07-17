@@ -50,7 +50,6 @@ func (t *transport) send(pdu []byte) error {
 		return err
 	}
 	_, err := t.writePDU(buf.Bytes())
-	// fmt.Printf("smp tx %v, err %v\n", fmt.Sprintf("[%X]", buf.Bytes()), err)
 	return err
 }
 
@@ -89,8 +88,6 @@ func (t *transport) sendPairingRandom() error {
 	if t.pairing == nil {
 		return fmt.Errorf("no pairing context")
 	}
-
-	log.Printf("send pairing random")
 
 	if t.pairing.localRandom == nil {
 		r := make([]byte, 16)
@@ -136,8 +133,6 @@ func (t *transport) sendMConfirm() error {
 	if t.pairing == nil {
 		return fmt.Errorf("no pairing context")
 	}
-
-	fmt.Printf("pCtx: %+v", t.pairing)
 
 	preq := buildPairingReq(t.pairing.request)
 	pres := buildPairingRsp(t.pairing.response)

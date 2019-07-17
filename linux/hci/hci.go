@@ -138,7 +138,7 @@ func (h *HCI) Init() error {
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
 	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
 	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
-	h.subh[evt.EncryptionChangeCode] = h.handleUnhandled
+	h.subh[evt.EncryptionChangeCode] = h.handleEncryptionChange
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),

@@ -205,13 +205,13 @@ func (c *Conn) initPairingContext() {
 	smp := c.smp
 
 	la := c.LocalAddr().Bytes()
-	//assume la is public address for now
-	//todo: figure out a better way
 	lat := uint8(0x00)
+	if (la[0] & 0xc0) == 0xc0 {
+		lat = 0x01
+	}
 	ra := c.RemoteAddr().Bytes()
 	rat := c.param.PeerAddressType()
 
-	fmt.Printf("init pairing context\n")
 	smp.InitContext(la, ra, lat, rat)
 }
 
@@ -256,9 +256,7 @@ func (c *Conn) encrypt(bi BondInfo) error {
 	m.EncryptedDiversifier = eDiv
 	m.RandomNumber = randVal
 
-	err := c.hci.Send(&m, nil)
-	fmt.Println("send encrypt:", m, err)
-	return nil
+	return c.hci.Send(&m, nil)
 }
 
 func (c *Conn) stkEncrypt(key []byte) error {
@@ -271,9 +269,7 @@ func (c *Conn) stkEncrypt(key []byte) error {
 	m.EncryptedDiversifier = 0
 	m.RandomNumber = 0
 
-	err := c.hci.Send(&m, nil)
-	fmt.Println("send encrypt:", m, err)
-	return nil //why not return err here??
+	return c.hci.Send(&m, nil)
 }
 
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]

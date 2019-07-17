@@ -79,7 +79,6 @@ func (p *pairingContext) calcMacLtk() error {
 	p.bond = hci.NewBondInfo(ltk, 0, 0, false)
 	p.scMacKey = mk
 
-	fmt.Printf("mac ltk ok, %+v\n", *p)
 	return nil
 }
 
