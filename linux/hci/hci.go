@@ -466,6 +466,9 @@ func (h *HCI) handleLEAdvertisingReport(b []byte) error {
 			for idx := h.adLast - 1; idx != h.adLast; idx-- {
 				if idx == -1 {
 					idx = len(h.adHist) - 1
+					if idx == h.adLast {
+						break
+					}
 				}
 				if h.adHist[idx] == nil {
 					break
@@ -685,7 +688,7 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 
 func (h *HCI) setAllowedCommands(n int) {
 	if n > chCmdBufChanSize {
-		fmt.Println("hci.setAllowedCommands: warning, defaulting %d -> %d", n, chCmdBufChanSize)
+		fmt.Printf("hci.setAllowedCommands: warning, defaulting %d -> %d\n", n, chCmdBufChanSize)
 		n = chCmdBufChanSize
 	}
 
