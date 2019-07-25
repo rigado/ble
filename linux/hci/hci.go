@@ -3,6 +3,7 @@ package hci
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strings"
 	"sync"
@@ -35,10 +36,10 @@ type pkt struct {
 }
 
 // NewHCI returns a hci device.
-func NewHCI(opts ...ble.Option) (*HCI, error) {
+func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
 		id: -1,
-
+		smp: smp,
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
@@ -67,6 +68,9 @@ type HCI struct {
 	sync.Mutex
 
 	params params
+
+	smp SmpManagerFactory
+	smpEnabled bool
 
 	skt io.ReadWriteCloser
 	id  int
@@ -128,12 +132,13 @@ func (h *HCI) Init() error {
 	h.evth[evt.CommandStatusCode] = h.handleCommandStatus
 	h.evth[evt.DisconnectionCompleteCode] = h.handleDisconnectionComplete
 	h.evth[evt.NumberOfCompletedPacketsCode] = h.handleNumberOfCompletedPackets
+	h.evth[evt.EncryptionChangeCode] = h.handleEncryptionChange
 
 	h.subh[evt.LEAdvertisingReportSubCode] = h.handleLEAdvertisingReport
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
 	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
 	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
-	// evt.EncryptionChangeCode:                     todo),
+	h.subh[evt.EncryptionChangeCode] = h.handleEncryptionChange
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),
@@ -184,6 +189,7 @@ func (h *HCI) Option(opts ...ble.Option) error {
 }
 
 func (h *HCI) init() error {
+	log.Println("hci reset")
 	h.Send(&cmd.Reset{}, nil)
 
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
@@ -661,6 +667,10 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	return nil
 }
 
+func (h *HCI) handleEncryptionChange(b []byte) error {
+	return nil
+}
+
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
 	h.muConns.Lock()
@@ -680,10 +690,17 @@ func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 }
 
 func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
+	//todo: probably need to support this
 	e := evt.LELongTermKeyRequest(b)
+	panic(nil)
 	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
+}
+
+func (h *HCI) handleUnhandled(b []byte) error {
+	log.Println("unhandled:", b)
+	return nil
 }
 
 func (h *HCI) setAllowedCommands(n int) {

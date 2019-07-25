@@ -1,0 +1,336 @@
+> HCI Event: Command Complete (0x0e) plen 4                                                                                                                                #9 3.844414
+      LE Set Scan Enable (0x08|0x000c) ncmd 1
+        Status: Success (0x00)
+< HCI Command: LE Create Connection (0x08|0x000d) plen 25                                                                                                                 #10 3.844490
+        Scan interval: 60.000 msec (0x0060)
+        Scan window: 60.000 msec (0x0060)
+        Filter policy: White list is not used (0x00)
+        Peer address type: Random (0x01)
+        Peer address: C5:74:7A:BA:49:32 (Static)
+        Own address type: Public (0x00)
+        Min connection interval: 30.00 msec (0x0018)
+        Max connection interval: 50.00 msec (0x0028)
+        Connection latency: 0 (0x0000)
+        Supervision timeout: 420 msec (0x002a)
+        Min connection length: 0.000 msec (0x0000)
+        Max connection length: 0.000 msec (0x0000)
+> HCI Event: Command Status (0x0f) plen 4                                                                                                                                 #11 3.846353
+      LE Create Connection (0x08|0x000d) ncmd 1
+        Status: Success (0x00)
+> HCI Event: LE Meta Event (0x3e) plen 19                                                                                                                                 #12 4.036327
+      LE Connection Complete (0x01)
+        Status: Success (0x00)
+        Handle: 0
+        Role: Master (0x00)
+        Peer address type: Random (0x01)
+        Peer address: C5:74:7A:BA:49:32 (Static)
+        Connection interval: 50.00 msec (0x0028)
+        Connection latency: 0 (0x0000)
+        Supervision timeout: 420 msec (0x002a)
+        Master clock accuracy: 0x07
+@ MGMT Event: Device Connected (0x000b) plen 37                                                                                                                      {0x0002} 4.036378
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Flags: 0x00000000
+        Data length: 24
+        Appearance: Heart Rate Belt (0x0341)
+        Flags: 0x06
+          LE General Discoverable Mode
+          BR/EDR Not Supported
+        16-bit Service UUIDs (complete): 3 entries
+          Heart Rate (0x180d)
+          Battery Service (0x180f)
+          Device Information (0x180a)
+        Name (complete): hrm9000
+@ MGMT Event: Device Connected (0x000b) plen 37                                                                                                                      {0x0001} 4.036378
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Flags: 0x00000000
+        Data length: 24
+        Appearance: Heart Rate Belt (0x0341)
+        Flags: 0x06
+          LE General Discoverable Mode
+          BR/EDR Not Supported
+        16-bit Service UUIDs (complete): 3 entries
+          Heart Rate (0x180d)
+          Battery Service (0x180f)
+          Device Information (0x180a)
+        Name (complete): hrm9000
+> HCI Event: LE Meta Event (0x3e) plen 4                                                                                                                                  #13 4.036338
+      LE Channel Selection Algorithm (0x14)
+        Handle: 0
+        Algorithm: #2 (0x01)
+< HCI Command: LE Read Remote Used Features (0x08|0x0016) plen 2                                                                                                          #14 4.036646
+        Handle: 0
+> ACL Data RX: Handle 0 flags 0x02 dlen 7                                                                                                                                 #15 4.038276
+      ATT: Exchange MTU Request (0x02) len 2
+        Client RX MTU: 247
+> HCI Event: Command Status (0x0f) plen 4                                                                                                                                 #16 4.039260
+      LE Read Remote Used Features (0x08|0x0016) ncmd 1
+        Status: Success (0x00)
+> HCI Event: LE Meta Event (0x3e) plen 11                                                                                                                                 #17 4.137246
+      LE Data Length Change (0x07)
+        Handle: 0
+        Max TX octets: 251
+        Max TX time: 2120
+        Max RX octets: 251
+        Max RX time: 2120
+> HCI Event: LE Meta Event (0x3e) plen 12                                                                                                                                 #18 4.238320
+      LE Read Remote Used Features (0x04)
+        Status: Success (0x00)
+        Handle: 0
+        Features: 0x25 0x41 0x00 0x00 0x00 0x00 0x00 0x00
+          LE Encryption
+          Extended Reject Indication
+          LE Data Packet Length Extension
+          LE 2M PHY
+          Channel Selection Algorithm #2
+< ACL Data TX: Handle 0 flags 0x00 dlen 11                                                                                                                                #19 4.238399
+      SMP: Pairing Request (0x01) len 6
+        IO capability: KeyboardDisplay (0x04)
+        OOB data: Authentication data not present (0x00)
+        Authentication requirement: Bonding, MITM, SC, No Keypresses (0x0d)
+        Max encryption key size: 16
+        Initiator key distribution: EncKey Sign (0x05)
+        Responder key distribution: EncKey IdKey Sign (0x07)
+< ACL Data TX: Handle 0 flags 0x00 dlen 7                                                                                                                                 #20 4.239073
+      ATT: Exchange MTU Response (0x03) len 2
+        Server RX MTU: 517
+< ACL Data TX: Handle 0 flags 0x00 dlen 7                                                                                                                                 #21 4.239096
+      ATT: Exchange MTU Request (0x02) len 2
+        Client RX MTU: 517
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #22 4.288280
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #23 4.338160
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 11                                                                                                                                #24 4.338264
+      SMP: Pairing Response (0x02) len 6
+        IO capability: NoInputNoOutput (0x03)
+        OOB data: Authentication data not present (0x00)
+        Authentication requirement: Bonding, No MITM, SC, No Keypresses (0x09)
+        Max encryption key size: 16
+        Initiator key distribution: EncKey (0x01)
+        Responder key distribution: EncKey IdKey (0x03)
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #25 4.339094
+        Num handles: 1
+        Handle: 0
+        Count: 1
+< ACL Data TX: Handle 0 flags 0x00 dlen 69                                                                                                                                #26 4.340912
+      SMP: Pairing Public Key (0x0c) len 64
+        X: b65b4000dfe0a771f8374fd385f65af2b0660c47d7de55e4dd04d38b9504da2e
+        Y: 4088842c5ba6984150cb60e9948b3200e2f7d26310b9515c66353d99581b10df
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #27 4.389149
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 7                                                                                                                                 #28 4.389155
+      ATT: Exchange MTU Response (0x03) len 2
+        Server RX MTU: 247
+< ACL Data TX: Handle 0 flags 0x00 dlen 11                                                                                                                                #29 4.389338
+      ATT: Read By Group Type Request (0x10) len 6
+        Handle range: 0x0001-0xffff
+        Attribute group type: Primary Service (0x2800)
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #30 4.439169
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 69                                                                                                                                #31 4.439519
+      SMP: Pairing Public Key (0x0c) len 64
+        X: b6c75a2f3f6893933dd454285f9077c0df96a0b1e2df98fa6767d6d757ee29c1
+        Y: 5505c9debc1d9b2641f7f4aeb129bcf11707a155b98f43f77b2e6e041bba137d
+> ACL Data RX: Handle 0 flags 0x02 dlen 21                                                                                                                                #32 4.441149
+      SMP: Pairing Confirm (0x03) len 16
+        Confim value: 36257146a0097de0c50ab1d39cb5712f
+> ACL Data RX: Handle 0 flags 0x02 dlen 36                                                                                                                                #33 4.441160
+      ATT: Read By Group Type Response (0x11) len 31
+        Attribute data length: 6
+        Attribute group list: 5 entries
+        Handle range: 0x0001-0x0009
+        UUID: Generic Access Profile (0x1800)
+        Handle range: 0x000a-0x000d
+        UUID: Generic Attribute Profile (0x1801)
+        Handle range: 0x000e-0x0013
+        UUID: Heart Rate (0x180d)
+        Handle range: 0x0014-0x0017
+        UUID: Battery Service (0x180f)
+        Handle range: 0x0018-0xffff
+        UUID: Device Information (0x180a)
+< ACL Data TX: Handle 0 flags 0x00 dlen 21                                                                                                                                #34 4.443400
+      SMP: Pairing Random (0x04) len 16
+        Random value: 64ad15c69f9a7430c43abe7bd6cccbda
+< ACL Data TX: Handle 0 flags 0x00 dlen 9                                                                                                                                 #35 4.461947
+      ATT: Write Request (0x12) len 4
+        Handle: 0x000d
+          Data: 0200
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #36 4.488169
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #37 4.489079
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 21                                                                                                                                #38 4.489087
+      SMP: Pairing Random (0x04) len 16
+        Random value: b3fb312bd2941f21484564dd6d25fe29
+< ACL Data TX: Handle 0 flags 0x00 dlen 21                                                                                                                                #39 4.489206
+      SMP: Pairing DHKey Check (0x0d) len 16
+        E: ec878227555bcd07ad19642238b3a4bf
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #40 4.538164
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 5                                                                                                                                 #41 4.538200
+      ATT: Write Response (0x13) len 0
+< ACL Data TX: Handle 0 flags 0x00 dlen 7                                                                                                                                 #42 4.538582
+      ATT: Read Request (0x0a) len 2
+        Handle: 0x0003
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #43 4.588111
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 21                                                                                                                                #44 4.588353
+      SMP: Pairing DHKey Check (0x0d) len 16
+        E: ba07527e3a8d69ad6214729b8ec205e0
+< HCI Command: LE Start Encryption (0x08|0x0019) plen 28                                                                                                                  #45 4.588382
+        Handle: 0
+        Random number: 0x0000000000000000
+        Encrypted diversifier: 0x0000
+        Long term key: f56269cf8c376f2e8862a5d5275bf0ba
+> HCI Event: Command Status (0x0f) plen 4                                                                                                                                 #46 4.590988
+      LE Start Encryption (0x08|0x0019) ncmd 1
+        Status: Success (0x00)
+> ACL Data RX: Handle 0 flags 0x02 dlen 12                                                                                                                                #47 4.638236
+      ATT: Read Response (0x0b) len 7
+        Value: 68726d39303030
+< ACL Data TX: Handle 0 flags 0x00 dlen 7                                                                                                                                 #48 4.638432
+      ATT: Read Request (0x0a) len 2
+        Handle: 0x0005
+> HCI Event: Encryption Change (0x08) plen 4                                                                                                                              #49 4.887969
+        Status: Success (0x00)
+        Handle: 0
+        Encryption: Enabled with AES-CCM (0x01)
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #50 4.938895
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 21                                                                                                                                #51 4.938899
+      SMP: Identity Information (0x08) len 16
+        Identity resolving key: e593ead2c0e36b34bf5957ebeef81053
+> ACL Data RX: Handle 0 flags 0x02 dlen 12                                                                                                                                #52 4.987873
+      SMP: Identity Address Information (0x09) len 7
+        Address type: Random (0x01)
+        Address: C5:74:7A:BA:49:32 (Static)
+@ MGMT Event: New Identity Resolving Key (0x0018) plen 30                                                                                                            {0x0002} 4.987926
+        Store hint: Yes (0x01)
+        Random address: 00:00:00:00:00:00 (Non-Resolvable)
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Key: e593ead2c0e36b34bf5957ebeef81053
+@ MGMT Event: New Identity Resolving Key (0x0018) plen 30                                                                                                            {0x0001} 4.987926
+        Store hint: Yes (0x01)
+        Random address: 00:00:00:00:00:00 (Non-Resolvable)
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Key: e593ead2c0e36b34bf5957ebeef81053
+@ MGMT Event: New Long Term Key (0x000a) plen 37                                                                                                                     {0x0002} 4.987964
+        Store hint: Yes (0x01)
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Key type: Unauthenticated key from P-256 (0x02)
+        Master: 0x00
+        Encryption size: 16
+        Diversifier: 0000
+        Randomizer: 0000000000000000
+        Key: f56269cf8c376f2e8862a5d5275bf0ba
+@ MGMT Event: New Long Term Key (0x000a) plen 37                                                                                                                     {0x0001} 4.987964
+        Store hint: Yes (0x01)
+        LE Address: C5:74:7A:BA:49:32 (Static)
+        Key type: Unauthenticated key from P-256 (0x02)
+        Master: 0x00
+        Encryption size: 16
+        Diversifier: 0000
+        Randomizer: 0000000000000000
+        Key: f56269cf8c376f2e8862a5d5275bf0ba
+@ MGMT Event: Command Complete (0x0001) plen 10                                                                                                                      {0x0001} 4.987985
+      Pair Device (0x0019) plen 7
+        Status: Success (0x00)
+        LE Address: C5:74:7A:BA:49:32 (Static)
+> ACL Data RX: Handle 0 flags 0x02 dlen 7                                                                                                                                 #53 4.988827
+      ATT: Read Response (0x0b) len 2
+        Value: 4103
+< ACL Data TX: Handle 0 flags 0x00 dlen 7                                                                                                                                 #54 5.005897
+      ATT: Read Request (0x0a) len 2
+        Handle: 0x0016
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #55 5.038046
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 11                                                                                                                                #56 5.038070
+      ATT: Read By Type Request (0x08) len 6
+        Handle range: 0x0001-0xffff
+        Attribute type: Central Address Resolution (0x2aa6)
+< ACL Data TX: Handle 0 flags 0x00 dlen 9                                                                                                                                 #57 5.038286
+      ATT: Error Response (0x01) len 4
+        Read By Type Request (0x08)
+        Handle: 0x0001
+        Error: Attribute Not Found (0x0a)
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #58 5.087970
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 6                                                                                                                                 #59 5.087996
+      ATT: Read Response (0x0b) len 1
+        Value: 54
+< ACL Data TX: Handle 0 flags 0x00 dlen 9                                                                                                                                 #60 5.088192
+      ATT: Write Request (0x12) len 4
+        Handle: 0x0017
+          Data: 0100
+> HCI Event: Number of Completed Packets (0x13) plen 5                                                                                                                    #61 5.137814
+        Num handles: 1
+        Handle: 0
+        Count: 1
+> ACL Data RX: Handle 0 flags 0x02 dlen 5                                                                                                                                 #62 5.187822
+      ATT: Write Response (0x13) len 0
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                 #63 6.387304
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 55
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                 #64 8.386401
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 56
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #65 10.385528
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 57
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #66 12.384540
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 58
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #67 14.383805
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 59
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #68 16.382720
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 5a
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #69 18.381912
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 5b
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #70 20.380998
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 5c
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #71 22.380063
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 5d
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #72 24.379215
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016
+          Data: 5e
+> ACL Data RX: Handle 0 flags 0x02 dlen 8                                                                                                                                #73 26.378337
+      ATT: Handle Value Notification (0x1b) len 3
+        Handle: 0x0016

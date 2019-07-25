@@ -140,6 +140,7 @@ func (s *Socket) Read(p []byte) (int, error) {
 	case <-s.closed:
 		return 0, io.EOF
 	default:
+		// log.Println("hci >", hex.EncodeToString(p[:n]))
 	}
 	return n, errors.Wrap(err, "can't read hci socket")
 }
@@ -148,6 +149,7 @@ func (s *Socket) Write(p []byte) (int, error) {
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 	n, err := unix.Write(s.fd, p)
+	// log.Println("hci <", hex.EncodeToString(p))
 	return n, errors.Wrap(err, "can't write hci socket")
 }
 

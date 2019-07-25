@@ -35,4 +35,8 @@ type Conn interface {
 
 	// Disconnected returns a receiving channel, which is closed when the connection disconnects.
 	Disconnected() <-chan struct{}
+
+	Bond() error
+
+	StartEncryption() error
 }

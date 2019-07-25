@@ -13,8 +13,10 @@ import (
 )
 
 // Addr ...
-func (h *HCI) Addr() ble.Addr { return h.addr }
-
+func (h *HCI) Addr() ble.Addr { return ble.NewAddr(h.addr.String()) }
+func (h *HCI) Bytes() []byte {
+	return ble.NewAddr(h.addr.String()).Bytes()
+}
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
 	h.advHandler = ah

@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
-	"net"
-
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/pkg/errors"
+	"io"
+	"net"
 )
 
 // Conn ...
@@ -63,9 +62,16 @@ type Conn struct {
 
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
+
+	smp SmpManager
+}
+
+type Encrypter interface {
+	Encrypt() error
 }
 
 func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
+
 	c := &Conn{
 		hci:   h,
 		ctx:   context.Background(),
@@ -86,6 +92,13 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 
 		chDone: make(chan struct{}),
 	}
+
+	if c.hci.smpEnabled {
+		c.smp = c.hci.smp.Create(defaultSmpConfig)
+	}
+	c.initPairingContext()
+	c.smp.SetWritePDUFunc(c.writePDU)
+	c.smp.SetEncryptFunc(c.encrypt)
 
 	go func() {
 		for {
@@ -111,6 +124,14 @@ func (c *Conn) Context() context.Context {
 // SetContext sets the context that is used by this Conn.
 func (c *Conn) SetContext(ctx context.Context) {
 	c.ctx = ctx
+}
+
+func (c *Conn) Bond() error {
+	return c.smp.Bond()
+}
+
+func (c *Conn) StartEncryption() error {
+	return c.smp.StartEncryption()
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
@@ -184,6 +205,77 @@ func (c *Conn) Write(sdu []byte) (int, error) {
 	return sent, nil
 }
 
+func (c *Conn) initPairingContext() {
+	smp := c.smp
+
+	la := c.LocalAddr().Bytes()
+	lat := uint8(0x00)
+	if (la[0] & 0xc0) == 0xc0 {
+		lat = 0x01
+	}
+	ra := c.RemoteAddr().Bytes()
+	rat := c.param.PeerAddressType()
+
+	smp.InitContext(la, ra, lat, rat)
+}
+
+func (c *Conn) encrypt(bi BondInfo) error {
+	legacy, stk := c.smp.LegacyPairingInfo()
+	//if a short term key is present, use it as the long term key
+	if legacy && len(stk) > 0 {
+		fmt.Println("encrypting with short term key")
+		return c.stkEncrypt(stk)
+	}
+
+	if bi == nil {
+		return fmt.Errorf("no bond information")
+	}
+
+	ltk := bi.LongTermKey()
+	if ltk == nil {
+		return fmt.Errorf("no ltk present")
+	}
+
+	m := cmd.LEStartEncryption{}
+	m.ConnectionHandle = c.param.ConnectionHandle()
+
+	eDiv := bi.EDiv()
+	randVal := bi.Random()
+
+	if bi.Legacy() {
+		//expect LTK, EDiv, and Rand to be present
+		if len(ltk) != 16 {
+			return fmt.Errorf("invalid length for ltk")
+		}
+
+		if eDiv == 0 || randVal == 0 {
+			return fmt.Errorf("ediv and random must not be 0 for legacy pairing")
+		}
+	}
+
+	for i, v := range ltk {
+		m.LongTermKey[i] = v
+	}
+
+	m.EncryptedDiversifier = eDiv
+	m.RandomNumber = randVal
+
+	return c.hci.Send(&m, nil)
+}
+
+func (c *Conn) stkEncrypt(key []byte) error {
+	m := cmd.LEStartEncryption{}
+	m.ConnectionHandle = c.param.ConnectionHandle()
+	for i, v := range key {
+		m.LongTermKey[i] = v
+	}
+
+	m.EncryptedDiversifier = 0
+	m.RandomNumber = 0
+
+	return c.hci.Send(&m, nil)
+}
+
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
 func (c *Conn) writePDU(pdu []byte) (int, error) {
 	sent := 0
@@ -244,7 +336,7 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		sent += flen
 
 		flags = (pbfContinuing << 4) // Set "continuing" in the boundary flags for the rest of fragments, if any.
-		pdu = pdu[flen:]             // Advence the point
+		pdu = pdu[flen:]             // Advance the point
 	}
 	return sent, nil
 }
@@ -283,9 +375,9 @@ func (c *Conn) recombine() error {
 	case cidLEAtt:
 		c.chInPDU <- p
 	case cidLESignal:
-		c.handleSignal(p)
-	case cidSMP:
-		c.handleSMP(p)
+		_ = c.handleSignal(p)
+	case CidSMP:
+		_ = c.smp.Handle(p)
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
@@ -318,7 +410,7 @@ func (c *Conn) LocalAddr() ble.Addr { return c.hci.Addr() }
 // RemoteAddr returns remote device's MAC address.
 func (c *Conn) RemoteAddr() ble.Addr {
 	a := c.param.PeerAddress()
-	return net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
+	return ble.NewAddr(net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]}).String())
 }
 
 // RxMTU returns the MTU which the upper layer is capable of accepting.

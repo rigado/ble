@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux"
+	bonds "github.com/go-ble/ble/linux/hci/bond"
 	"github.com/pkg/errors"
 )
 
@@ -20,6 +23,7 @@ var (
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
 	bond = flag.Bool("bond", false, "attempt to bond on connection")
+	forceEncrypt = flag.Bool("fe", false, "force encryption to be started if bond information is found")
 )
 
 func main() {
@@ -29,7 +33,15 @@ func main() {
 	log.Printf("addr: %v", *addr)
 
 	optid := ble.OptDeviceID(*device)
-	d, err := linux.NewDeviceWithNameAndHandler("", nil, optid)
+
+	//To create a bond with a device, the bond manager needs a file
+	//to store and load bond information
+	bondFilePath := filepath.Join("bonds.json")
+	bm := bonds.NewBondManager(bondFilePath)
+
+	//Enable security by putting the bond manager in the enable security option
+	optSecurity := ble.OptEnableSecurity(bm)
+	d, err := linux.NewDeviceWithNameAndHandler("", nil, optid, optSecurity)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
@@ -67,17 +79,41 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(5 * time.Second)
+	<-time.After(2 * time.Second)
 
-	fmt.Printf("Discovering profile...\n")
-	p, err := cln.DiscoverProfile(true)
-	if err != nil {
-		log.Fatalf("can't discover profile: %s", err)
+	if *bond {
+		//bonds can be manually triggered by issuing the bond command
+		//however, the typical process is
+		/* 1. connect
+		   2. attempt to read or write to a characteristic which requires security
+		   3. peripheral responds with insufficient authentication
+		   4. central triggers bonding
+		 */
+		log.Println("creating a new bond")
+		err = cln.Bond()
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
-	log.Println("exploring")
-	// Start the exploration.
-	explore(cln, p)
+	if *forceEncrypt {
+		aStr := strings.Replace(cln.Addr().String(), ":", "", -1)
+		aBytes, _ := hex.DecodeString(aStr)
+		for i := len(aBytes)/2-1; i >= 0; i-- {
+			opp := len(aBytes)-1-i
+			aBytes[i], aBytes[opp] = aBytes[opp], aBytes[i]
+		}
+
+		log.Println("starting encryption for", hex.EncodeToString(aBytes))
+		if exists := bm.Exists(hex.EncodeToString(aBytes)); exists == true {
+			log.Println("found bond info; starting encryption")
+			if err := cln.StartEncryption(); err != nil {
+				log.Println("failed to start encryption:", err)
+			}
+		}
+	}
+
+	<-time.After(60 * time.Second)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())

@@ -79,7 +79,8 @@ func (a *Advertisement) addrWErr() (ble.Addr, error) {
 		return nil, err
 	}
 
-	addr := net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
+	addr := ble.NewAddr(
+		net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]}).String())
 	at, err := a.e.AddressTypeWErr(a.i)
 	if err != nil {
 		return nil, err
