@@ -1,6 +1,8 @@
 package hci
 
 import (
+	"encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -31,6 +33,12 @@ func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) 
 	}
 	p, err := adv.NewRawPacket(ad)
 	if err != nil {
+		a := make([]byte, 6)
+		addrArray := e.Address(i)
+		for i := 0; i < 6; i++ {
+			a[i] = addrArray[i]
+		}
+		fmt.Println("address:", hex.EncodeToString(a))
 		return nil, err
 	}
 

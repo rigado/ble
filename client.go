@@ -71,4 +71,6 @@ type Client interface {
 	Conn() Conn
 
 	Bond() error
+
+	StartEncryption() error
 }

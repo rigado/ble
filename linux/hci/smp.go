@@ -33,7 +33,7 @@ type SmpManager interface {
 	Handle(data []byte) error
 	Bond() error
 	BondInfoFor(addr string) BondInfo
-	EnableEncryption(addr string) error
+	StartEncryption() error
 	SetWritePDUFunc(func([]byte) (int, error))
 	SetEncryptFunc(func(BondInfo) error)
 	LegacyPairingInfo() (bool, []byte)

@@ -130,6 +130,10 @@ func (c *Conn) Bond() error {
 	return c.smp.Bond()
 }
 
+func (c *Conn) StartEncryption() error {
+	return c.smp.StartEncryption()
+}
+
 // Read copies re-assembled L2CAP PDUs into sdu.
 func (c *Conn) Read(sdu []byte) (n int, err error) {
 	p, ok := <-c.chInPDU

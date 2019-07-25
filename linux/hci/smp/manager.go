@@ -1,6 +1,7 @@
 package smp
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/go-ble/ble/linux/hci"
 	"log"
@@ -90,6 +91,14 @@ func (m *manager) Bond() error {
 	m.t.pairing = m.pairing
 
 	return m.t.sendPairingRequest()
+}
+
+func (m *manager) StartEncryption() error {
+	bi, err := m.bondManager.Find(hex.EncodeToString(m.pairing.remoteAddr))
+	if err != nil {
+		return err
+	}
+	return m.encrypt(bi)
 }
 
 //todo: implement if needed
