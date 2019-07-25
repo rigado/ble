@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -22,6 +23,7 @@ var (
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
 	bond = flag.Bool("bond", false, "attempt to bond on connection")
+	forceEncrypt = flag.Bool("fe", false, "force encryption to be started if bond information is found")
 )
 
 func main() {
@@ -77,7 +79,7 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(5 * time.Second)
+	<-time.After(2 * time.Second)
 
 	if *bond {
 		//bonds can be manually triggered by issuing the bond command
@@ -94,15 +96,22 @@ func main() {
 		}
 	}
 
-	//fmt.Printf("Discovering profile...\n")
-	//_, err = cln.DiscoverProfile(true)
-	//if err != nil {
-	//	log.Fatalf("can't discover profile: %s", err)
-	//}
+	if *forceEncrypt {
+		aStr := strings.Replace(cln.Addr().String(), ":", "", -1)
+		aBytes, _ := hex.DecodeString(aStr)
+		for i := len(aBytes)/2-1; i >= 0; i-- {
+			opp := len(aBytes)-1-i
+			aBytes[i], aBytes[opp] = aBytes[opp], aBytes[i]
+		}
 
-	// log.Println("exploring")
-	// // Start the exploration.
-	// explore(cln, p)
+		log.Println("starting encryption for", hex.EncodeToString(aBytes))
+		if exists := bm.Exists(hex.EncodeToString(aBytes)); exists == true {
+			log.Println("found bond info; starting encryption")
+			if err := cln.StartEncryption(); err != nil {
+				log.Println("failed to start encryption:", err)
+			}
+		}
+	}
 
 	<-time.After(60 * time.Second)
 

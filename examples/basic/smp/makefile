@@ -3,7 +3,7 @@ native: clean
 
 arm: clean
 	env GOOS=linux GOARCH=arm go build -o explorer-arm
-	scp explorer-arm admin@192.168.2.107:~
+	scp explorer-arm admin@192.168.30.230:~
 
 clean:
 	rm -f explorer explorer-arm
