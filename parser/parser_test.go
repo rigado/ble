@@ -1,4 +1,4 @@
-package adv
+package parser
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-ble/ble"
+	"github.com/rigado/ble/linux/adv"
 )
 
 type testPdu struct {
@@ -38,7 +39,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	b := []byte{}
 	p.add(typ, b)
 
-	_, err := decode(p.bytes())
+	_, err := Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len==0, no decode error")
 	}
@@ -57,7 +58,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	b = append(b, 0xbb) //appending extra byte here!
 	p.add(typ, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len%%size != 0, no decode error")
 	}
@@ -71,7 +72,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	}
 	p.add(typ, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len<arrayElementSize, no decode error")
 	}
@@ -85,7 +86,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	}
 	p.add(typ, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len<minSz, no decode error")
 	}
@@ -106,7 +107,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	badLength := byte(len(b) + 32)
 	p.addBad(typ, badLength, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("corrupt length +32, no decode error")
 	}
@@ -114,7 +115,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	//255
 	p = testPdu{}
 	p.addBad(typ, 255, b)
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("corrupt length 255, no decode error")
 	}
@@ -144,7 +145,7 @@ func testArrayGood(typ byte, t *testing.T) error {
 	b = append(b, b3...)
 	p.add(typ, b)
 
-	m, err := decode(p.bytes())
+	m, err := Parse(p.bytes())
 	if err != nil {
 		return fmt.Errorf("decode error %v", err)
 	}
@@ -226,7 +227,7 @@ func testNonArrayGood(typ byte, t *testing.T) error {
 	}
 
 	p.add(typ, b)
-	m, err := decode(p.bytes())
+	m, err := Parse(p.bytes())
 	if err != nil {
 		return fmt.Errorf("decode error %v", err)
 	}
@@ -261,7 +262,7 @@ func testNonArrayBad(typ byte, t *testing.T) error {
 	b := []byte{}
 	p.add(typ, b)
 
-	_, err := decode(p.bytes())
+	_, err := Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len==0, no decode error")
 	}
@@ -275,7 +276,7 @@ func testNonArrayBad(typ byte, t *testing.T) error {
 	}
 	p.add(typ, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("len<minSz, no decode error")
 	}
@@ -293,7 +294,7 @@ func testNonArrayBad(typ byte, t *testing.T) error {
 	badLength := byte(len(b) + 32)
 	p.addBad(typ, badLength, b)
 
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("corrupt length +32, no decode error")
 	}
@@ -301,7 +302,7 @@ func testNonArrayBad(typ byte, t *testing.T) error {
 	//255
 	p = testPdu{}
 	p.addBad(typ, 255, b)
-	_, err = decode(p.bytes())
+	_, err = Parse(p.bytes())
 	if err == nil {
 		return fmt.Errorf("corrupt length 255, no decode error")
 	}
@@ -347,7 +348,7 @@ func TestParserCombined(t *testing.T) {
 	p.add(types.uuid16comp, u16)
 	p.add(types.uuid128comp, u128)
 
-	m, err := decode(p.bytes())
+	m, err := Parse(p.bytes())
 	if err != nil {
 		t.Fatalf("combined adv decode err %v", err)
 	}
@@ -389,9 +390,9 @@ func TestParserCombined(t *testing.T) {
 
 func TestIBeacon(t *testing.T) {
 	u128 := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
-	p, _ := NewPacket(Flags(123), IBeacon(u128, 12345, 45678, 56))
+	p, _ := adv.NewPacket(adv.Flags(123), adv.IBeacon(u128, 12345, 45678, 56))
 	b := p.Bytes()
-	m, err := decode(b)
+	m, err := Parse(b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +454,7 @@ func testServiceData(typ byte, dl int, t *testing.T) error {
 
 	p.add(typ, append(uuid, data...))
 
-	m, err := decode(p.bytes())
+	m, err := Parse(p.bytes())
 	if err != nil {
 		return fmt.Errorf("decode error %v", err)
 	}
@@ -463,26 +464,29 @@ func testServiceData(typ byte, dl int, t *testing.T) error {
 	}
 
 	t.Logf("%+v", m)
-	//check service data
-	sd, ok := m[dec.key].([]ble.ServiceData)
+
+	//check service data map exists?
+	sdm, ok := m[dec.key].(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("svc data key missing %v", dec.key)
+		return fmt.Errorf("svc data map invalid %v", dec.key)
 	}
 
-	//uuid ok?
-	sdu := sd[0].UUID
-	sduexp := ble.UUID(uuid)
-	sduok := reflect.DeepEqual(sdu, sduexp)
-	if !sduok {
-		return fmt.Errorf("svc uuid mismatch:\nexp %v %v\ngot %v %v", sduexp, reflect.TypeOf(sduexp), sdu, reflect.TypeOf(sdu))
+	// sd exists for uuid?
+	ai, ok := sdm[ble.UUID(uuid).String()].([]interface{})
+	if !ok {
+		return fmt.Errorf("svc data for %v not found", uuid)
 	}
 
-	//data ok
-	sdd := sd[0].Data
-	sddexp := data
-	sddok := reflect.DeepEqual(sdd, sddexp)
-	if !sddok {
-		return fmt.Errorf("svc data mismatch:\nexp %v %v\ngot %v %v", sddexp, reflect.TypeOf(sddexp), sdd, reflect.TypeOf(sdd))
+	// sd has bytes?
+	sd, ok := ai[0].([]byte)
+	if !ok {
+		return fmt.Errorf("no ble svc data found, got %v", reflect.TypeOf(ai[0]))
+	}
+
+	// sd data correct?
+	sdok := reflect.DeepEqual(sd, data)
+	if !sdok {
+		return fmt.Errorf("svc data mismatch:\nexp %v %v\ngot %v %v", data, reflect.TypeOf(data), sd, reflect.TypeOf(sd))
 	}
 
 	return nil
@@ -512,7 +516,7 @@ func TestServiceData(t *testing.T) {
 // 	p.add(types.svc32, []byte{0x11, 0x22, 0x33, 0x44, 55, 66, 77, 88, 99, 10, 11})
 // 	p.add(types.svc128, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0xff})
 
-// 	m, err := decode(p.bytes())
+// 	m, err := Parse(p.bytes())
 // 	t.Fatal(m, err)
 
 // 	// v, ok := m[keys.uuid128comp].([]interface{})
