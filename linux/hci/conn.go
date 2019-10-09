@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"net"
+	"time"
+
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/pkg/errors"
-	"io"
-	"net"
 )
 
 // Conn ...
@@ -104,10 +106,20 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		for {
 			if err := c.recombine(); err != nil {
 				if err != io.EOF {
-					// TODO: wrap and pass the error up.
-					// err := errors.Wrap(err, "recombine failed")
-					_ = logger.Error("recombine failed: ", "err", err)
+					err = errors.Wrap(err, "recombine")
+					if c.hci.errorHandler != nil {
+						c.hci.errorHandler(err)
+					}
+
+					//attempt to cleanup
+					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
+						err = errors.Wrap(err, "recombine cleanup")
+						if c.hci.errorHandler != nil {
+							c.hci.errorHandler(err)
+						}
+					}
 				}
+
 				close(c.chInPDU)
 				return
 			}
@@ -343,9 +355,15 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 
 // Recombines fragments into a L2CAP PDU. [Vol 3, Part A, 7.2.2]
 func (c *Conn) recombine() error {
-	pkt, ok := <-c.chInPkt
-	if !ok {
-		return io.EOF
+	var pkt packet
+	var ok bool
+	select {
+	case pkt, ok = <-c.chInPkt:
+		if !ok {
+			return io.EOF
+		}
+	case <-time.After(time.Minute * 10):
+		return fmt.Errorf("idle timeout")
 	}
 
 	p := pdu(pkt.data())

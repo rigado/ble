@@ -38,8 +38,8 @@ type pkt struct {
 // NewHCI returns a hci device.
 func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
-		id: -1,
-		smp: smp,
+		id:        -1,
+		smp:       smp,
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
@@ -69,7 +69,7 @@ type HCI struct {
 
 	params params
 
-	smp SmpManagerFactory
+	smp        SmpManagerFactory
 	smpEnabled bool
 
 	skt io.ReadWriteCloser
@@ -630,14 +630,13 @@ func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
 	return nil
 }
 
-func (h *HCI) handleDisconnectionComplete(b []byte) error {
-	e := evt.DisconnectionComplete(b)
+func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	h.muConns.Lock()
-	c, found := h.conns[e.ConnectionHandle()]
-	delete(h.conns, e.ConnectionHandle())
+	c, found := h.conns[ch]
+	delete(h.conns, ch)
 	h.muConns.Unlock()
 	if !found {
-		return fmt.Errorf("disconnecting an invalid handle %04X", e.ConnectionHandle())
+		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 	close(c.chInPkt)
 
@@ -665,6 +664,12 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	c.txBuffer.PutAll()
 	c.txBuffer.UnlockPool()
 	return nil
+}
+
+func (h *HCI) handleDisconnectionComplete(b []byte) error {
+	e := evt.DisconnectionComplete(b)
+	ch := e.ConnectionHandle()
+	return h.cleanupConnectionHandle(ch)
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
