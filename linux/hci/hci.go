@@ -270,8 +270,15 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 
 	h.muSent.Lock()
+	_, ok := h.sent[c.OpCode()]
+	if ok {
+		h.muSent.Unlock()
+		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
+	}
+
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
+
 	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
@@ -557,6 +564,7 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 	h.muSent.Lock()
 	p, found := h.sent[int(e.CommandOpcode())]
 	h.muSent.Unlock()
+
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandCompleteEP: % X", e)
 	}

@@ -414,11 +414,10 @@ func (c *Conn) Close() error {
 		// Return if it's already closed.
 		return nil
 	default:
-		c.hci.Send(&cmd.Disconnect{
+		return c.hci.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
 		}, nil)
-		return nil
 	}
 }
 
