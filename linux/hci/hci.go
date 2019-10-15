@@ -291,9 +291,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// emergency timeout to prevent calls from locking up if the HCI
 	// interface doesn't respond.  Responsed here should normally be fast
 	// a timeout indicates a major problem with HCI.
-	timeout := time.NewTimer(10 * time.Second)
 	select {
-	case <-timeout.C:
+	case <-time.After(10 * time.Second)
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
 		ret = nil
 	case <-h.done:
@@ -303,7 +302,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		err = nil
 		ret = b
 	}
-	timeout.Stop()
 
 	// clear sent table when done, we sometimes get command complete or
 	// command status messages with no matching send, which can attempt to
