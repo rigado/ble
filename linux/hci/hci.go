@@ -314,6 +314,9 @@ func (h *HCI) send(c Command) ([]byte, error) {
 }
 
 func (h *HCI) sktLoop() {
+	readErr := 0
+	handleErr := 0
+
 	b := make([]byte, 4096)
 	defer close(h.done)
 	for {
@@ -321,10 +324,14 @@ func (h *HCI) sktLoop() {
 		if n == 0 || err != nil {
 			if err == io.EOF {
 				h.err = err //callers depend on detecting io.EOF, don't wrap it.
+				return
 			} else {
-				h.err = fmt.Errorf("skt: %s", err)
+				eout := fmt.Errorf("skt read err %v: %v", readErr, err)
+				readErr++
+				h.err = eout
+				fmt.Println(eout)
+				// return
 			}
-			return
 		}
 		p := make([]byte, n)
 		copy(p, b)
@@ -334,8 +341,11 @@ func (h *HCI) sktLoop() {
 			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
 				_ = logger.Error("skt: %v", err)
 			} else {
-				h.err = fmt.Errorf("skt: %v", err)
-				return
+				eout := fmt.Errorf("skt handle err %v: %v", handleErr, err)
+				handleErr++
+				h.err = eout
+				fmt.Println(eout)
+				// return
 			}
 		}
 	}
