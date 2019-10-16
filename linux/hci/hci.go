@@ -345,6 +345,7 @@ func (h *HCI) sktLoop() {
 				handleErr++
 				h.err = eout
 				fmt.Println(eout)
+				h.setAllowedCommands(1)
 				// return
 			}
 		}
