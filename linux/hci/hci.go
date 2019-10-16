@@ -292,7 +292,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// interface doesn't respond.  Responsed here should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
-	case <-time.After(10 * time.Second)
+	case <-time.After(10 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
 		ret = nil
 	case <-h.done:
