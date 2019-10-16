@@ -345,11 +345,31 @@ func (h *HCI) sktLoop() {
 				handleErr++
 				h.err = eout
 				fmt.Println(eout)
-				h.setAllowedCommands(1)
+				h.cleanupAfterBadPkt()
 				// return
 			}
 		}
 	}
+}
+
+func (h *HCI) cleanupAfterBadPkt() {
+	// try and put some bufs back on an error
+	h.muSent.Lock()
+
+	fmt.Printf("h.sent:\n%v\n", h.sent)
+
+	// assume since there is one cmd sent, that was the one that encountered an error
+	if len(h.sent) == 1 {
+		for k := range h.sent {
+			delete(h.sent, k)
+			fmt.Printf("recovered, deleting pending command %v\n", k)
+		}
+	} else {
+		fmt.Printf("can't recover, multiple pending commands")
+	}
+	h.muSent.Unlock()
+
+	h.setAllowedCommands(1)
 }
 
 func (h *HCI) close(err error) error {
@@ -718,11 +738,6 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{
 		ConnectionHandle: e.ConnectionHandle(),
 	}, nil)
-}
-
-func (h *HCI) handleUnhandled(b []byte) error {
-	log.Println("unhandled:", b)
-	return nil
 }
 
 func (h *HCI) setAllowedCommands(n int) {
