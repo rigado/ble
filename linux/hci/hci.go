@@ -169,8 +169,17 @@ func (h *HCI) Init() error {
 	return nil
 }
 
+func (h *HCI) discardConnections() {
+	for ch, conn := range h.conns {
+		conn.Close()
+		h.cleanupConnectionHandle(ch)
+	}
+}
+
 // Close ...
 func (h *HCI) Close() error {
+	h.discardConnections()
+	<-time.After(time.Second * 5)
 	return h.close(nil)
 }
 
