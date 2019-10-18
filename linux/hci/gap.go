@@ -190,7 +190,7 @@ func (h *HCI) Accept() (ble.Conn, error) {
 	case c := <-h.chSlaveConn:
 		return c, nil
 	case <-tmo:
-		return nil, fmt.Errorf("listner timed out")
+		return nil, fmt.Errorf("listener timed out")
 	}
 }
 

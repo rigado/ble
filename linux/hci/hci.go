@@ -171,15 +171,16 @@ func (h *HCI) Init() error {
 
 func (h *HCI) discardConnections() {
 	for ch, conn := range h.conns {
-		conn.Close()
-		h.cleanupConnectionHandle(ch)
+		e1 := conn.Close()
+		e2 := h.cleanupConnectionHandle(ch)
+		fmt.Printf("hci/discardConn %v, cl %v, cu %v\n", ch, e1, e2)
 	}
 }
 
 // Close ...
 func (h *HCI) Close() error {
 	h.discardConnections()
-	<-time.After(time.Second * 5)
+	h.done <- true
 	return h.close(nil)
 }
 
@@ -339,7 +340,7 @@ func (h *HCI) sktLoop() {
 				readErr++
 				h.err = eout
 				fmt.Println(eout)
-				// return
+				return
 			}
 		}
 		p := make([]byte, n)
@@ -354,8 +355,8 @@ func (h *HCI) sktLoop() {
 				handleErr++
 				h.err = eout
 				fmt.Println(eout)
-				h.cleanupAfterBadPkt()
-				// return
+				//h.cleanupAfterBadPkt()
+				return
 			}
 		}
 	}
@@ -384,7 +385,9 @@ func (h *HCI) cleanupAfterBadPkt() {
 func (h *HCI) close(err error) error {
 	h.err = err
 	if h.skt != nil {
-		return h.skt.Close()
+		if err := h.skt.Close(); err == nil {
+			h.skt = nil
+		}
 	}
 	return err
 }

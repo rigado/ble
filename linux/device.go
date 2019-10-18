@@ -2,9 +2,10 @@ package linux
 
 import (
 	"context"
-	smp2 "github.com/go-ble/ble/linux/hci/smp"
 	"io"
 	"log"
+
+	smp2 "github.com/go-ble/ble/linux/hci/smp"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/att"
@@ -59,6 +60,11 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			if err != io.EOF {
 				log.Printf("can't accept: %s", err)
 			}
+			return
+		}
+
+		if l2c == nil {
+			log.Printf("l2c nil")
 			return
 		}
 
