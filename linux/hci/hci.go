@@ -327,20 +327,20 @@ func (h *HCI) sktLoop() {
 	handleErr := 0
 
 	b := make([]byte, 4096)
-	defer close(h.done)
+	defer func() {
+		close(h.done)
+		h.dispatchError(h.err)
+	}()
+
 	for {
 		n, err := h.skt.Read(b)
 		if n == 0 || err != nil {
 			if err == io.EOF {
 				h.err = err //callers depend on detecting io.EOF, don't wrap it.
-				return
 			} else {
-				eout := fmt.Errorf("skt read err %v: %v", readErr, err)
-				readErr++
-				h.err = eout
-				fmt.Println(eout)
-				return
+				h.err = fmt.Errorf("skt read err %v: %v", readErr, err)
 			}
+			return
 		}
 		p := make([]byte, n)
 		copy(p, b)
@@ -350,36 +350,32 @@ func (h *HCI) sktLoop() {
 			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
 				_ = logger.Error("skt: %v", err)
 			} else {
-				eout := fmt.Errorf("skt handle err %v: %v", handleErr, err)
-				handleErr++
-				h.err = eout
-				fmt.Println(eout)
-				//h.cleanupAfterBadPkt()
+				h.err = fmt.Errorf("skt handle err %v: %v", handleErr, err)
 				return
 			}
 		}
 	}
 }
 
-func (h *HCI) cleanupAfterBadPkt() {
-	// try and put some bufs back on an error
-	h.muSent.Lock()
+// func (h *HCI) cleanupAfterBadPkt() {
+// 	// try and put some bufs back on an error
+// 	h.muSent.Lock()
 
-	fmt.Printf("h.sent:\n%v\n", h.sent)
+// 	fmt.Printf("h.sent:\n%v\n", h.sent)
 
-	// assume since there is one cmd sent, that was the one that encountered an error
-	if len(h.sent) == 1 {
-		for k := range h.sent {
-			delete(h.sent, k)
-			fmt.Printf("recovered, deleting pending command %v\n", k)
-		}
-	} else {
-		fmt.Printf("can't recover, multiple pending commands")
-	}
-	h.muSent.Unlock()
+// 	// assume since there is one cmd sent, that was the one that encountered an error
+// 	if len(h.sent) == 1 {
+// 		for k := range h.sent {
+// 			delete(h.sent, k)
+// 			fmt.Printf("recovered, deleting pending command %v\n", k)
+// 		}
+// 	} else {
+// 		fmt.Printf("can't recover, multiple pending commands")
+// 	}
+// 	h.muSent.Unlock()
 
-	h.setAllowedCommands(1)
-}
+// 	h.setAllowedCommands(1)
+// }
 
 func (h *HCI) close(err error) error {
 	h.err = err
