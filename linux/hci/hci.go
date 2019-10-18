@@ -180,7 +180,6 @@ func (h *HCI) discardConnections() {
 // Close ...
 func (h *HCI) Close() error {
 	h.discardConnections()
-	h.done <- true
 	return h.close(nil)
 }
 
