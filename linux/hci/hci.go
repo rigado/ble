@@ -121,8 +121,9 @@ type HCI struct {
 	//error handler
 	errorHandler func(error)
 
-	err  error
-	done chan bool
+	err       error
+	done      chan bool
+	isClosing bool
 }
 
 // Init ...
@@ -172,13 +173,17 @@ func (h *HCI) Init() error {
 func (h *HCI) discardConnections() {
 	for ch, conn := range h.conns {
 		e1 := conn.Close()
-		e2 := h.cleanupConnectionHandle(ch)
-		fmt.Printf("hci/discardConn %v, cl %v, cu %v\n", ch, e1, e2)
+		fmt.Printf("disconnecting hndl %v, err %v\n", ch, e1)
+		if e1 == nil {
+			<-conn.Disconnected()
+			fmt.Printf("disconnected hndl %v", ch)
+		}
 	}
 }
 
 // Close ...
 func (h *HCI) Close() error {
+	h.isClosing = true
 	h.discardConnections()
 	return h.close(nil)
 }
@@ -329,7 +334,9 @@ func (h *HCI) sktLoop() {
 	b := make([]byte, 4096)
 	defer func() {
 		close(h.done)
-		h.dispatchError(h.err)
+		if !h.isClosing {
+			h.dispatchError(h.err)
+		}
 	}()
 
 	for {
@@ -356,26 +363,6 @@ func (h *HCI) sktLoop() {
 		}
 	}
 }
-
-// func (h *HCI) cleanupAfterBadPkt() {
-// 	// try and put some bufs back on an error
-// 	h.muSent.Lock()
-
-// 	fmt.Printf("h.sent:\n%v\n", h.sent)
-
-// 	// assume since there is one cmd sent, that was the one that encountered an error
-// 	if len(h.sent) == 1 {
-// 		for k := range h.sent {
-// 			delete(h.sent, k)
-// 			fmt.Printf("recovered, deleting pending command %v\n", k)
-// 		}
-// 	} else {
-// 		fmt.Printf("can't recover, multiple pending commands")
-// 	}
-// 	h.muSent.Unlock()
-
-// 	h.setAllowedCommands(1)
-// }
 
 func (h *HCI) close(err error) error {
 	h.err = err
