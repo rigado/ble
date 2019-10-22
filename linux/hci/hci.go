@@ -171,13 +171,15 @@ func (h *HCI) Init() error {
 }
 
 func (h *HCI) discardConnections() {
-	for ch, conn := range h.conns {
-		e1 := conn.Close()
-		fmt.Printf("disconnecting hndl %v, err %v\n", ch, e1)
-		if e1 == nil {
-			<-conn.Disconnected()
-			fmt.Printf("disconnected hndl %v", ch)
-		}
+	for ch := range h.conns {
+		// e1 := conn.Close()
+		// fmt.Printf("disconnecting hndl %v, err %v\n", ch, e1)
+		// if e1 == nil {
+		// 	<-conn.Disconnected()
+		// 	fmt.Printf("disconnected hndl %v", ch)
+		// }
+
+		h.cleanupConnectionHandle(ch)
 	}
 }
 
@@ -272,7 +274,9 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	case b = <-h.chCmdBufs:
 		//ok
 	case <-time.After(chCmdBufTimeout):
-		return nil, fmt.Errorf("chCmdBufs get timeout")
+		err := fmt.Errorf("chCmdBufs get timeout")
+		h.errorHandler(err)
+		return nil, err
 	}
 
 	b[0] = byte(pktTypeCommand) // HCI header
