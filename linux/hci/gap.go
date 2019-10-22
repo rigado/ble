@@ -17,6 +17,7 @@ func (h *HCI) Addr() ble.Addr { return ble.NewAddr(h.addr.String()) }
 func (h *HCI) Bytes() []byte {
 	return ble.NewAddr(h.addr.String()).Bytes()
 }
+
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
 	h.advHandler = ah
@@ -223,7 +224,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	case <-h.done:
 		return nil, h.err
 	case c := <-h.chMasterConn:
-		return gatt.NewClient(c)
+		return gatt.NewClient(c, h.done)
 
 	}
 }
@@ -240,7 +241,7 @@ func (h *HCI) cancelDial() (ble.Client, error) {
 	if err == ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
-			return gatt.NewClient(c)
+			return gatt.NewClient(c, h.done)
 		default:
 			return nil, errors.Wrap(err, "cancel connection failed")
 		}

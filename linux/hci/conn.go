@@ -352,6 +352,8 @@ func (c *Conn) recombine() error {
 	var pkt packet
 	var ok bool
 	select {
+	case <-c.hci.done:
+		return io.EOF
 	case pkt, ok = <-c.chInPkt:
 		if !ok {
 			return io.EOF

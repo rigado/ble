@@ -78,7 +78,6 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		if err != nil {
 			log.Printf("can't create ATT server: %s", err)
 			continue
-
 		}
 		go as.Loop()
 	}

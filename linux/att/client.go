@@ -14,7 +14,7 @@ type NotificationHandler interface {
 	HandleNotification(req []byte)
 }
 
-// Client implementa an Attribute Protocol Client.
+// Client implementation an Attribute Protocol Client.
 type Client struct {
 	l2c  ble.Conn
 	rspc chan []byte
@@ -23,10 +23,11 @@ type Client struct {
 	chTxBuf chan []byte
 	chErr   chan error
 	handler NotificationHandler
+	done    chan bool
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c ble.Conn, h NotificationHandler) *Client {
+func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 	c := &Client{
 		l2c:     l2c,
 		rspc:    make(chan []byte),
@@ -34,6 +35,7 @@ func NewClient(l2c ble.Conn, h NotificationHandler) *Client {
 		rxBuf:   make([]byte, ble.MaxMTU),
 		chErr:   make(chan error, 1),
 		handler: h,
+		done:    done,
 	}
 	c.chTxBuf <- make([]byte, l2c.TxMTU(), l2c.TxMTU())
 	return c
@@ -526,6 +528,21 @@ func (c *Client) Loop() {
 
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
+
+		// keep trying?
+		select {
+		case <-c.done:
+			fmt.Println("exited client loop: done")
+			return
+
+		default:
+			if c.l2c == nil {
+				fmt.Println("exited client loop: l2c nil")
+				return
+			}
+			//ok
+		}
+
 		n, err := c.l2c.Read(c.rxBuf)
 		logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
 		if err != nil {
