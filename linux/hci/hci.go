@@ -275,7 +275,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		//ok
 	case <-time.After(chCmdBufTimeout):
 		err := fmt.Errorf("chCmdBufs get timeout")
-		h.errorHandler(err)
+		h.dispatchError(err)
 		return nil, err
 	}
 
@@ -338,9 +338,7 @@ func (h *HCI) sktLoop() {
 	b := make([]byte, 4096)
 	defer func() {
 		close(h.done)
-		if !h.isClosing {
-			h.dispatchError(h.err)
-		}
+		h.dispatchError(h.err)
 	}()
 
 	for {
@@ -757,9 +755,13 @@ func (h *HCI) setAllowedCommands(n int) {
 }
 
 func (h *HCI) dispatchError(e error) {
-	if h.errorHandler == nil {
+	switch {
+	case h.errorHandler == nil:
 		fmt.Println(e)
-	} else {
+	case h.isClosing:
+		//don't dispatch
+		fmt.Println("hci/isClosing:", e)
+	default:
 		h.errorHandler(e)
 	}
 }

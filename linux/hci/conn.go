@@ -107,19 +107,13 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 			if err := c.recombine(); err != nil {
 				if err != io.EOF {
 					err = errors.Wrap(err, "recombine")
-					if c.hci.errorHandler != nil {
-						c.hci.errorHandler(err)
-					}
+					c.hci.dispatchError(err)
 
 					//attempt to cleanup
 					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
-						err = errors.Wrap(err, "recombine cleanup")
-						if c.hci.errorHandler != nil {
-							c.hci.errorHandler(err)
-						}
+						c.hci.dispatchError(errors.Wrap(err, "recombine cleanup"))
 					}
 				}
-
 				close(c.chInPDU)
 				return
 			}
