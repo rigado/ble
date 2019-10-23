@@ -297,7 +297,9 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
 
-	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
+	if h.skt == nil {
+		return nil, fmt.Errorf("hci: nil socket")
+	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
 		h.close(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
