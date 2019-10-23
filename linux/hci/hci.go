@@ -415,14 +415,13 @@ func (h *HCI) handleEvt(b []byte) error {
 	if plen != len(b[2:]) {
 		return fmt.Errorf("invalid event packet: % X", b)
 	}
+
 	if code == evt.CommandCompleteCode || code == evt.CommandStatusCode {
 		if f := h.evth[code]; f != nil {
 			return f(b[2:])
 		}
 	}
-	if plen != len(b[2:]) {
-		h.err = fmt.Errorf("invalid event packet: % X", b)
-	}
+
 	if f := h.evth[code]; f != nil {
 		h.err = f(b[2:])
 		return nil
