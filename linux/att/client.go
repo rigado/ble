@@ -528,7 +528,6 @@ func (c *Client) Loop() {
 
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
-
 		// keep trying?
 		select {
 		case <-c.done:
@@ -556,13 +555,25 @@ func (c *Client) Loop() {
 		copy(b, c.rxBuf)
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
-			c.rspc <- b
-			continue
+			select {
+			case <-c.done:
+				fmt.Println("exited client loop: closed after notif rx")
+				return
+			case c.rspc <- b:
+				continue
+			default:
+				fmt.Println("exited client loop: response channel error")
+				return
+			}
 		}
 
 		// Deliver the full request to upper layer.
 		select {
+		case <-c.done:
+			fmt.Println("exited client loop: closed after rx")
+			return
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
+			// ok
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.
 			_ = logger.Error("client", "req", "can't enqueue incoming notification.")
