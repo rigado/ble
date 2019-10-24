@@ -223,9 +223,11 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 		return h.cancelDial()
 	case <-h.done:
 		return nil, h.err
-	case c := <-h.chMasterConn:
+	case c, ok := <-h.chMasterConn:
+		if !ok {
+			return nil, fmt.Errorf("chMasterConn closed")
+		}
 		return gatt.NewClient(c, h.done)
-
 	}
 }
 

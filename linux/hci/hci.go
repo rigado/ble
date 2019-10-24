@@ -178,6 +178,10 @@ func (h *HCI) cleanup() {
 	//close the socket
 	h.close(nil)
 
+	//this effectively kills any dials in flight
+	close(h.chMasterConn)
+	h.chMasterConn = nil
+
 	// kill all open connections w/o disconnect
 	for ch := range h.conns {
 		h.cleanupConnectionHandle(ch)
@@ -187,6 +191,7 @@ func (h *HCI) cleanup() {
 	h.muSent.Lock()
 	h.sent = nil
 	h.muSent.Unlock()
+
 }
 
 // Close ...
@@ -363,6 +368,7 @@ func (h *HCI) sktProcessLoop() {
 			fmt.Println("close requested")
 			h.err = nil
 			return
+
 		case p, ok = <-h.sktRxChan:
 			if !ok {
 				fmt.Println("socket rx closed")
