@@ -53,7 +53,8 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		chMasterConn: make(chan *Conn),
 		chSlaveConn:  make(chan *Conn),
 
-		done: make(chan bool),
+		done:      make(chan bool),
+		sktRxChan: make(chan []byte, 16), //todo pick a real number
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -121,9 +122,11 @@ type HCI struct {
 	//error handler
 	errorHandler func(error)
 
-	err       error
-	done      chan bool
-	isClosing bool
+	err  error
+	done chan bool
+
+	killed    bool
+	sktRxChan chan []byte
 }
 
 // Init ...
@@ -156,7 +159,8 @@ func (h *HCI) Init() error {
 
 	h.setAllowedCommands(1)
 
-	go h.sktLoop()
+	go h.sktReadLoop()
+	go h.sktProcessLoop()
 	if err := h.init(); err != nil {
 		return err
 	}
@@ -170,24 +174,33 @@ func (h *HCI) Init() error {
 	return nil
 }
 
-func (h *HCI) discardConnections() {
-	for ch := range h.conns {
-		// e1 := conn.Close()
-		// fmt.Printf("disconnecting hndl %v, err %v\n", ch, e1)
-		// if e1 == nil {
-		// 	<-conn.Disconnected()
-		// 	fmt.Printf("disconnected hndl %v", ch)
-		// }
+func (h *HCI) cleanup() {
+	//close the socket
+	h.close(nil)
 
+	// kill all open connections w/o disconnect
+	for ch := range h.conns {
 		h.cleanupConnectionHandle(ch)
 	}
+
+	// clean out all sent commands (prob unneeded)
+	h.muSent.Lock()
+	h.sent = nil
+	h.muSent.Unlock()
 }
 
 // Close ...
 func (h *HCI) Close() error {
-	h.isClosing = true
-	h.discardConnections()
-	return h.close(nil)
+	// h.isClosing = true
+	// h.discardConnections()
+	// return h.close(nil)
+	if !h.killed {
+		h.killed = true
+		close(h.done)
+	}
+
+	// everything will be cleaned up when sktLoop exits
+	return nil
 }
 
 // Error ...
@@ -265,7 +278,10 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
+	} else if h.killed {
+		return nil, fmt.Errorf("hci killed")
 	}
+
 	p := &pkt{c, make(chan []byte)}
 
 	// get buffer w/timeout
@@ -297,8 +313,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
 
-	if h.skt == nil {
-		return nil, fmt.Errorf("hci: nil socket")
+	if h.killed {
+		return nil, fmt.Errorf("hci killed")
 	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
@@ -333,28 +349,28 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	return ret, err
 }
 
-func (h *HCI) sktLoop() {
-	readErr := 0
-	handleErr := 0
+func (h *HCI) sktProcessLoop() {
 
-	b := make([]byte, 4096)
-	defer func() {
-		close(h.done)
-		h.dispatchError(h.err)
-	}()
+	defer h.cleanup()
+	defer h.dispatchError(h.err)
 
 	for {
-		n, err := h.skt.Read(b)
-		if n == 0 || err != nil {
-			if err == io.EOF {
-				h.err = err //callers depend on detecting io.EOF, don't wrap it.
-			} else {
-				h.err = fmt.Errorf("skt read err %v: %v", readErr, err)
-			}
+		var p []byte
+		var ok bool
+
+		select {
+		case <-h.done:
+			fmt.Println("close requested")
+			h.err = nil
 			return
+		case p, ok = <-h.sktRxChan:
+			if !ok {
+				fmt.Println("socket rx closed")
+				return
+			}
+			// will process the bytes below
 		}
-		p := make([]byte, n)
-		copy(p, b)
+
 		if err := h.handlePkt(p); err != nil {
 			// Some bluetooth devices may append vendor specific packets at the last,
 			// in this case, simply ignore them.
@@ -365,6 +381,31 @@ func (h *HCI) sktLoop() {
 				return
 			}
 		}
+	}
+}
+
+func (h *HCI) sktReadLoop() {
+	defer func() {
+		fmt.Println("sktRxLoop done")
+		close(h.sktRxChan)
+	}()
+
+	b := make([]byte, 4096)
+
+	for {
+		n, err := h.skt.Read(b)
+		if n == 0 || err != nil {
+			if err == io.EOF {
+				h.err = err //callers depend on detecting io.EOF, don't wrap it.
+			} else {
+				h.err = fmt.Errorf("skt read error: %v", err)
+			}
+			return
+		}
+
+		p := make([]byte, n)
+		copy(p, b)
+		h.sktRxChan <- p
 	}
 }
 
@@ -627,6 +668,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
+
 	if e.Role() == roleMaster {
 		if e.Status() == 0x00 {
 			select {
@@ -678,7 +720,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	delete(h.conns, ch)
 	close(c.chInPkt)
 
-	if !h.isClosing && c.param.Role() == roleSlave {
+	if !h.killed && c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
@@ -763,9 +805,9 @@ func (h *HCI) dispatchError(e error) {
 	switch {
 	case h.errorHandler == nil:
 		fmt.Println(e)
-	case h.isClosing:
+	case h.killed:
 		//don't dispatch
-		fmt.Println("hci/isClosing:", e)
+		fmt.Println("hci/killed:", e)
 	default:
 		h.errorHandler(e)
 	}
