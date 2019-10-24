@@ -399,14 +399,16 @@ func (h *HCI) handlePkt(b []byte) error {
 
 func (h *HCI) handleACL(b []byte) error {
 	handle := packet(b).handle()
+
 	h.muConns.Lock()
-	c, ok := h.conns[handle]
-	h.muConns.Unlock()
-	if !ok {
+	defer h.muConns.Unlock()
+
+	if c, ok := h.conns[handle]; ok {
+		c.chInPkt <- b
+	} else {
 		_ = logger.Warn("invalid connection handle on ACL packet", "handle", handle)
-		return nil
 	}
-	c.chInPkt <- b
+
 	return nil
 }
 
@@ -665,16 +667,18 @@ func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
 }
 
 func (h *HCI) cleanupConnectionHandle(ch uint16) error {
+
 	h.muConns.Lock()
+	defer h.muConns.Unlock()
 	c, found := h.conns[ch]
-	delete(h.conns, ch)
-	h.muConns.Unlock()
 	if !found {
 		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
+
+	delete(h.conns, ch)
 	close(c.chInPkt)
 
-	if c.param.Role() == roleSlave {
+	if !h.isClosing && c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
@@ -689,7 +693,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
-	// will be recycled. [Vol2, Part E 4.1.1]
+	// will be recycled. [Vol2, Part E 4.3]
 	//
 	// must be done with the pool locked to avoid race conditions where
 	// writePDU is in progress and does a Get from the pool after this completes,

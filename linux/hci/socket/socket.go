@@ -55,6 +55,7 @@ type Socket struct {
 	closed chan struct{}
 	rmu    sync.Mutex
 	wmu    sync.Mutex
+	killed bool
 }
 
 // NewSocket returns a HCI User Channel of specified device id.
@@ -154,14 +155,17 @@ func (s *Socket) Write(p []byte) (int, error) {
 }
 
 func (s *Socket) Close() error {
-	if s.closed != nil {
+	if !s.killed {
 		fmt.Println("closing hci socket!")
+		s.killed = true
 		close(s.closed)
-		s.closed = nil
+
 		s.Write([]byte{0x01, 0x09, 0x10, 0x00}) // no-op command to wake up the Read call if it's blocked
 		s.rmu.Lock()
-		defer s.rmu.Unlock()
-		return errors.Wrap(unix.Close(s.fd), "can't close hci socket")
+		err := unix.Close(s.fd)
+		s.rmu.Unlock()
+
+		return errors.Wrap(err, "can't close hci socket")
 	}
 
 	fmt.Println("hci socket already closed!")
