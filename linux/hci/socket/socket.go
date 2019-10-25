@@ -31,6 +31,7 @@ const (
 	ioctlSize     = 4
 	hciMaxDevices = 16
 	typHCI        = 72 // 'H'
+	readTimeout   = 1000
 )
 
 var (
@@ -127,16 +128,20 @@ func open(fd, id int) (*Socket, error) {
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
+	var err error
+	n := 0
+
 	s.rmu.Lock()
-	n, err := unix.Read(s.fd, p)
-	s.rmu.Unlock()
-	// Close always sends a dummy command to wake up Read
-	// bad things happen to the HCI state machines if they receive
-	// a reply from that command, so make sure no data is returned
-	// on a closed socket.
-	//
-	// note that if Write and Close are called concurrently it's
-	// indeterminate which replies get through.
+	defer s.rmu.Unlock()
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unix.POLLIN}}
+	unix.Poll(pfds, readTimeout)
+
+	// poll for data success?
+	if pfds[0].Revents&unix.POLLIN > 0 {
+		n, err = unix.Read(s.fd, p)
+	} else {
+		return 0, nil
+	}
 	select {
 	case <-s.closed:
 		return 0, io.EOF
@@ -160,7 +165,7 @@ func (s *Socket) Close() error {
 		s.killed = true
 		close(s.closed)
 
-		s.Write([]byte{0x01, 0x09, 0x10, 0x00}) // no-op command to wake up the Read call if it's blocked
+		// s.Write([]byte{0x01, 0x09, 0x10, 0x00}) // no-op command to wake up the Read call if it's blocked
 		s.rmu.Lock()
 		err := unix.Close(s.fd)
 		s.rmu.Unlock()

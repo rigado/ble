@@ -400,18 +400,33 @@ func (h *HCI) sktReadLoop() {
 
 	for {
 		n, err := h.skt.Read(b)
-		if n == 0 || err != nil {
-			if err == io.EOF {
-				h.err = err //callers depend on detecting io.EOF, don't wrap it.
-			} else {
-				h.err = fmt.Errorf("skt read error: %v", err)
-			}
-			return
-		}
 
-		p := make([]byte, n)
-		copy(p, b)
-		h.sktRxChan <- p
+		switch {
+		case n == 0 && err == nil:
+			// read timeout
+			select {
+			case <-h.done:
+				//exit!
+				return
+			default:
+				continue
+			}
+
+		//callers depend on detecting io.EOF, don't wrap it.
+		case err == io.EOF:
+			h.err = err
+			return
+
+		case err != nil:
+			h.err = fmt.Errorf("skt read error: %v", err)
+			return
+
+		default:
+			// ok
+			p := make([]byte, n)
+			copy(p, b)
+			h.sktRxChan <- p
+		}
 	}
 }
 
