@@ -189,7 +189,9 @@ func (h *HCI) cleanup() {
 
 	// clean out all sent commands (prob unneeded)
 	h.muSent.Lock()
-	h.sent = nil
+	for k := range h.sent {
+		delete(h.sent, k)
+	}
 	h.muSent.Unlock()
 
 }
@@ -432,12 +434,7 @@ func (h *HCI) sktReadLoop() {
 
 func (h *HCI) close(err error) error {
 	h.err = err
-	if h.skt != nil {
-		if err := h.skt.Close(); err == nil {
-			h.skt = nil
-		}
-	}
-	return err
+	return h.skt.Close()
 }
 
 func (h *HCI) handlePkt(b []byte) error {

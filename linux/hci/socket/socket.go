@@ -53,7 +53,6 @@ type devListRequest struct {
 // Socket implements a HCI User Channel as ReadWriteCloser.
 type Socket struct {
 	fd     int
-	closed chan struct{}
 	rmu    sync.Mutex
 	wmu    sync.Mutex
 	killed bool
@@ -124,10 +123,14 @@ func open(fd, id int) (*Socket, error) {
 		unix.Read(fd, b)
 	}
 
-	return &Socket{fd: fd, closed: make(chan struct{})}, nil
+	return &Socket{fd: fd}, nil
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
+	if !s.isOpen() {
+		return 0, io.EOF
+	}
+
 	var err error
 	n := 0
 
@@ -138,35 +141,37 @@ func (s *Socket) Read(p []byte) (int, error) {
 
 	// poll for data success?
 	if pfds[0].Revents&unix.POLLIN > 0 {
+		// there is data!
 		n, err = unix.Read(s.fd, p)
 	} else {
+		// no data, read timeout
 		return 0, nil
 	}
-	select {
-	case <-s.closed:
+
+	// check if we are still open since the read takes a while
+	if !s.isOpen() {
 		return 0, io.EOF
-	default:
-		// log.Println("hci >", hex.EncodeToString(p[:n]))
 	}
 	return n, errors.Wrap(err, "can't read hci socket")
 }
 
 func (s *Socket) Write(p []byte) (int, error) {
+	if !s.isOpen() {
+		return 0, io.EOF
+	}
+
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 	n, err := unix.Write(s.fd, p)
-	// log.Println("hci <", hex.EncodeToString(p))
 	return n, errors.Wrap(err, "can't write hci socket")
 }
 
 func (s *Socket) Close() error {
-	if !s.killed {
+	if s.isOpen() {
 		fmt.Println("closing hci socket!")
-		s.killed = true
-		close(s.closed)
 
-		// s.Write([]byte{0x01, 0x09, 0x10, 0x00}) // no-op command to wake up the Read call if it's blocked
 		s.rmu.Lock()
+		s.killed = true
 		err := unix.Close(s.fd)
 		s.rmu.Unlock()
 
@@ -175,4 +180,8 @@ func (s *Socket) Close() error {
 
 	fmt.Println("hci socket already closed!")
 	return nil
+}
+
+func (s *Socket) isOpen() bool {
+	return !s.killed
 }
