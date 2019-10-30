@@ -193,7 +193,6 @@ func (h *HCI) cleanup() {
 		delete(h.sent, k)
 	}
 	h.muSent.Unlock()
-
 }
 
 // Close ...
@@ -368,12 +367,13 @@ func (h *HCI) sktProcessLoop() {
 		select {
 		case <-h.done:
 			fmt.Println("close requested")
-			h.err = nil
+			h.err = io.EOF
 			return
 
 		case p, ok = <-h.sktRxChan:
 			if !ok {
 				fmt.Println("socket rx closed")
+				h.err = io.EOF
 				return
 			}
 			// will process the bytes below
