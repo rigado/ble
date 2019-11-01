@@ -52,10 +52,10 @@ type devListRequest struct {
 
 // Socket implements a HCI User Channel as ReadWriteCloser.
 type Socket struct {
-	fd     int
-	rmu    sync.Mutex
-	wmu    sync.Mutex
-	killed bool
+	fd   int
+	rmu  sync.Mutex
+	wmu  sync.Mutex
+	done chan int
 }
 
 // NewSocket returns a HCI User Channel of specified device id.
@@ -86,6 +86,7 @@ func NewSocket(id int) (*Socket, error) {
 	for id := 0; id < int(req.devNum); id++ {
 		s, err := open(fd, id)
 		if err == nil {
+			s.done = make(chan int)
 			return s, nil
 		}
 		msg = msg + fmt.Sprintf("(hci%d: %s)", id, err)
@@ -168,10 +169,9 @@ func (s *Socket) Write(p []byte) (int, error) {
 
 func (s *Socket) Close() error {
 	if s.isOpen() {
+		close(s.done)
 		fmt.Println("closing hci socket!")
-
 		s.rmu.Lock()
-		s.killed = true
 		err := unix.Close(s.fd)
 		s.rmu.Unlock()
 
@@ -183,5 +183,11 @@ func (s *Socket) Close() error {
 }
 
 func (s *Socket) isOpen() bool {
-	return !s.killed
+	select {
+	case <-s.done:
+		//killed!
+		return false
+	default:
+		return true
+	}
 }
