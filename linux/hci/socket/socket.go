@@ -87,7 +87,6 @@ func NewSocket(id int) (*Socket, error) {
 	for id := 0; id < int(req.devNum); id++ {
 		s, err := open(fd, id)
 		if err == nil {
-			s.done = make(chan int)
 			return s, nil
 		}
 		msg = msg + fmt.Sprintf("(hci%d: %s)", id, err)
@@ -125,7 +124,7 @@ func open(fd, id int) (*Socket, error) {
 		unix.Read(fd, b)
 	}
 
-	return &Socket{fd: fd}, nil
+	return &Socket{fd: fd, done: make(chan int)}, nil
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
