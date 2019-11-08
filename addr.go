@@ -24,7 +24,7 @@ func (a addr) String() string {
 	return string(a)
 }
 
-func (a addr) Bytes() []byte{
+func (a addr) Bytes() []byte {
 	hexStr := strings.Replace(a.String(), ":", "", -1)
 
 	out, err := hex.DecodeString(hexStr)

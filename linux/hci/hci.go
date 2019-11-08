@@ -43,16 +43,17 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
-		muSent:    &sync.Mutex{},
+		muSent:    sync.Mutex{},
 
 		evth: map[int]handlerFn{},
 		subh: map[int]handlerFn{},
 
-		muConns:      &sync.Mutex{},
+		muConns:      sync.Mutex{},
 		conns:        make(map[uint16]*Conn),
 		chMasterConn: make(chan *Conn),
 		chSlaveConn:  make(chan *Conn),
 
+		muClose:   sync.Mutex{},
 		done:      make(chan bool),
 		sktRxChan: make(chan []byte, 16), //todo pick a real number
 	}
@@ -79,7 +80,7 @@ type HCI struct {
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chCmdPkt  chan *pkt
 	chCmdBufs chan []byte
-	muSent    *sync.Mutex
+	muSent    sync.Mutex
 	sent      map[int]*pkt
 
 	// evtHub
@@ -111,7 +112,7 @@ type HCI struct {
 	pool *Pool
 
 	// L2CAP connections
-	muConns      *sync.Mutex
+	muConns      sync.Mutex
 	conns        map[uint16]*Conn
 	chMasterConn chan *Conn // Dial returns master connections.
 	chSlaveConn  chan *Conn // Peripheral accept slave connections.
@@ -121,11 +122,11 @@ type HCI struct {
 
 	//error handler
 	errorHandler func(error)
+	err          error
 
-	err  error
-	done chan bool
+	muClose sync.Mutex
+	done    chan bool
 
-	killed    bool
 	sktRxChan chan []byte
 }
 
@@ -197,15 +198,16 @@ func (h *HCI) cleanup() {
 
 // Close ...
 func (h *HCI) Close() error {
-	// h.isClosing = true
-	// h.discardConnections()
-	// return h.close(nil)
-	if !h.killed {
-		h.killed = true
+	h.muClose.Lock()
+	defer h.muClose.Unlock()
+
+	select {
+	case <-h.done:
+		//already closed, nothing to do
+	default:
 		close(h.done)
 	}
 
-	// everything will be cleaned up when sktLoop exits
 	return nil
 }
 
@@ -221,6 +223,15 @@ func (h *HCI) Option(opts ...ble.Option) error {
 		err = opt(h)
 	}
 	return err
+}
+
+func (h *HCI) isOpen() bool {
+	select {
+	case <-h.done:
+		return false
+	default:
+		return true
+	}
 }
 
 func (h *HCI) init() error {
@@ -284,8 +295,6 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
-	} else if h.killed {
-		return nil, fmt.Errorf("hci killed")
 	}
 
 	p := &pkt{c, make(chan []byte)}
@@ -293,6 +302,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// get buffer w/timeout
 	var b []byte
 	select {
+	case <-h.done:
+		return nil, fmt.Errorf("hci closed")
 	case b = <-h.chCmdBufs:
 		//ok
 	case <-time.After(chCmdBufTimeout):
@@ -319,8 +330,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
 
-	if h.killed {
-		return nil, fmt.Errorf("hci killed")
+	if !h.isOpen() {
+		return nil, fmt.Errorf("hci closed")
 	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
@@ -655,8 +666,13 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandCompleteEP: % X", e)
 	}
-	p.done <- e.ReturnParameters()
-	return nil
+
+	select {
+	case <-h.done:
+		return fmt.Errorf("hci closed")
+	case p.done <- e.ReturnParameters():
+		return nil
+	}
 }
 
 func (h *HCI) handleCommandStatus(b []byte) error {
@@ -676,8 +692,13 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
-	p.done <- []byte{e.Status()}
-	return nil
+
+	select {
+	case <-h.done:
+		return fmt.Errorf("hci closed")
+	case p.done <- []byte{e.Status()}:
+		return nil
+	}
 }
 
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
@@ -738,7 +759,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	delete(h.conns, ch)
 	close(c.chInPkt)
 
-	if !h.killed && c.param.Role() == roleSlave {
+	if !h.isOpen() && c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
@@ -810,10 +831,14 @@ func (h *HCI) setAllowedCommands(n int) {
 	//put with timeout
 	for len(h.chCmdBufs) < n {
 		select {
+		case <-h.done:
+			//closed
+			return
 		case h.chCmdBufs <- make([]byte, chCmdBufElementSize):
 			//ok
 		case <-time.After(chCmdBufTimeout):
 			h.dispatchError(fmt.Errorf("chCmdBufs put timeout"))
+			//timeout
 			break
 		}
 	}
@@ -823,9 +848,9 @@ func (h *HCI) dispatchError(e error) {
 	switch {
 	case h.errorHandler == nil:
 		fmt.Println(e)
-	case h.killed:
+	case !h.isOpen():
 		//don't dispatch
-		fmt.Println("hci/killed:", e)
+		fmt.Println("hci closing:", e)
 	default:
 		h.errorHandler(e)
 	}

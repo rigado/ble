@@ -190,7 +190,6 @@ func (s *Socket) Close() error {
 func (s *Socket) isOpen() bool {
 	select {
 	case <-s.done:
-		//killed!
 		return false
 	default:
 		return true
