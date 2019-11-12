@@ -111,7 +111,7 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 
 					//attempt to cleanup
 					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
-						c.hci.dispatchError(errors.Wrap(err, "recombine cleanup"))
+						fmt.Printf("recombine cleanup: %v\n", err)
 					}
 				}
 				close(c.chInPDU)
