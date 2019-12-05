@@ -9,10 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chmorgan/go-serial2/serial"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
-	"github.com/go-ble/ble/linux/hci/socket"
+	"github.com/go-ble/ble/linux/hci/h4"
 	"github.com/pkg/errors"
 )
 
@@ -152,7 +153,15 @@ func (h *HCI) Init() error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	skt, err := socket.NewSocket(h.id)
+	so := serial.OpenOptions{
+		PortName:          "/dev/ttyACM0",
+		BaudRate:          1000000,
+		DataBits:          8,
+		StopBits:          1,
+		RTSCTSFlowControl: true,
+	}
+
+	skt, err := h4.New(so)
 	if err != nil {
 		return err
 	}
