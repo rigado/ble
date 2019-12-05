@@ -23,6 +23,9 @@ type h4 struct {
 	rmu sync.Mutex
 	wmu sync.Mutex
 
+	frame        []byte
+	frameTimeout time.Time
+
 	rxQueue chan []byte
 	txQueue chan []byte
 
@@ -45,8 +48,8 @@ func New(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	// todo this is mega slow and stupid, but I doubt we can change this on the fly
 	log.Println("flushing...")
 	b := make([]byte, 2048)
-	//reset to wake up?
-	sp.Write([]byte{1, 3, 12, 0})
+	sp.Write([]byte{1, 3, 12, 0}) //dummy reset
+	<-time.After(time.Millisecond * 250)
 	_, err = sp.Read(b)
 	if err != nil {
 		sp.Close()
@@ -89,7 +92,7 @@ func (h *h4) Read(p []byte) (int, error) {
 		return 0, fmt.Errorf("timeout")
 	}
 
-	log.Println("read", p[:n], n, err)
+	log.Printf("read [% 0x], %v, %v", p[:n], n, err)
 
 	// check if we are still open since the read could take a while
 	if !h.isOpen() {
@@ -106,7 +109,7 @@ func (h *h4) Write(p []byte) (int, error) {
 	h.wmu.Lock()
 	defer h.wmu.Unlock()
 	n, err := h.sp.Write(p)
-	log.Println("write", p, n, err)
+	log.Printf("write [% 0x], %v, %v", p, n, err)
 
 	return n, errors.Wrap(err, "can't write h4")
 }
@@ -143,9 +146,7 @@ func (h *h4) isOpen() bool {
 }
 
 func (h *h4) rxLoop() {
-	msg := make([]byte, 0, 256)
-	tmp := make([]byte, 256)
-	fto := time.Now().Add(time.Millisecond * 100)
+	tmp := make([]byte, 512)
 	for {
 		select {
 		case <-h.done:
@@ -160,23 +161,77 @@ func (h *h4) rxLoop() {
 
 		// read
 		n, err := h.sp.Read(tmp)
-		// log.Printf("sp read %v %v", n, err)
-		if err == nil && n != 0 {
-			log.Printf("rx %v", tmp[:n])
-			msg = append(msg, tmp[:n]...)
+		if err != nil || n == 0 {
+			continue
 		}
 
-		//flush
-		if time.Now().After(fto) {
-			if len(msg) != 0 {
-				log.Printf("sp flush %v", msg)
-				h.rxQueue <- msg
-			} else {
-				log.Printf("sp flush: nil")
-			}
-
-			fto = time.Now().Add(time.Millisecond * 200)
-			msg = make([]byte, 0, 256)
-		}
+		// put
+		h.frameAssemble(tmp[:n])
 	}
+}
+
+func (h *h4) frameAssemble(b []byte) {
+	switch {
+	case len(b) == 0:
+		return
+	case time.Now().After(h.frameTimeout):
+		fallthrough
+	case h.frame == nil:
+		h.frameReset()
+	default:
+		// ok
+	}
+
+	var more []byte
+	var done []byte
+	var new bool
+
+	// new frame?
+	if len(h.frame) == 0 {
+		if len(b) < 3 {
+			log.Printf("bad length %v", len(b))
+			return
+		}
+		if b[0] != BT_H4_EVT_PKT {
+			log.Printf("bad type 0x%0x", b[0])
+			return
+		}
+
+		new = true
+		h.frame = append(h.frame, b[:3]...)
+	}
+
+	start := 0
+	if new {
+		start = 3
+	}
+
+	rem := b[start:]
+	exp := int(h.frame[2])
+
+	switch {
+	case len(rem) < exp:
+		h.frame = append(h.frame, rem...)
+	case len(rem) == exp:
+		done = append(h.frame, rem...)
+	case len(rem) > exp:
+		done = append(h.frame, rem[:exp]...)
+		more = rem[exp:]
+	default:
+		//ok
+	}
+
+	if len(done) != 0 {
+		h.rxQueue <- done
+		h.frameReset()
+	}
+
+	if len(more) != 0 {
+		h.frameAssemble(more)
+	}
+}
+
+func (h *h4) frameReset() {
+	h.frame = make([]byte, 0, 256)
+	h.frameTimeout = time.Now().Add(time.Millisecond * 500)
 }
