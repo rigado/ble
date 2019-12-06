@@ -23,8 +23,7 @@ type h4 struct {
 	rmu sync.Mutex
 	wmu sync.Mutex
 
-	frame        []byte
-	frameTimeout time.Time
+	frame *frame
 
 	rxQueue chan []byte
 	txQueue chan []byte
@@ -64,6 +63,7 @@ func New(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 		rxQueue: make(chan []byte, rxQueueSize),
 		txQueue: make(chan []byte, txQueueSize),
 	}
+	h.frame = newFrame(h.rxQueue)
 
 	go h.rxLoop()
 
@@ -166,72 +166,6 @@ func (h *h4) rxLoop() {
 		}
 
 		// put
-		h.frameAssemble(tmp[:n])
+		h.frame.Assemble(tmp[:n])
 	}
-}
-
-func (h *h4) frameAssemble(b []byte) {
-	switch {
-	case len(b) == 0:
-		return
-	case time.Now().After(h.frameTimeout):
-		fallthrough
-	case h.frame == nil:
-		h.frameReset()
-	default:
-		// ok
-	}
-
-	var more []byte
-	var done []byte
-	var new bool
-
-	// new frame?
-	if len(h.frame) == 0 {
-		if len(b) < 3 {
-			log.Printf("bad length %v", len(b))
-			return
-		}
-		if b[0] != BT_H4_EVT_PKT {
-			log.Printf("bad type 0x%0x", b[0])
-			return
-		}
-
-		new = true
-		h.frame = append(h.frame, b[:3]...)
-	}
-
-	start := 0
-	if new {
-		start = 3
-	}
-
-	rem := b[start:]
-	exp := int(h.frame[2])
-
-	switch {
-	case len(rem) < exp:
-		h.frame = append(h.frame, rem...)
-	case len(rem) == exp:
-		done = append(h.frame, rem...)
-	case len(rem) > exp:
-		done = append(h.frame, rem[:exp]...)
-		more = rem[exp:]
-	default:
-		//ok
-	}
-
-	if len(done) != 0 {
-		h.rxQueue <- done
-		h.frameReset()
-	}
-
-	if len(more) != 0 {
-		h.frameAssemble(more)
-	}
-}
-
-func (h *h4) frameReset() {
-	h.frame = make([]byte, 0, 256)
-	h.frameTimeout = time.Now().Add(time.Millisecond * 500)
 }
