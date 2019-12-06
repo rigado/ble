@@ -16,6 +16,7 @@ type frame struct {
 	b       []byte
 	timeout time.Time
 	out     chan []byte
+	evtType byte
 }
 
 func newFrame(c chan []byte) *frame {
@@ -58,7 +59,7 @@ func (f *frame) Assemble(b []byte) {
 	// fmt.Printf("in  %0x\n", b)
 	// fmt.Printf("buf %0x\n", b)
 
-	rf, err := f.rawFrame()
+	rf, err := f.frame()
 	if err != nil {
 		return
 	}
@@ -89,11 +90,18 @@ func (f *frame) waitStart(b []byte) error {
 	var v byte
 	var ok bool
 	for i, v = range b {
-		if v == BT_H4_EVT_PKT {
-			ok = true
-			f.timeout = time.Now().Add(time.Millisecond * 500)
-			break
+		switch v {
+		case eventPacket:
+			f.evtType = eventPacket
+		case aclPacket:
+			f.evtType = aclPacket
+		default:
+			continue
 		}
+
+		ok = true
+		f.timeout = time.Now().Add(time.Millisecond * 500)
+		break
 	}
 
 	if !ok {
@@ -106,43 +114,42 @@ func (f *frame) waitStart(b []byte) error {
 	return nil
 }
 
-func (f *frame) event() (byte, error) {
-	if len(f.b) <= headerOffsetEventType {
+func (f *frame) dataLength() (int, error) {
+	switch f.evtType {
+	case aclPacket:
+		return f.aclLength()
+	case eventPacket:
+		return f.eventLength()
+	default:
+		return 0, fmt.Errorf("invalid event type %v", f.evtType)
+	}
+}
+
+func (f *frame) eventLength() (int, error) {
+	if len(f.b) < 3 {
 		return 0, fmt.Errorf("not enough bytes")
 	}
 
-	return f.b[headerOffsetEventType], nil
+	return int(f.b[2]) + headerLength, nil
 }
 
-func (f *frame) dataLength() (byte, error) {
-	if len(f.b) <= headerOffsetDataLength {
+func (f *frame) aclLength() (int, error) {
+	if len(f.b) < 5 {
 		return 0, fmt.Errorf("not enough bytes")
 	}
 
-	return f.b[headerOffsetDataLength], nil
+	l := int(f.b[3]) | (int(f.b[4]) << 8)
+	fmt.Printf("expecting %v bytes acl data\n", l)
+
+	return l + 5, nil
 }
 
-func (f *frame) data() ([]byte, error) {
-	dl, err := f.dataLength()
+func (f *frame) frame() ([]byte, error) {
+	tl, err := f.dataLength()
 	if err != nil {
 		return nil, err
 	}
 
-	tl := int(dl) + headerLength
-	if len(f.b) < tl {
-		return nil, fmt.Errorf("not enough bytes")
-	}
-	return f.b[headerLength:tl], nil
-}
-
-func (f *frame) rawFrame() ([]byte, error) {
-	dl, err := f.dataLength()
-	if err != nil {
-		return nil, err
-	}
-
-	dli := int(dl)
-	tl := dli + headerLength
 	if len(f.b) < tl {
 		return nil, fmt.Errorf("not enough bytes")
 	}

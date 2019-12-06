@@ -422,6 +422,7 @@ func (h *HCI) sktReadLoop() {
 
 	for {
 		n, err := h.skt.Read(b)
+		fmt.Println("sktRead", n, err)
 
 		switch {
 		case n == 0 && err == nil:
@@ -461,14 +462,16 @@ func (h *HCI) handlePkt(b []byte) error {
 	// Strip the 1-byte HCI header and pass down the rest of the packet.
 	t, b := b[0], b[1:]
 	switch t {
-	case pktTypeCommand:
-		return fmt.Errorf("unmanaged cmd: % X", b)
 	case pktTypeACLData:
 		return h.handleACL(b)
-	case pktTypeSCOData:
-		return fmt.Errorf("unsupported sco packet: % X", b)
 	case pktTypeEvent:
 		return h.handleEvt(b)
+
+		//unhandled stuff
+	case pktTypeCommand:
+		return fmt.Errorf("unmanaged cmd: % X", b)
+	case pktTypeSCOData:
+		return fmt.Errorf("unsupported sco packet: % X", b)
 	case pktTypeVendor:
 		return fmt.Errorf("unsupported vendor packet: % X", b)
 	default:
