@@ -44,32 +44,34 @@ func (f *frame) Assemble(b []byte) {
 		// ok
 	}
 
-	// log.Printf("b %0x f.b %0x", b, f.b)
 	if len(f.b) == 0 {
 		err := f.waitStart(b)
 		if err != nil {
 			return
 		}
 	} else {
-		f.b = append(b)
+		bb := make([]byte, len(b))
+		copy(bb, b)
+		f.b = append(f.b, bb...)
 	}
+
+	// fmt.Printf("in  %0x\n", b)
+	// fmt.Printf("buf %0x\n", b)
 
 	rf, err := f.rawFrame()
 	if err != nil {
 		return
 	}
-	// log.Printf("frameRx: %0x", rf)
 	out := make([]byte, len(rf))
 	copy(out, rf)
-	f.out <- rf
+	// fmt.Printf("out: %0x\n", out)
+	f.out <- out
 
 	// shift
 	if len(f.b) > len(rf) {
 		rem := make([]byte, len(f.b[len(rf):]))
 		copy(rem, f.b[len(rf):])
-		// log.Printf("f.b %0x rem %0x", f.b, rem)
 		f.reset()
-		// log.Printf("f.b %0x rem %0x", f.b, rem)
 		f.Assemble(rem)
 	} else {
 		f.reset()
@@ -79,11 +81,6 @@ func (f *frame) Assemble(b []byte) {
 func (f *frame) reset() {
 	f.b = make([]byte, 0, 256)
 	f.timeout = time.Time{}
-}
-
-type headerInfo struct {
-	minLength, lengthOffset, dataOffset int
-	desc                                string
 }
 
 func (f *frame) waitStart(b []byte) error {
@@ -103,7 +100,9 @@ func (f *frame) waitStart(b []byte) error {
 		return fmt.Errorf("couldnt find start byte")
 	}
 
-	f.b = append(b[i:])
+	bb := make([]byte, len(b[i:]))
+	copy(bb, b[i:])
+	f.b = append(f.b, bb...)
 	return nil
 }
 

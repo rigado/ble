@@ -97,10 +97,10 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 
 	if c.hci.smpEnabled {
 		c.smp = c.hci.smp.Create(defaultSmpConfig)
+		c.initPairingContext()
+		c.smp.SetWritePDUFunc(c.writePDU)
+		c.smp.SetEncryptFunc(c.encrypt)
 	}
-	c.initPairingContext()
-	c.smp.SetWritePDUFunc(c.writePDU)
-	c.smp.SetEncryptFunc(c.encrypt)
 
 	go func() {
 		for {

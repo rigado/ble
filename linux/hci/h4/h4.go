@@ -89,7 +89,7 @@ func (h *h4) Read(p []byte) (int, error) {
 		n = copy(p, t)
 
 	case <-time.After(time.Second):
-		return 0, fmt.Errorf("timeout")
+		return 0, nil //fmt.Errorf("timeout")
 	}
 
 	log.Printf("read [% 0x], %v, %v", p[:n], n, err)
