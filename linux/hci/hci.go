@@ -9,11 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chmorgan/go-serial2/serial"
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/go-ble/ble/linux/hci/h4"
+	"github.com/go-ble/ble/linux/hci/socket"
+	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
 )
 
@@ -153,19 +154,21 @@ func (h *HCI) Init() error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	so := serial.OpenOptions{
-		PortName:          "/dev/ttyACM0",
-		BaudRate:          1000000,
-		DataBits:          8,
-		StopBits:          1,
-		RTSCTSFlowControl: true,
+	var err error
+	if false {
+		h.skt, err = socket.NewSocket(1)
+	} else {
+		h.skt, err = h4.New(serial.OpenOptions{
+			PortName:          "/dev/ttyACM0",
+			BaudRate:          1000000,
+			DataBits:          8,
+			StopBits:          1,
+			RTSCTSFlowControl: true,
+		})
 	}
-
-	skt, err := h4.New(so)
 	if err != nil {
 		return err
 	}
-	h.skt = skt
 
 	h.setAllowedCommands(1)
 
@@ -422,7 +425,7 @@ func (h *HCI) sktReadLoop() {
 
 	for {
 		n, err := h.skt.Read(b)
-		fmt.Println("sktRead", n, err)
+		// fmt.Println("sktRead", n, err)
 
 		switch {
 		case n == 0 && err == nil:

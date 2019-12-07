@@ -561,9 +561,9 @@ func (c *Client) Loop() {
 				return
 			case c.rspc <- b:
 				continue
-			default:
-				fmt.Println("exited client loop: response channel error")
-				return
+				// default:
+				// 	fmt.Println("exited client loop: response channel error")
+				// 	return
 			}
 		}
 

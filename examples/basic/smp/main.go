@@ -17,12 +17,12 @@ import (
 )
 
 var (
-	device = flag.Int("device", 1, "hci index")
-	name   = flag.String("name", "", "name of remote peripheral")
-	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
-	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
-	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
-	bond = flag.Bool("bond", false, "attempt to bond on connection")
+	device       = flag.Int("device", 1, "hci index")
+	name         = flag.String("name", "Nordic_HRM", "name of remote peripheral")
+	addr         = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	sub          = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
+	sd           = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
+	bond         = flag.Bool("bond", true, "attempt to bond on connection")
 	forceEncrypt = flag.Bool("fe", false, "force encryption to be started if bond information is found")
 )
 
@@ -88,19 +88,20 @@ func main() {
 		   2. attempt to read or write to a characteristic which requires security
 		   3. peripheral responds with insufficient authentication
 		   4. central triggers bonding
-		 */
+		*/
 		log.Println("creating a new bond")
 		err = cln.Bond()
 		if err != nil {
 			log.Println(err)
 		}
+		log.Println("bonded")
 	}
 
 	if *forceEncrypt {
 		aStr := strings.Replace(cln.Addr().String(), ":", "", -1)
 		aBytes, _ := hex.DecodeString(aStr)
-		for i := len(aBytes)/2-1; i >= 0; i-- {
-			opp := len(aBytes)-1-i
+		for i := len(aBytes)/2 - 1; i >= 0; i-- {
+			opp := len(aBytes) - 1 - i
 			aBytes[i], aBytes[opp] = aBytes[opp], aBytes[i]
 		}
 

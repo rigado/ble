@@ -6,8 +6,15 @@ import (
 )
 
 func smpF4(u, v, x []byte, z uint8) ([]byte, error) {
-	if len(u) != 32 || len(v) != 32 || len(x) != 16 {
-		return nil, fmt.Errorf("length error")
+	switch {
+	case len(u) != 32:
+		return nil, fmt.Errorf("length error u got %v, want 32", len(u))
+	case len(v) != 32:
+		return nil, fmt.Errorf("length error v got %v, want 32", len(v))
+	case len(x) != 16:
+		return nil, fmt.Errorf("length error x got %v, want 16", len(x))
+	default:
+		//ok
 	}
 
 	m := []byte{z}

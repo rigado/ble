@@ -19,10 +19,10 @@ func buildPairingRsp(p hci.SmpConfig) []byte {
 }
 
 type transport struct {
-	pairing *pairingContext
-	writePDU func([]byte) (int, error)
+	pairing     *pairingContext
+	writePDU    func([]byte) (int, error)
 	bondManager hci.BondManager
-	encrypter hci.Encrypter
+	encrypter   hci.Encrypter
 }
 
 func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error)) *transport {
@@ -98,7 +98,6 @@ func (t *transport) sendPairingRandom() error {
 		t.pairing.localRandom = r
 	}
 
-
 	out := append([]byte{pairingRandom}, t.pairing.localRandom...)
 
 	return t.send(out)
@@ -113,8 +112,8 @@ func (t *transport) sendDHKeyCheck() error {
 	p := t.pairing
 
 	//Ea = f6 (MacKey, Na, Nb, 0, IOcapA, A, B)
-	la := p.localAddr
-	ra := p.remoteAddr
+	la := append(p.localAddr, p.localAddrType)
+	ra := append(p.remoteAddr, p.remoteAddrType)
 	na := p.localRandom
 	nb := p.remoteRandom
 

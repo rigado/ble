@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chmorgan/go-serial2/serial"
+	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
 )
 
