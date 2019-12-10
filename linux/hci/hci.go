@@ -870,3 +870,11 @@ func (h *HCI) dispatchError(e error) {
 		h.errorHandler(e)
 	}
 }
+
+// workaround, remove
+func (h *HCI) NOP() error {
+	ReadBDADDRRP := cmd.ReadBDADDRRP{}
+	err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
+	fmt.Println("NOP: err ", err)
+	return err
+}

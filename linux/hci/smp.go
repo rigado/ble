@@ -37,6 +37,8 @@ type SmpManager interface {
 	SetWritePDUFunc(func([]byte) (int, error))
 	SetEncryptFunc(func(BondInfo) error)
 	LegacyPairingInfo() (bool, []byte)
+
+	SetNOPFunc(func() error) //workaround, remove
 }
 
 type SmpConfig struct {

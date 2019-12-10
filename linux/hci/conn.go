@@ -100,6 +100,7 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		c.initPairingContext()
 		c.smp.SetWritePDUFunc(c.writePDU)
 		c.smp.SetEncryptFunc(c.encrypt)
+		c.smp.SetNOPFunc(h.NOP)
 	}
 
 	go func() {

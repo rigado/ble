@@ -19,14 +19,17 @@ func buildPairingRsp(p hci.SmpConfig) []byte {
 }
 
 type transport struct {
-	pairing     *pairingContext
-	writePDU    func([]byte) (int, error)
+	pairing  *pairingContext
+	writePDU func([]byte) (int, error)
+
 	bondManager hci.BondManager
 	encrypter   hci.Encrypter
+
+	nopFunc func() error //workaround stuff
 }
 
-func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error)) *transport {
-	return &transport{ctx, writePDU, bm, e}
+func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error) *transport {
+	return &transport{ctx, writePDU, bm, e, nopFunc}
 }
 
 func (t *transport) SetContext(ctx *pairingContext) {
@@ -79,6 +82,11 @@ func (t *transport) sendPublicKey() error {
 
 	if err != nil {
 		return err
+	}
+
+	//workaround stuff
+	if t.nopFunc != nil {
+		t.nopFunc()
 	}
 
 	return nil
