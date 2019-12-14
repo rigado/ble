@@ -155,11 +155,11 @@ func (h *HCI) Init() error {
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	var err error
-	if false {
-		h.skt, err = socket.NewSocket(1)
+	if true {
+		h.skt, err = socket.NewSocket(h.id)
 	} else {
 		h.skt, err = h4.New(serial.OpenOptions{
-			PortName:          "/dev/ttyACM0",
+			PortName:          "/dev/ttymxc2",
 			BaudRate:          1000000,
 			DataBits:          8,
 			StopBits:          1,
@@ -873,8 +873,10 @@ func (h *HCI) dispatchError(e error) {
 
 // workaround, remove
 func (h *HCI) NOP() error {
-	ReadBDADDRRP := cmd.ReadBDADDRRP{}
-	err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
-	fmt.Println("NOP: err ", err)
-	return err
+	return nil
+
+	// ReadBDADDRRP := cmd.ReadBDADDRRP{}
+	// err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
+	// fmt.Println("NOP: err ", err)
+	// return err
 }
