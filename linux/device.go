@@ -2,9 +2,10 @@ package linux
 
 import (
 	"context"
-	smp2 "github.com/go-ble/ble/linux/hci/smp"
 	"io"
 	"log"
+
+	smp2 "github.com/go-ble/ble/linux/hci/smp"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/att"
@@ -62,6 +63,11 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			return
 		}
 
+		if l2c == nil {
+			log.Printf("l2c nil")
+			return
+		}
+
 		// Initialize the per-connection cccd values.
 		l2c.SetContext(context.WithValue(l2c.Context(), ble.ContextKeyCCC, make(map[uint16]uint16)))
 		l2c.SetRxMTU(mtu)
@@ -72,7 +78,6 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		if err != nil {
 			log.Printf("can't create ATT server: %s", err)
 			continue
-
 		}
 		go as.Loop()
 	}

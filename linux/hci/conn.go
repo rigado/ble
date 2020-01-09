@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"net"
+	"time"
+
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/pkg/errors"
-	"io"
-	"net"
 )
 
 // Conn ...
@@ -104,9 +106,13 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		for {
 			if err := c.recombine(); err != nil {
 				if err != io.EOF {
-					// TODO: wrap and pass the error up.
-					// err := errors.Wrap(err, "recombine failed")
-					_ = logger.Error("recombine failed: ", "err", err)
+					err = errors.Wrap(err, "recombine")
+					c.hci.dispatchError(err)
+
+					//attempt to cleanup
+					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
+						fmt.Printf("recombine cleanup: %v\n", err)
+					}
 				}
 				close(c.chInPDU)
 				return
@@ -343,9 +349,17 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 
 // Recombines fragments into a L2CAP PDU. [Vol 3, Part A, 7.2.2]
 func (c *Conn) recombine() error {
-	pkt, ok := <-c.chInPkt
-	if !ok {
+	var pkt packet
+	var ok bool
+	select {
+	case <-c.hci.done:
 		return io.EOF
+	case pkt, ok = <-c.chInPkt:
+		if !ok {
+			return io.EOF
+		}
+	case <-time.After(time.Minute * 10):
+		return fmt.Errorf("idle timeout")
 	}
 
 	p := pdu(pkt.data())
@@ -396,11 +410,10 @@ func (c *Conn) Close() error {
 		// Return if it's already closed.
 		return nil
 	default:
-		c.hci.Send(&cmd.Disconnect{
+		return c.hci.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
 		}, nil)
-		return nil
 	}
 }
 

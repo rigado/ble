@@ -38,22 +38,24 @@ type pkt struct {
 // NewHCI returns a hci device.
 func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
-		id: -1,
-		smp: smp,
+		id:        -1,
+		smp:       smp,
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
 		sent:      make(map[int]*pkt),
-		muSent:    &sync.Mutex{},
+		muSent:    sync.Mutex{},
 
 		evth: map[int]handlerFn{},
 		subh: map[int]handlerFn{},
 
-		muConns:      &sync.Mutex{},
+		muConns:      sync.Mutex{},
 		conns:        make(map[uint16]*Conn),
 		chMasterConn: make(chan *Conn),
 		chSlaveConn:  make(chan *Conn),
 
-		done: make(chan bool),
+		muClose:   sync.Mutex{},
+		done:      make(chan bool),
+		sktRxChan: make(chan []byte, 16), //todo pick a real number
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -69,7 +71,7 @@ type HCI struct {
 
 	params params
 
-	smp SmpManagerFactory
+	smp        SmpManagerFactory
 	smpEnabled bool
 
 	skt io.ReadWriteCloser
@@ -78,7 +80,7 @@ type HCI struct {
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chCmdPkt  chan *pkt
 	chCmdBufs chan []byte
-	muSent    *sync.Mutex
+	muSent    sync.Mutex
 	sent      map[int]*pkt
 
 	// evtHub
@@ -110,7 +112,7 @@ type HCI struct {
 	pool *Pool
 
 	// L2CAP connections
-	muConns      *sync.Mutex
+	muConns      sync.Mutex
 	conns        map[uint16]*Conn
 	chMasterConn chan *Conn // Dial returns master connections.
 	chSlaveConn  chan *Conn // Peripheral accept slave connections.
@@ -120,9 +122,12 @@ type HCI struct {
 
 	//error handler
 	errorHandler func(error)
+	err          error
 
-	err  error
-	done chan bool
+	muClose sync.Mutex
+	done    chan bool
+
+	sktRxChan chan []byte
 }
 
 // Init ...
@@ -155,7 +160,8 @@ func (h *HCI) Init() error {
 
 	h.setAllowedCommands(1)
 
-	go h.sktLoop()
+	go h.sktReadLoop()
+	go h.sktProcessLoop()
 	if err := h.init(); err != nil {
 		return err
 	}
@@ -169,9 +175,40 @@ func (h *HCI) Init() error {
 	return nil
 }
 
+func (h *HCI) cleanup() {
+	//close the socket
+	h.close(nil)
+
+	//this effectively kills any dials in flight
+	close(h.chMasterConn)
+	h.chMasterConn = nil
+
+	// kill all open connections w/o disconnect
+	for ch := range h.conns {
+		h.cleanupConnectionHandle(ch)
+	}
+
+	// clean out all sent commands (prob unneeded)
+	h.muSent.Lock()
+	for k := range h.sent {
+		delete(h.sent, k)
+	}
+	h.muSent.Unlock()
+}
+
 // Close ...
 func (h *HCI) Close() error {
-	return h.close(nil)
+	h.muClose.Lock()
+	defer h.muClose.Unlock()
+
+	select {
+	case <-h.done:
+		//already closed, nothing to do
+	default:
+		close(h.done)
+	}
+
+	return nil
 }
 
 // Error ...
@@ -186,6 +223,15 @@ func (h *HCI) Option(opts ...ble.Option) error {
 		err = opt(h)
 	}
 	return err
+}
+
+func (h *HCI) isOpen() bool {
+	select {
+	case <-h.done:
+		return false
+	default:
+		return true
+	}
 }
 
 func (h *HCI) init() error {
@@ -250,15 +296,20 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
 	}
+
 	p := &pkt{c, make(chan []byte)}
 
 	// get buffer w/timeout
 	var b []byte
 	select {
+	case <-h.done:
+		return nil, fmt.Errorf("hci closed")
 	case b = <-h.chCmdBufs:
 		//ok
 	case <-time.After(chCmdBufTimeout):
-		return nil, fmt.Errorf("chCmdBufs get timeout")
+		err := fmt.Errorf("chCmdBufs get timeout")
+		h.dispatchError(err)
+		return nil, err
 	}
 
 	b[0] = byte(pktTypeCommand) // HCI header
@@ -270,9 +321,18 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 
 	h.muSent.Lock()
+	_, ok := h.sent[c.OpCode()]
+	if ok {
+		h.muSent.Unlock()
+		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
+	}
+
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
-	if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
+
+	if !h.isOpen() {
+		return nil, fmt.Errorf("hci closed")
+	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
 		h.close(fmt.Errorf("hci: failed to send cmd"))
 	} else if n != 4+c.Len() {
 		h.close(fmt.Errorf("hci: failed to send whole cmd pkt to hci socket"))
@@ -284,9 +344,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// emergency timeout to prevent calls from locking up if the HCI
 	// interface doesn't respond.  Responsed here should normally be fast
 	// a timeout indicates a major problem with HCI.
-	timeout := time.NewTimer(10 * time.Second)
 	select {
-	case <-timeout.C:
+	case <-time.After(10 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
 		ret = nil
 	case <-h.done:
@@ -296,7 +355,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		err = nil
 		ret = b
 	}
-	timeout.Stop()
 
 	// clear sent table when done, we sometimes get command complete or
 	// command status messages with no matching send, which can attempt to
@@ -308,40 +366,86 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	return ret, err
 }
 
-func (h *HCI) sktLoop() {
-	b := make([]byte, 4096)
-	defer close(h.done)
+func (h *HCI) sktProcessLoop() {
+
+	defer h.cleanup()
+	defer h.dispatchError(h.err)
+
 	for {
-		n, err := h.skt.Read(b)
-		if n == 0 || err != nil {
-			if err == io.EOF {
-				h.err = err //callers depend on detecting io.EOF, don't wrap it.
-			} else {
-				h.err = fmt.Errorf("skt: %s", err)
-			}
+		var p []byte
+		var ok bool
+
+		select {
+		case <-h.done:
+			fmt.Println("close requested")
+			h.err = io.EOF
 			return
+
+		case p, ok = <-h.sktRxChan:
+			if !ok {
+				fmt.Println("socket rx closed")
+				h.err = io.EOF
+				return
+			}
+			// will process the bytes below
 		}
-		p := make([]byte, n)
-		copy(p, b)
+
 		if err := h.handlePkt(p); err != nil {
 			// Some bluetooth devices may append vendor specific packets at the last,
 			// in this case, simply ignore them.
 			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
 				_ = logger.Error("skt: %v", err)
 			} else {
-				h.err = fmt.Errorf("skt: %v", err)
+				h.err = fmt.Errorf("skt handle error: %v", err)
 				return
 			}
 		}
 	}
 }
 
+func (h *HCI) sktReadLoop() {
+	defer func() {
+		fmt.Println("sktRxLoop done")
+		close(h.sktRxChan)
+	}()
+
+	b := make([]byte, 4096)
+
+	for {
+		n, err := h.skt.Read(b)
+
+		switch {
+		case n == 0 && err == nil:
+			// read timeout
+			select {
+			case <-h.done:
+				//exit!
+				return
+			default:
+				continue
+			}
+
+		//callers depend on detecting io.EOF, don't wrap it.
+		case err == io.EOF:
+			h.err = err
+			return
+
+		case err != nil:
+			h.err = fmt.Errorf("skt read error: %v", err)
+			return
+
+		default:
+			// ok
+			p := make([]byte, n)
+			copy(p, b)
+			h.sktRxChan <- p
+		}
+	}
+}
+
 func (h *HCI) close(err error) error {
 	h.err = err
-	if h.skt != nil {
-		return h.skt.Close()
-	}
-	return err
+	return h.skt.Close()
 }
 
 func (h *HCI) handlePkt(b []byte) error {
@@ -365,14 +469,16 @@ func (h *HCI) handlePkt(b []byte) error {
 
 func (h *HCI) handleACL(b []byte) error {
 	handle := packet(b).handle()
+
 	h.muConns.Lock()
-	c, ok := h.conns[handle]
-	h.muConns.Unlock()
-	if !ok {
+	defer h.muConns.Unlock()
+
+	if c, ok := h.conns[handle]; ok {
+		c.chInPkt <- b
+	} else {
 		_ = logger.Warn("invalid connection handle on ACL packet", "handle", handle)
-		return nil
 	}
-	c.chInPkt <- b
+
 	return nil
 }
 
@@ -381,14 +487,13 @@ func (h *HCI) handleEvt(b []byte) error {
 	if plen != len(b[2:]) {
 		return fmt.Errorf("invalid event packet: % X", b)
 	}
+
 	if code == evt.CommandCompleteCode || code == evt.CommandStatusCode {
 		if f := h.evth[code]; f != nil {
 			return f(b[2:])
 		}
 	}
-	if plen != len(b[2:]) {
-		h.err = fmt.Errorf("invalid event packet: % X", b)
-	}
+
 	if f := h.evth[code]; f != nil {
 		h.err = f(b[2:])
 		return nil
@@ -557,11 +662,17 @@ func (h *HCI) handleCommandComplete(b []byte) error {
 	h.muSent.Lock()
 	p, found := h.sent[int(e.CommandOpcode())]
 	h.muSent.Unlock()
+
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandCompleteEP: % X", e)
 	}
-	p.done <- e.ReturnParameters()
-	return nil
+
+	select {
+	case <-h.done:
+		return fmt.Errorf("hci closed")
+	case p.done <- e.ReturnParameters():
+		return nil
+	}
 }
 
 func (h *HCI) handleCommandStatus(b []byte) error {
@@ -581,8 +692,13 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 	if !found {
 		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
-	p.done <- []byte{e.Status()}
-	return nil
+
+	select {
+	case <-h.done:
+		return fmt.Errorf("hci closed")
+	case p.done <- []byte{e.Status()}:
+		return nil
+	}
 }
 
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
@@ -591,6 +707,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	h.muConns.Lock()
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
+
 	if e.Role() == roleMaster {
 		if e.Status() == 0x00 {
 			select {
@@ -630,18 +747,19 @@ func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
 	return nil
 }
 
-func (h *HCI) handleDisconnectionComplete(b []byte) error {
-	e := evt.DisconnectionComplete(b)
+func (h *HCI) cleanupConnectionHandle(ch uint16) error {
+
 	h.muConns.Lock()
-	c, found := h.conns[e.ConnectionHandle()]
-	delete(h.conns, e.ConnectionHandle())
-	h.muConns.Unlock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[ch]
 	if !found {
-		return fmt.Errorf("disconnecting an invalid handle %04X", e.ConnectionHandle())
+		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
+
+	delete(h.conns, ch)
 	close(c.chInPkt)
 
-	if c.param.Role() == roleSlave {
+	if !h.isOpen() && c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
 		// This may failed with ErrCommandDisallowed, if the controller
@@ -656,7 +774,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
-	// will be recycled. [Vol2, Part E 4.1.1]
+	// will be recycled. [Vol2, Part E 4.3]
 	//
 	// must be done with the pool locked to avoid race conditions where
 	// writePDU is in progress and does a Get from the pool after this completes,
@@ -665,6 +783,12 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	c.txBuffer.PutAll()
 	c.txBuffer.UnlockPool()
 	return nil
+}
+
+func (h *HCI) handleDisconnectionComplete(b []byte) error {
+	e := evt.DisconnectionComplete(b)
+	ch := e.ConnectionHandle()
+	return h.cleanupConnectionHandle(ch)
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
@@ -698,11 +822,6 @@ func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 	}, nil)
 }
 
-func (h *HCI) handleUnhandled(b []byte) error {
-	log.Println("unhandled:", b)
-	return nil
-}
-
 func (h *HCI) setAllowedCommands(n int) {
 	if n > chCmdBufChanSize {
 		fmt.Printf("hci.setAllowedCommands: warning, defaulting %d -> %d\n", n, chCmdBufChanSize)
@@ -712,19 +831,27 @@ func (h *HCI) setAllowedCommands(n int) {
 	//put with timeout
 	for len(h.chCmdBufs) < n {
 		select {
+		case <-h.done:
+			//closed
+			return
 		case h.chCmdBufs <- make([]byte, chCmdBufElementSize):
 			//ok
 		case <-time.After(chCmdBufTimeout):
 			h.dispatchError(fmt.Errorf("chCmdBufs put timeout"))
+			//timeout
 			break
 		}
 	}
 }
 
 func (h *HCI) dispatchError(e error) {
-	if h.errorHandler == nil {
+	switch {
+	case h.errorHandler == nil:
 		fmt.Println(e)
-	} else {
+	case !h.isOpen():
+		//don't dispatch
+		fmt.Println("hci closing:", e)
+	default:
 		h.errorHandler(e)
 	}
 }

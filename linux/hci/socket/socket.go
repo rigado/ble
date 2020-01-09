@@ -31,6 +31,7 @@ const (
 	ioctlSize     = 4
 	hciMaxDevices = 16
 	typHCI        = 72 // 'H'
+	readTimeout   = 1000
 )
 
 var (
@@ -51,10 +52,11 @@ type devListRequest struct {
 
 // Socket implements a HCI User Channel as ReadWriteCloser.
 type Socket struct {
-	fd     int
-	closed chan struct{}
-	rmu    sync.Mutex
-	wmu    sync.Mutex
+	fd   int
+	rmu  sync.Mutex
+	wmu  sync.Mutex
+	done chan int
+	cmu  sync.Mutex
 }
 
 // NewSocket returns a HCI User Channel of specified device id.
@@ -122,41 +124,74 @@ func open(fd, id int) (*Socket, error) {
 		unix.Read(fd, b)
 	}
 
-	return &Socket{fd: fd, closed: make(chan struct{})}, nil
+	return &Socket{fd: fd, done: make(chan int)}, nil
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
-	s.rmu.Lock()
-	n, err := unix.Read(s.fd, p)
-	s.rmu.Unlock()
-	// Close always sends a dummy command to wake up Read
-	// bad things happen to the HCI state machines if they receive
-	// a reply from that command, so make sure no data is returned
-	// on a closed socket.
-	//
-	// note that if Write and Close are called concurrently it's
-	// indeterminate which replies get through.
-	select {
-	case <-s.closed:
+	if !s.isOpen() {
 		return 0, io.EOF
-	default:
-		// log.Println("hci >", hex.EncodeToString(p[:n]))
+	}
+
+	var err error
+	n := 0
+
+	s.rmu.Lock()
+	defer s.rmu.Unlock()
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unix.POLLIN}}
+	unix.Poll(pfds, readTimeout)
+
+	// poll for data success?
+	if pfds[0].Revents&unix.POLLIN > 0 {
+		// there is data!
+		n, err = unix.Read(s.fd, p)
+	} else {
+		// no data, read timeout
+		return 0, nil
+	}
+
+	// check if we are still open since the read takes a while
+	if !s.isOpen() {
+		return 0, io.EOF
 	}
 	return n, errors.Wrap(err, "can't read hci socket")
 }
 
 func (s *Socket) Write(p []byte) (int, error) {
+	if !s.isOpen() {
+		return 0, io.EOF
+	}
+
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 	n, err := unix.Write(s.fd, p)
-	// log.Println("hci <", hex.EncodeToString(p))
 	return n, errors.Wrap(err, "can't write hci socket")
 }
 
 func (s *Socket) Close() error {
-	close(s.closed)
-	s.Write([]byte{0x01, 0x09, 0x10, 0x00}) // no-op command to wake up the Read call if it's blocked
-	s.rmu.Lock()
-	defer s.rmu.Unlock()
-	return errors.Wrap(unix.Close(s.fd), "can't close hci socket")
+	s.cmu.Lock()
+	defer s.cmu.Unlock()
+
+	select {
+	case <-s.done:
+		fmt.Println("hci socket already closed!")
+		return nil
+
+	default:
+		close(s.done)
+		fmt.Println("closing hci socket!")
+		s.rmu.Lock()
+		err := unix.Close(s.fd)
+		s.rmu.Unlock()
+
+		return errors.Wrap(err, "can't close hci socket")
+	}
+}
+
+func (s *Socket) isOpen() bool {
+	select {
+	case <-s.done:
+		return false
+	default:
+		return true
+	}
 }

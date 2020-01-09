@@ -16,12 +16,12 @@ const (
 )
 
 // NewClient returns a GATT Client.
-func NewClient(conn ble.Conn) (*Client, error) {
+func NewClient(conn ble.Conn, done chan bool) (*Client, error) {
 	p := &Client{
 		subs: make(map[uint16]*sub),
 		conn: conn,
 	}
-	p.ac = att.NewClient(conn, p)
+	p.ac = att.NewClient(conn, p, done)
 	go p.ac.Loop()
 	return p, nil
 }
