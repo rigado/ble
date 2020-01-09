@@ -1,4 +1,4 @@
-package adv
+package parser
 
 import (
 	"fmt"
@@ -205,7 +205,7 @@ func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 	return arr, nil
 }
 
-func decode(pdu []byte) (map[string]interface{}, error) {
+func Parse(pdu []byte) (map[string]interface{}, error) {
 	if pdu == nil {
 		return nil, fmt.Errorf("invalid pdu: %v", pdu)
 	}

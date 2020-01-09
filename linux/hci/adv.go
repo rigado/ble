@@ -2,7 +2,6 @@ package hci
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -33,13 +32,13 @@ func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) 
 	}
 	p, err := adv.NewRawPacket(ad)
 	if err != nil {
-		a := make([]byte, 6)
-		addrArray := e.Address(i)
-		for i := 0; i < 6; i++ {
-			a[i] = addrArray[i]
+		//reverse for printing
+		a := e.Address(i)
+		for i := len(a)/2 - 1; i >= 0; i-- {
+			opp := len(a) - 1 - i
+			a[i], a[opp] = a[opp], a[i]
 		}
-		fmt.Println("address:", hex.EncodeToString(a))
-		return nil, err
+		return nil, errors.Wrap(err, hex.EncodeToString(a[:]))
 	}
 
 	a := &Advertisement{e: e, i: i, p: p}
@@ -57,7 +56,7 @@ type Advertisement struct {
 	p *adv.Packet
 }
 
-// setScanResponse ssociate sca response to the existing advertisement.
+// setScanResponse associate scan response to the existing advertisement.
 func (a *Advertisement) setScanResponse(sr *Advertisement) error {
 
 	ad, err := a.e.DataWErr(a.i)

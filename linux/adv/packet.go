@@ -4,8 +4,27 @@ import (
 	"encoding/binary"
 
 	"github.com/go-ble/ble"
+	"github.com/go-ble/ble/parser"
 	"github.com/pkg/errors"
 )
+
+var keys = struct {
+	flags       string
+	services    string
+	solicited   string
+	serviceData string
+	localName   string
+	txpwr       string
+	mfgdata     string
+}{
+	flags:       ble.AdvertisementMapKeys.Flags,
+	services:    ble.AdvertisementMapKeys.Services,
+	solicited:   ble.AdvertisementMapKeys.Solicited,
+	serviceData: ble.AdvertisementMapKeys.ServiceData,
+	localName:   ble.AdvertisementMapKeys.Name,
+	txpwr:       ble.AdvertisementMapKeys.TxPower,
+	mfgdata:     ble.AdvertisementMapKeys.MFG,
+}
 
 // Packet is an implemntation of ble.AdvPacket for crafting or parsing an advertising packet or scan response.
 // Refer to Supplement to Bluetooth Core Specification | CSSv6, Part A.
@@ -48,7 +67,7 @@ func NewRawPacket(bytes ...[]byte) (*Packet, error) {
 	}
 
 	//decode the bytes
-	m, err := decode(b)
+	m, err := parser.Parse(b)
 	if err != nil {
 		return nil, errors.Wrap(err, "pdu decode")
 	}
