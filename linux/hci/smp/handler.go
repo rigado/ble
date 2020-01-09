@@ -162,6 +162,11 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 		return nil, err
 	}
 
+	err = t.saveBondInfo()
+	if err != nil {
+		return nil, err
+	}
+
 	//encrypt!
 	return nil, t.encrypter.Encrypt()
 }

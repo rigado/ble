@@ -8,19 +8,19 @@ import (
 )
 
 type manager struct {
-	config hci.SmpConfig
-	pairing *pairingContext
-	t *transport
+	config      hci.SmpConfig
+	pairing     *pairingContext
+	t           *transport
 	bondManager hci.BondManager
-	encrypt func(info hci.BondInfo) error
+	encrypt     func(info hci.BondInfo) error
 }
 
 //todo: need to have on instance per connection which requires a mutex in the bond manager
 //todo: remove bond manager from input parameters?
 func NewSmpManager(config hci.SmpConfig, bm hci.BondManager) *manager {
 	p := &pairingContext{request: config}
-	m := &manager{config:config, pairing:p, bondManager: bm}
-	t := NewSmpTransport(p, bm, m, nil)
+	m := &manager{config: config, pairing: p, bondManager: bm}
+	t := NewSmpTransport(p, bm, m, nil, nil)
 	m.t = t
 	return m
 }
@@ -35,6 +35,10 @@ func (m *manager) SetWritePDUFunc(w func([]byte) (int, error)) {
 
 func (m *manager) SetEncryptFunc(e func(info hci.BondInfo) error) {
 	m.encrypt = e
+}
+
+func (m *manager) SetNOPFunc(f func() error) {
+	m.t.nopFunc = f
 }
 
 func (m *manager) InitContext(localAddr, remoteAddr []byte,

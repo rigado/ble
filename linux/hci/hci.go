@@ -12,7 +12,9 @@ import (
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/go-ble/ble/linux/hci/h4"
 	"github.com/go-ble/ble/linux/hci/socket"
+	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
 )
 
@@ -152,11 +154,21 @@ func (h *HCI) Init() error {
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
-	skt, err := socket.NewSocket(h.id)
+	var err error
+	if true {
+		h.skt, err = socket.NewSocket(h.id)
+	} else {
+		h.skt, err = h4.New(serial.OpenOptions{
+			PortName:          "/dev/ttymxc2",
+			BaudRate:          1000000,
+			DataBits:          8,
+			StopBits:          1,
+			RTSCTSFlowControl: true,
+		})
+	}
 	if err != nil {
 		return err
 	}
-	h.skt = skt
 
 	h.setAllowedCommands(1)
 
@@ -452,14 +464,16 @@ func (h *HCI) handlePkt(b []byte) error {
 	// Strip the 1-byte HCI header and pass down the rest of the packet.
 	t, b := b[0], b[1:]
 	switch t {
-	case pktTypeCommand:
-		return fmt.Errorf("unmanaged cmd: % X", b)
 	case pktTypeACLData:
 		return h.handleACL(b)
-	case pktTypeSCOData:
-		return fmt.Errorf("unsupported sco packet: % X", b)
 	case pktTypeEvent:
 		return h.handleEvt(b)
+
+		//unhandled stuff
+	case pktTypeCommand:
+		return fmt.Errorf("unmanaged cmd: % X", b)
+	case pktTypeSCOData:
+		return fmt.Errorf("unsupported sco packet: % X", b)
 	case pktTypeVendor:
 		return fmt.Errorf("unsupported vendor packet: % X", b)
 	default:
@@ -854,4 +868,14 @@ func (h *HCI) dispatchError(e error) {
 	default:
 		h.errorHandler(e)
 	}
+}
+
+// workaround, remove
+func (h *HCI) NOP() error {
+	return nil
+
+	// ReadBDADDRRP := cmd.ReadBDADDRRP{}
+	// err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
+	// fmt.Println("NOP: err ", err)
+	// return err
 }
