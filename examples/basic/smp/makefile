@@ -2,8 +2,7 @@ native: clean
 	go build -o explorer
 
 arm: clean
-	env GOOS=linux GOARCH=arm CGO_ENABLED=1 CC=arm-linux-gnueabihf-gcc go build -o explorer-arm
-	# scp explorer-arm admin@192.168.30.230:~
+	env GOOS=linux GOARCH=arm go build -o explorer-arm
 
 clean:
 	rm -f explorer explorer-arm
