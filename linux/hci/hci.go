@@ -425,7 +425,6 @@ func (h *HCI) sktReadLoop() {
 
 	for {
 		n, err := h.skt.Read(b)
-		// fmt.Println("sktRead", n, err)
 
 		switch {
 		case n == 0 && err == nil:
