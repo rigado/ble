@@ -111,7 +111,7 @@ func (t *transport) sendPairingRandom() error {
 	return t.send(out)
 }
 
-func (t *transport) sendDHKeyCheck() error {
+func (t *transport) sendDHKeyCheck(key int) error {
 	if t.pairing == nil {
 		return fmt.Errorf("no pairing context")
 	}
@@ -119,15 +119,27 @@ func (t *transport) sendDHKeyCheck() error {
 	log.Printf("send dhkey check")
 	p := t.pairing
 
-	//Ea = f6 (MacKey, Na, Nb, 0, IOcapA, A, B)
+	//Ea = f6 (MacKey, Na, Nb, rb, IOcapA, A, B)
 	la := append(p.localAddr, p.localAddrType)
 	ra := append(p.remoteAddr, p.remoteAddrType)
 	na := p.localRandom
 	nb := p.remoteRandom
 
-	ioCap := swapBuf([]byte{t.pairing.request.AuthReq, t.pairing.request.OobFlag, t.pairing.request.IoCap})
+	rb := make([]byte, 16)
+	if key != 0 {
+		keyBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(keyBytes, uint32(key))
+		rb[12] = keyBytes[0]
+		rb[13] = keyBytes[1]
+		rb[14] = keyBytes[2]
+		rb[15] = keyBytes[3]
+	}
 
-	ea, err := smpF6(t.pairing.scMacKey, na, nb, make([]byte, 16), ioCap, la, ra)
+	//swap to little endian
+	rb = swapBuf(rb)
+
+	ioCap := swapBuf([]byte{t.pairing.request.AuthReq, t.pairing.request.OobFlag, t.pairing.request.IoCap})
+	ea, err := smpF6(t.pairing.scMacKey, na, nb, rb, ioCap, la, ra)
 	if err != nil {
 		return err
 	}

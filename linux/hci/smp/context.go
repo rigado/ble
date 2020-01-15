@@ -3,6 +3,7 @@ package smp
 import (
 	"bytes"
 	"crypto"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"github.com/go-ble/ble/linux/hci"
@@ -55,6 +56,56 @@ func (p *pairingContext) checkConfirm() error {
 	}
 
 	return nil
+}
+
+func (p *pairingContext) checkPasskeyConfirm(iteration, key int) error {
+	//Cb =f4(PKbx,PKax, Nb, 0 )
+	// make the keys work as expected
+	kbx := MarshalPublicKeyX(p.scRemotePubKey)
+	kax := MarshalPublicKeyX(p.scECDHKeys.public)
+	nb := p.remoteRandom
+
+	z := 0x80 | (byte)((key & (1 << iteration)) >> iteration)
+
+	calcConf, err := smpF4(kbx, kax, nb, z)
+	if err != nil {
+		return err
+	}
+
+	//fmt.Printf("i: %d, z: %x, c: %v, cc: %v, ra: %v, rb: %v\n", iteration, z,
+	//	hex.EncodeToString(p.remoteConfirm),
+	//	hex.EncodeToString(calcConf),
+	//	hex.EncodeToString(p.localRandom),
+	//	hex.EncodeToString(p.remoteRandom))
+
+	if !bytes.Equal(p.remoteConfirm, calcConf) {
+		return fmt.Errorf("passkey confirm mismatch %d, exp %v got %v",
+			iteration, hex.EncodeToString(p.remoteConfirm), hex.EncodeToString(calcConf))
+	}
+
+	return nil
+}
+
+//todo: key should be set at the beginning
+func (p *pairingContext) generatePassKeyConfirm(iteration, key int) ([]byte, []byte) {
+	kbx := MarshalPublicKeyX(p.scRemotePubKey)
+	kax := MarshalPublicKeyX(p.scECDHKeys.public)
+	nai := make([]byte, 16)
+	_, err := rand.Read(nai)
+	if err != nil {
+
+	}
+
+	z := 0x80 | (byte)((key & (1 << iteration)) >> iteration)
+
+	calcConf, err := smpF4(kax, kbx, nai, z)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	//fmt.Printf("passkey confirm %d: z: %x, conf: %v\n", iteration, z, hex.EncodeToString(calcConf))
+
+	return calcConf, nai
 }
 
 func (p *pairingContext) calcMacLtk() error {

@@ -7,6 +7,11 @@ import (
 	"github.com/go-ble/ble/linux/hci"
 )
 
+//todo: track this state in the pairing context
+var isPassKeyPairing = false
+var passKeyIteration = 0
+var pairingKey = 123456
+
 //func smpOnPairingRequest(c *Conn, in pdu) ([]byte, error) {
 //	if len(in) < 6 {
 //		return nil, fmt.Errorf("%v, invalid length %v", hex.EncodeToString(in), len(in))
@@ -37,6 +42,9 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	rx.RespKeyDist = in[5]
 	t.pairing.response = rx
 
+	isPassKeyPairing = false
+	passKeyIteration = 0
+
 	if isLegacy(rx.AuthReq) {
 		t.pairing.legacy = true
 		return nil, t.sendMConfirm()
@@ -55,7 +63,7 @@ func smpOnPairingConfirm(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("invalid length")
 	}
 
-	t.pairing.remoteConfirm = []byte(in)
+	t.pairing.remoteConfirm = in
 
 	err := t.sendPairingRandom()
 	if err != nil {
@@ -85,17 +93,31 @@ func smpOnPairingRandom(t *transport, in pdu) ([]byte, error) {
 }
 
 func onSecureRandom(t *transport) ([]byte, error) {
-	err := t.pairing.checkConfirm()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
+	if isPassKeyPairing {
+		err := t.pairing.checkPasskeyConfirm(passKeyIteration, pairingKey)
+		if err != nil {
+			return nil, err
+		}
+
+		passKeyIteration++
+
+		if passKeyIteration < 20 {
+			continuePassKeyPairing(t)
+			return nil, nil
+		}
+	} else {
+		err := t.pairing.checkConfirm()
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+		fmt.Println("pairing confirm ok!")
 	}
-	fmt.Println("pairing confirm ok!")
 
 	// TODO
 	// here we would do the compare from g2(...) but this is just works only for now
 	// move on to auth stage 2 (2.3.5.6.5) calc mackey, ltk
-	err = t.pairing.calcMacLtk()
+	err := t.pairing.calcMacLtk()
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -103,7 +125,7 @@ func onSecureRandom(t *transport) ([]byte, error) {
 	fmt.Println("mac ltk ok!")
 
 	//send dhkey check
-	err = t.sendDHKeyCheck()
+	err = t.sendDHKeyCheck(pairingKey)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -146,6 +168,15 @@ func smpOnPairingPublicKey(t *transport, in pdu) ([]byte, error) {
 	}
 
 	t.pairing.scRemotePubKey = pubk
+
+	//check to see if we should start a passkey pairing procedure
+	//this should actually be done according to the spec
+	//todo: need a way to get the passkey into the library
+	if t.pairing.response.IoCap == 0x00 {
+		//device has a display, so lets do passkey pairing
+		//todo: this check is kind of bogus
+		startPassKeyPairing(t)
+	}
 	return nil, nil
 }
 
@@ -217,4 +248,18 @@ func smpOnMasterIdentification(t *transport, in pdu) ([]byte, error) {
 
 	//todo: move this somewhere more useful
 	return nil, t.saveBondInfo()
+}
+
+func startPassKeyPairing(t *transport) {
+	isPassKeyPairing = true
+	passKeyIteration = 0
+
+	continuePassKeyPairing(t)
+}
+
+func continuePassKeyPairing(t *transport) {
+	confirm, random := t.pairing.generatePassKeyConfirm(passKeyIteration, 123456)
+	t.pairing.localRandom = random
+	out := append([]byte{pairingConfirm}, confirm...)
+	t.send(out)
 }

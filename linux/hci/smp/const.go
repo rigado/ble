@@ -15,4 +15,6 @@ const (
 	pairingPublicKey        = 0x0C // Pairing Public Key LE-U
 	pairingDHKeyCheck       = 0x0D // Pairing DHKey Check LE-U
 	pairingKeypress         = 0x0E // Pairing Keypress Notification LE-U
+
+
 )
