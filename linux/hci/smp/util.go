@@ -2,6 +2,7 @@ package smp
 
 import (
 	"crypto/aes"
+	"encoding/binary"
 	"github.com/enceve/crypto/cmac"
 )
 
@@ -60,4 +61,18 @@ func isLegacy(authReq byte) bool {
 	}
 
 	return true
+}
+
+func getLegacyParingTK(key int) []byte {
+	tk := make([]byte, 16)
+	keyBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(keyBytes, uint32(key))
+	tk[12] = keyBytes[0]
+	tk[13] = keyBytes[1]
+	tk[14] = keyBytes[2]
+	tk[15] = keyBytes[3]
+
+	tk = swapBuf(tk)
+
+	return tk
 }

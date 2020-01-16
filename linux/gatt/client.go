@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/att"
 )
 
 const (
-	cccNotify   = 0x0001
-	cccIndicate = 0x0002
+	cccNotify   = uint16(0x0001)
+	cccIndicate = uint16(0x0002)
 )
 
 // NewClient returns a GATT Client.
@@ -296,10 +297,12 @@ func (p *Client) Subscribe(c *ble.Characteristic, ind bool, h ble.NotificationHa
 	if c.CCCD == nil {
 		return fmt.Errorf("CCCD not found")
 	}
+	flag := cccNotify
 	if ind {
-		return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccIndicate, h)
+		flag = cccIndicate
 	}
-	return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccNotify, h)
+
+	return p.setHandlers(c.CCCD.Handle, c.ValueHandle, flag, h)
 }
 
 // Unsubscribe unsubscribes to indication (if ind is set true), or notification
@@ -396,8 +399,8 @@ func (p *Client) HandleNotification(req []byte) {
 	}
 }
 
-func (p *Client) Bond() error {
-	return p.conn.Bond()
+func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
+	return p.conn.Pair(authData, to)
 }
 
 func (p *Client) StartEncryption() error {

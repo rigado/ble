@@ -16,5 +16,8 @@ const (
 	pairingDHKeyCheck       = 0x0D // Pairing DHKey Check LE-U
 	pairingKeypress         = 0x0E // Pairing Keypress Notification LE-U
 
+	passkeyIterationCount   = 20
 
+	oobData
+	oobDataPreset = 0x01
 )

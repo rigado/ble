@@ -6,8 +6,23 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci"
 )
+
+const (
+	JustWorks = iota
+	NumericComp
+	Passkey
+	Oob
+)
+
+var pairingTypeStrings = []string{
+	"Just Works",
+	"Numeric Comparison",
+	"Passkey Entry",
+	"OOB Data",
+}
 
 type pairingContext struct {
 	request hci.SmpConfig
@@ -31,6 +46,11 @@ type pairingContext struct {
 	legacy bool
 	shortTermKey []byte
 
+	passKeyIteration int
+
+	pairingType int
+	state PairingState
+	authData ble.AuthData
 	bond hci.BondInfo
 }
 
@@ -58,15 +78,18 @@ func (p *pairingContext) checkConfirm() error {
 	return nil
 }
 
-func (p *pairingContext) checkPasskeyConfirm(iteration, key int) error {
-	//Cb =f4(PKbx,PKax, Nb, 0 )
+func (p *pairingContext) checkPasskeyConfirm() error {
 	// make the keys work as expected
 	kbx := MarshalPublicKeyX(p.scRemotePubKey)
 	kax := MarshalPublicKeyX(p.scECDHKeys.public)
 	nb := p.remoteRandom
+	i := p.passKeyIteration
+	key := p.authData.Passkey
 
-	z := 0x80 | (byte)((key & (1 << iteration)) >> iteration)
+	//this gets the bit of the passkey for the current iteration
+	z := 0x80 | (byte)((key & (1 << i)) >> i)
 
+	//Cb =f4(PKbx,PKax, Nb, rb)
 	calcConf, err := smpF4(kbx, kax, nb, z)
 	if err != nil {
 		return err
@@ -80,14 +103,14 @@ func (p *pairingContext) checkPasskeyConfirm(iteration, key int) error {
 
 	if !bytes.Equal(p.remoteConfirm, calcConf) {
 		return fmt.Errorf("passkey confirm mismatch %d, exp %v got %v",
-			iteration, hex.EncodeToString(p.remoteConfirm), hex.EncodeToString(calcConf))
+			i, hex.EncodeToString(p.remoteConfirm), hex.EncodeToString(calcConf))
 	}
 
 	return nil
 }
 
 //todo: key should be set at the beginning
-func (p *pairingContext) generatePassKeyConfirm(iteration, key int) ([]byte, []byte) {
+func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 	kbx := MarshalPublicKeyX(p.scRemotePubKey)
 	kax := MarshalPublicKeyX(p.scECDHKeys.public)
 	nai := make([]byte, 16)
@@ -96,7 +119,8 @@ func (p *pairingContext) generatePassKeyConfirm(iteration, key int) ([]byte, []b
 
 	}
 
-	z := 0x80 | (byte)((key & (1 << iteration)) >> iteration)
+	i := p.passKeyIteration
+	z := 0x80 | (byte)((p.authData.Passkey & (1 << i)) >> i)
 
 	calcConf, err := smpF4(kax, kbx, nai, z)
 	if err != nil {
@@ -164,7 +188,11 @@ func (p *pairingContext) checkLegacyConfirm() error {
 	ra:= p.remoteAddr
 	sRand:= p.remoteRandom
 
-	c1, err := smpC1(make([]byte, 16), sRand, preq, pres,
+	k := make([]byte, 16)
+	if p.pairingType == Passkey {
+		k = getLegacyParingTK(p.authData.Passkey)
+	}
+	c1, err := smpC1(k, sRand, preq, pres,
 		p.localAddrType,
 		p.remoteAddrType,
 		la,

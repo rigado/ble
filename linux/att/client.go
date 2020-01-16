@@ -458,13 +458,13 @@ func (c *Client) ExecuteWrite(flags uint8) error {
 	req.SetAttributeOpcode()
 	req.SetFlags(flags)
 
-	b, err := c.sendReq(req)
+	rspBytes, err := c.sendReq(req)
 	if err != nil {
 		return err
 	}
 
 	// Convert and validate the response.
-	rsp := ExecuteWriteResponse(b)
+	rsp := ExecuteWriteResponse(rspBytes)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
 		return ble.ATTError(rsp[4])
@@ -561,9 +561,6 @@ func (c *Client) Loop() {
 				return
 			case c.rspc <- b:
 				continue
-				// default:
-				// 	fmt.Println("exited client loop: response channel error")
-				// 	return
 			}
 		}
 

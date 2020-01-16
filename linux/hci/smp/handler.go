@@ -7,11 +7,6 @@ import (
 	"github.com/go-ble/ble/linux/hci"
 )
 
-//todo: track this state in the pairing context
-var isPassKeyPairing = false
-var passKeyIteration = 0
-var pairingKey = 123456
-
 //func smpOnPairingRequest(c *Conn, in pdu) ([]byte, error) {
 //	if len(in) < 6 {
 //		return nil, fmt.Errorf("%v, invalid length %v", hex.EncodeToString(in), len(in))
@@ -42,16 +37,25 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	rx.RespKeyDist = in[5]
 	t.pairing.response = rx
 
-	isPassKeyPairing = false
-	passKeyIteration = 0
+	t.pairing.pairingType = JustWorks
+	t.pairing.passKeyIteration = 0
 
-	if isLegacy(rx.AuthReq) {
-		t.pairing.legacy = true
-		return nil, t.sendMConfirm()
-	} else {
-		//secure connections
-		return nil, t.sendPublicKey()
+	t.pairing.legacy = isLegacy(rx.AuthReq)
+	t.pairing.pairingType = determinePairingType(t)
+
+	fmt.Println("detected pairing type: ", pairingTypeStrings[t.pairing.pairingType])
+
+	if t.pairing.pairingType == Oob &&
+		len(t.pairing.authData.OOBData) == 0 {
+		t.pairing.state = Error
+		return nil, fmt.Errorf("pairing requires OOB data but OOB data not specified")
 	}
+
+	if t.pairing.legacy {
+		return nil, t.sendMConfirm()
+	}
+
+	return nil, t.sendPublicKey()
 }
 
 func smpOnPairingConfirm(t *transport, in pdu) ([]byte, error) {
@@ -82,7 +86,7 @@ func smpOnPairingRandom(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("invalid length")
 	}
 
-	t.pairing.remoteRandom = []byte(in)
+	t.pairing.remoteRandom = in
 
 	//conf check
 	if t.pairing.legacy {
@@ -93,16 +97,13 @@ func smpOnPairingRandom(t *transport, in pdu) ([]byte, error) {
 }
 
 func onSecureRandom(t *transport) ([]byte, error) {
-	if isPassKeyPairing {
-		err := t.pairing.checkPasskeyConfirm(passKeyIteration, pairingKey)
+	if t.pairing.pairingType == Passkey {
+		more, err := handlePassKeyRandom(t)
 		if err != nil {
 			return nil, err
 		}
 
-		passKeyIteration++
-
-		if passKeyIteration < 20 {
-			continuePassKeyPairing(t)
+		if more {
 			return nil, nil
 		}
 	} else {
@@ -111,7 +112,6 @@ func onSecureRandom(t *transport) ([]byte, error) {
 			fmt.Println(err)
 			return nil, err
 		}
-		fmt.Println("pairing confirm ok!")
 	}
 
 	// TODO
@@ -122,10 +122,9 @@ func onSecureRandom(t *transport) ([]byte, error) {
 		fmt.Println(err)
 		return nil, err
 	}
-	fmt.Println("mac ltk ok!")
 
 	//send dhkey check
-	err = t.sendDHKeyCheck(pairingKey)
+	err = t.sendDHKeyCheck()
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -140,13 +139,12 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Println("remote confirm OK!")
-
 	lRand := t.pairing.localRandom
 	rRand := t.pairing.remoteRandom
 
 	//calculate STK
-	stk, err := smpS1(make([]byte, 16), rRand, lRand)
+	k := getLegacyParingTK(t.pairing.authData.Passkey)
+	stk, err := smpS1(k, rRand, lRand)
 	t.pairing.shortTermKey = stk
 
 	return nil, t.encrypter.Encrypt()
@@ -169,12 +167,7 @@ func smpOnPairingPublicKey(t *transport, in pdu) ([]byte, error) {
 
 	t.pairing.scRemotePubKey = pubk
 
-	//check to see if we should start a passkey pairing procedure
-	//this should actually be done according to the spec
-	//todo: need a way to get the passkey into the library
-	if t.pairing.response.IoCap == 0x00 {
-		//device has a display, so lets do passkey pairing
-		//todo: this check is kind of bogus
+	if t.pairing.pairingType == Passkey {
 		startPassKeyPairing(t)
 	}
 	return nil, nil
@@ -198,14 +191,20 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 		return nil, err
 	}
 
-	//encrypt!
+	//at this point, the pairing is complete
+	t.pairing.state = Finished
+
+
+	//todo: separate this out
 	return nil, t.encrypter.Encrypt()
 }
 
 func smpOnPairingFailed(t *transport, in pdu) ([]byte, error) {
-	fmt.Println("pairing failed")
-	t.pairing = nil
-	return nil, nil
+	reason := "unknown"
+	if len(in) > 0 {
+		reason = pairingFailedReason[in[0]]
+	}
+	return nil, fmt.Errorf("pairing failed: %s", reason)
 }
 
 func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
@@ -233,7 +232,7 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 
 func smpOnEncryptionInformation(t *transport, in pdu) ([]byte, error) {
 	//need to save the ltk, ediv, and rand to a file
-	t.pairing.bond = hci.NewBondInfo([]byte(in), 0, 0, true)
+	t.pairing.bond = hci.NewBondInfo(in, 0, 0, true)
 
 	return nil, nil
 }
@@ -246,20 +245,87 @@ func smpOnMasterIdentification(t *transport, in pdu) ([]byte, error) {
 	ltk := t.pairing.bond.LongTermKey()
 	t.pairing.bond = hci.NewBondInfo(ltk, ediv, randVal, true)
 
-	//todo: move this somewhere more useful
-	return nil, t.saveBondInfo()
+	err := t.saveBondInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	t.pairing.state = Finished
+
+	return nil, nil
+}
+
+func handlePassKeyRandom(t *transport) (bool, error) {
+	err := t.pairing.checkPasskeyConfirm()
+	if err != nil {
+		return false, err
+	}
+
+	t.pairing.passKeyIteration++
+
+	if t.pairing.passKeyIteration < passkeyIterationCount {
+		continuePassKeyPairing(t)
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func startPassKeyPairing(t *transport) {
-	isPassKeyPairing = true
-	passKeyIteration = 0
+
+	t.pairing.passKeyIteration = 0
 
 	continuePassKeyPairing(t)
 }
 
 func continuePassKeyPairing(t *transport) {
-	confirm, random := t.pairing.generatePassKeyConfirm(passKeyIteration, 123456)
+	confirm, random := t.pairing.generatePassKeyConfirm()
 	t.pairing.localRandom = random
 	out := append([]byte{pairingConfirm}, confirm...)
 	t.send(out)
+}
+
+//Core spec v5.0 Vol 3, Part H, 2.3.5.1
+//Tables 2.6, 2.7, and 2.8
+var ioCapsTableSC = [][]int{
+	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
+	{ JustWorks, NumericComp, Passkey, JustWorks, NumericComp },
+	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
+	{ JustWorks, JustWorks, JustWorks, JustWorks, JustWorks },
+	{ Passkey, NumericComp, Passkey, JustWorks, NumericComp },
+}
+
+var ioCapsTableLegacy = [][]int{
+	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
+	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
+	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
+	{ JustWorks, JustWorks, JustWorks, JustWorks, JustWorks },
+	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
+}
+
+func determinePairingType(t *transport) int {
+	mitmMask := byte(0x04)
+
+	req := t.pairing.request
+	rsp := t.pairing.response
+
+
+	if req.OobFlag == 0x01 && rsp.OobFlag == 0x01 && t.pairing.legacy {
+		return Oob
+	}
+
+	if req.OobFlag == 0x01 || rsp.OobFlag == 0x01 {
+		return Oob
+	}
+
+	if req.AuthReq & mitmMask == 0x00 &&
+		rsp.AuthReq & mitmMask == 0x00 {
+		return JustWorks
+	}
+
+	if t.pairing.legacy {
+		return ioCapsTableLegacy[rsp.IoCap][req.IoCap]
+	}
+
+	return ioCapsTableSC[rsp.IoCap][req.IoCap]
 }
