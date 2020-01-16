@@ -12,9 +12,7 @@ import (
 	"github.com/go-ble/ble"
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
-	"github.com/go-ble/ble/linux/hci/h4"
 	"github.com/go-ble/ble/linux/hci/socket"
-	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
 )
 
@@ -155,17 +153,7 @@ func (h *HCI) Init() error {
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	var err error
-	if true {
-		h.skt, err = socket.NewSocket(h.id)
-	} else {
-		h.skt, err = h4.New(serial.OpenOptions{
-			PortName:          "/dev/ttymxc2",
-			BaudRate:          1000000,
-			DataBits:          8,
-			StopBits:          1,
-			RTSCTSFlowControl: true,
-		})
-	}
+	h.skt, err = socket.NewSocket(h.id)
 	if err != nil {
 		return err
 	}

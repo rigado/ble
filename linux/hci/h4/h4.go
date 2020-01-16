@@ -1,4 +1,3 @@
-// +build linux
 
 package h4
 
