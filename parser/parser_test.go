@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-ble/ble"
-	"github.com/rigado/ble/linux/adv"
+	"github.com/go-ble/ble/linux/adv"
 )
 
 type testPdu struct {
