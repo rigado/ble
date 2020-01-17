@@ -23,8 +23,26 @@ func NewClient(conn ble.Conn, done chan bool) (*Client, error) {
 		conn: conn,
 	}
 	p.ac = att.NewClient(conn, p, done)
+	//srv, err := NewServerWithName("test")
+	//if err != nil {
+	//	//todo: log error
+	//}
+
+	//p.srv = srv
+	//
+	//p.srv.Lock()
+	////todo: handle error
+	//p.as, _ = att.NewServer(p.srv.DB(), conn)
+	//p.srv.Unlock()
+
 	go p.ac.Loop()
+
 	return p, nil
+}
+
+func ClientWithServer(c *Client, db *att.DB) *Client {
+	c.ac = c.ac.WithServer(db)
+	return c
 }
 
 // A Client is a GATT Client.
@@ -36,6 +54,7 @@ type Client struct {
 	subs    map[uint16]*sub
 
 	ac   *att.Client
+
 	conn ble.Conn
 }
 
@@ -115,6 +134,10 @@ func (p *Client) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
 				p.profile.Services = append(p.profile.Services, s)
 			}
 			if endh == 0xFFFF {
+				return p.profile.Services, nil
+			}
+
+			if len(p.profile.Services) == len(filter) {
 				return p.profile.Services, nil
 			}
 			start = endh + 1
@@ -343,7 +366,12 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h ble.NotificationHandler) 
 	} else {
 		s.iHandler = h
 	}
-	return p.ac.Write(s.cccdh, v)
+
+	err := p.ac.Write(s.cccdh, v)
+	if err != nil {
+		delete(p.subs, vh)
+	}
+	return err
 }
 
 // ClearSubscriptions clears all subscriptions to notifications and indications.

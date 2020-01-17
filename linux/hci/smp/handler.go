@@ -147,7 +147,12 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	stk, err := smpS1(k, rRand, lRand)
 	t.pairing.shortTermKey = stk
 
-	return nil, t.encrypter.Encrypt()
+	if t.pairing.request.AuthReq & 0x01 == 0x00 {
+		t.pairing.state = Finished
+	}
+
+	err = t.encrypter.Encrypt()
+	return nil, err
 }
 
 func smpOnPairingPublicKey(t *transport, in pdu) ([]byte, error) {

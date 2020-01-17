@@ -3,7 +3,6 @@ package hci
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/go-ble/ble/linux/hci/cmd"
 	"github.com/go-ble/ble/linux/hci/evt"
 	"github.com/go-ble/ble/linux/hci/socket"
+	"github.com/mgutz/logxi/v1"
 	"github.com/pkg/errors"
 )
 
@@ -62,6 +62,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		return nil, errors.Wrap(err, "can't set options")
 	}
 
+	logger.SetLevel(log.LevelDebug)
 	return h, nil
 }
 
@@ -235,7 +236,7 @@ func (h *HCI) isOpen() bool {
 }
 
 func (h *HCI) init() error {
-	log.Println("hci reset")
+	logger.Info("hci reset")
 	h.Send(&cmd.Reset{}, nil)
 
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
@@ -244,6 +245,8 @@ func (h *HCI) init() error {
 	a := ReadBDADDRRP.BDADDR
 	h.addr = net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 
+	//ES note: Per Core Spec 5.0, Part E, 7.4.5
+	//This command is _not_ to be supported by LE only controllers
 	ReadBufferSizeRP := cmd.ReadBufferSizeRP{}
 	h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP)
 

@@ -2,6 +2,7 @@ package linux
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 
@@ -79,6 +80,7 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			log.Printf("can't create ATT server: %s", err)
 			continue
 		}
+		fmt.Println("starting server loop")
 		go as.Loop()
 	}
 }
@@ -190,6 +192,13 @@ func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	// d.HCI.Dial is a blocking call, although most of time it should return immediately.
 	// But in case passing wrong device address or the device went non-connectable, it blocks.
 	cln, err := d.HCI.Dial(ctx, a)
+	if d.Server.DB() != nil {
+		//get client access to the local GATT DB
+		gattClient := cln.(*gatt.Client)
+		cln = gatt.ClientWithServer(gattClient, d.Server.DB())
+	}
+	//todo: test this more
+	//srv := d.Server
 	return cln, errors.Wrap(err, "can't dial")
 }
 

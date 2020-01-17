@@ -29,5 +29,6 @@ var (
 	PeripheralPrivacyUUID = UUID16(0x2A02)
 	ReconnectionAddrUUID  = UUID16(0x2A03)
 	PeferredParamsUUID    = UUID16(0x2A04)
+	CentralAddressResolutionUUID = UUID16(0x2AA6)
 	ServiceChangedUUID    = UUID16(0x2A05)
 )

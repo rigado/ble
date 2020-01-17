@@ -125,8 +125,8 @@ func (s *Server) Loop() {
 		len int
 	}
 	pool := make(chan *sbuf, 2)
-	pool <- &sbuf{buf: make([]byte, s.rxMTU)}
-	pool <- &sbuf{buf: make([]byte, s.rxMTU)}
+	pool <- &sbuf{buf: make([]byte, ble.MaxMTU)}
+	pool <- &sbuf{buf: make([]byte, ble.MaxMTU)}
 
 	seq := make(chan *sbuf)
 	go func() {
@@ -173,9 +173,17 @@ func (s *Server) Loop() {
 	}
 }
 
+func (s *Server) HandleRequest(req []byte) []byte {
+	return s.handleRequest(req)
+}
+
 func (s *Server) handleRequest(b []byte) []byte {
 	var resp []byte
+	if len(b) == 0 {
+		return nil
+	}
 	logger.Debug("server", "req", fmt.Sprintf("% X", b))
+
 	switch reqType := b[0]; reqType {
 	case ExchangeMTURequestCode:
 		resp = s.handleExchangeMTURequest(b)
@@ -223,7 +231,7 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 	s.conn.SetTxMTU(txMTU)
 
 	if txMTU != len(s.txBuf) {
-		// Apply the txMTU afer this response has been sent and before
+		// Apply the txMTU after this response has been sent and before
 		// any other attribute protocol PDU is sent.
 		defer func() {
 			s.txBuf = make([]byte, txMTU, txMTU)
@@ -234,6 +242,8 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 		}()
 	}
 
+	s.rxMTU = ble.MaxMTU
+	s.conn.SetRxMTU(s.rxMTU)
 	rsp := ExchangeMTUResponse(s.txBuf)
 	rsp.SetAttributeOpcode()
 	rsp.SetServerRxMTU(uint16(s.rxMTU))
