@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/go-ble/ble/linux/hci"
+	"github.com/rigado/ble/linux/hci"
 	"io/ioutil"
 	"os"
 	"sync"

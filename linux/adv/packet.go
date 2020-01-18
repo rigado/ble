@@ -3,9 +3,9 @@ package adv
 import (
 	"encoding/binary"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/parser"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/parser"
 )
 
 var keys = struct {

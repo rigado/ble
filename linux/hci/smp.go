@@ -1,7 +1,7 @@
 package hci
 
 import (
-	"github.com/go-ble/ble"
+	"github.com/rigado/ble"
 	"time"
 )
 

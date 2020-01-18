@@ -6,12 +6,12 @@ import (
 	"io"
 	"log"
 
-	smp2 "github.com/go-ble/ble/linux/hci/smp"
+	smp2 "github.com/rigado/ble/linux/hci/smp"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/att"
-	"github.com/go-ble/ble/linux/gatt"
-	"github.com/go-ble/ble/linux/hci"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/att"
+	"github.com/rigado/ble/linux/gatt"
+	"github.com/rigado/ble/linux/hci"
 	"github.com/pkg/errors"
 )
 

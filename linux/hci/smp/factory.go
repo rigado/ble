@@ -1,6 +1,6 @@
 package smp
 
-import "github.com/go-ble/ble/linux/hci"
+import "github.com/rigado/ble/linux/hci"
 
 type factory struct {
 	bm hci.BondManager

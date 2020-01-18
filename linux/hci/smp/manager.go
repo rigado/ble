@@ -3,8 +3,8 @@ package smp
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/hci"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci"
 	"time"
 )
 
