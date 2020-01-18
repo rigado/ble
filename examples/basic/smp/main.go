@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
-	bonds "github.com/go-ble/ble/linux/hci/bond"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux"
+	bonds "github.com/rigado/ble/linux/hci/bond"
 	"github.com/pkg/errors"
 )
 
@@ -48,6 +48,7 @@ func main() {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
+
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {

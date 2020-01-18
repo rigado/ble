@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/go-ble/ble/linux/hci"
+	"github.com/rigado/ble/linux/hci"
 )
 
 //func smpOnPairingRequest(c *Conn, in pdu) ([]byte, error) {

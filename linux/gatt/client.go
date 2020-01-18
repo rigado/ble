@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/att"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/att"
 )
 
 const (

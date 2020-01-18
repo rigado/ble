@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci/evt"
 )
 
 var r interface{}

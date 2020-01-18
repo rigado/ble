@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/adv"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/adv"
+	"github.com/rigado/ble/linux/hci/evt"
 )
 
 // RandomAddress is a Random Device Address.
