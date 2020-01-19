@@ -23,17 +23,6 @@ func NewClient(conn ble.Conn, done chan bool) (*Client, error) {
 		conn: conn,
 	}
 	p.ac = att.NewClient(conn, p, done)
-	//srv, err := NewServerWithName("test")
-	//if err != nil {
-	//	//todo: log error
-	//}
-
-	//p.srv = srv
-	//
-	//p.srv.Lock()
-	////todo: handle error
-	//p.as, _ = att.NewServer(p.srv.DB(), conn)
-	//p.srv.Unlock()
 
 	go p.ac.Loop()
 
