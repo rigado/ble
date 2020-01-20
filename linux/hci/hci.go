@@ -8,12 +8,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 	"github.com/rigado/ble/linux/hci/evt"
 	"github.com/rigado/ble/linux/hci/socket"
-	"github.com/mgutz/logxi/v1"
-	"github.com/pkg/errors"
 )
 
 // Command ...
@@ -62,7 +61,6 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		return nil, errors.Wrap(err, "can't set options")
 	}
 
-	logger.SetLevel(log.LevelDebug)
 	return h, nil
 }
 

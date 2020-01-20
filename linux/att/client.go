@@ -46,7 +46,6 @@ func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 		connClosed: make(chan struct{}),
 	}
 	c.chTxBuf <- make([]byte, l2c.TxMTU(), l2c.TxMTU())
-	logger.SetLevel(7)
 
 	go func() {
 		<-l2c.Disconnected()
