@@ -16,6 +16,7 @@ const (
 	IoCapsKeyboardOnly      = 0x02
 	IoCapsNone              = 0x03
 	IoCapsKeyboardDisplay   = 0x04
+	IoCapsReservedStart     = 0x05
 )
 
 type OobDataFlag byte
