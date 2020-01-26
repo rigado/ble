@@ -55,6 +55,8 @@ const CommandStatusCode = 0x0F
 // CommandStatus implements Command Status (0x0F) [Vol 2, Part E, 7.7.15].
 type CommandStatus []byte
 
+func (r CommandStatus) Valid() bool { return len(r) >= 4 }
+
 func (r CommandStatus) Status() uint8 { return r[0] }
 
 func (r CommandStatus) NumHCICommandPackets() uint8 { return r[1] }

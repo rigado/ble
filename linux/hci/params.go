@@ -3,7 +3,7 @@ package hci
 import (
 	"sync"
 
-	"github.com/go-ble/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 type params struct {
@@ -39,16 +39,16 @@ func (p *params) init() {
 		AdvertisingFilterPolicy: 0x00,
 	}
 	p.connParams = cmd.LECreateConnection{
-		LEScanInterval:        0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
-		LEScanWindow:          0x0004,    // 0x0004 - 0x4000; N * 0.625 msec
+		LEScanInterval:        0x0040,    // 0x0004 - 0x4000; N * 0.625 msec
+		LEScanWindow:          0x0040,    // 0x0004 - 0x4000; N * 0.625 msec
 		InitiatorFilterPolicy: 0x00,      // White list is not used
 		PeerAddressType:       0x00,      // Public Device Address
 		PeerAddress:           [6]byte{}, //
 		OwnAddressType:        0x00,      // Public Device Address
-		ConnIntervalMin:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
-		ConnIntervalMax:       0x0006,    // 0x0006 - 0x0C80; N * 1.25 msec
+		ConnIntervalMin:       0x006,    // 0x0006 - 0x0C80; N * 1.25 msec
+		ConnIntervalMax:       0x006,    // 0x0006 - 0x0C80; N * 1.25 msec
 		ConnLatency:           0x0000,    // 0x0000 - 0x01F3; N * 1.25 msec
-		SupervisionTimeout:    0x0048,    // 0x000A - 0x0C80; N * 10 msec
+		SupervisionTimeout:    0x0400,    // 0x000A - 0x0C80; N * 10 msec
 		MinimumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 		MaximumCELength:       0x0000,    // 0x0000 - 0xFFFF; N * 0.625 msec
 	}

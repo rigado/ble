@@ -4,8 +4,8 @@ import (
 	"log"
 	"sync"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/att"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/att"
 )
 
 // NewServerWithName creates a new Server with the specified name
@@ -81,6 +81,7 @@ func defaultServicesWithHandler(name string, handler ble.NotifyHandler) []*ble.S
 	gapSvc.NewCharacteristic(ble.PeripheralPrivacyUUID).SetValue([]byte{0x00})
 	gapSvc.NewCharacteristic(ble.ReconnectionAddrUUID).SetValue([]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	gapSvc.NewCharacteristic(ble.PeferredParamsUUID).SetValue([]byte{0x06, 0x00, 0x06, 0x00, 0x00, 0x00, 0xd0, 0x07})
+	gapSvc.NewCharacteristic(ble.CentralAddressResolutionUUID).SetValue([]byte{0x00})
 
 	gattSvc := ble.NewService(ble.GATTUUID)
 	var indicationHandler ble.NotifyHandlerFunc

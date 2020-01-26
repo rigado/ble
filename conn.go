@@ -3,6 +3,7 @@ package ble
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // Conn implements a L2CAP connection.
@@ -35,4 +36,8 @@ type Conn interface {
 
 	// Disconnected returns a receiving channel, which is closed when the connection disconnects.
 	Disconnected() <-chan struct{}
+
+	Pair(AuthData, time.Duration) error
+
+	StartEncryption() error
 }

@@ -6,14 +6,17 @@ import (
 	"net"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/adv"
-	"github.com/go-ble/ble/linux/gatt"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/adv"
+	"github.com/rigado/ble/linux/gatt"
 	"github.com/pkg/errors"
 )
 
 // Addr ...
-func (h *HCI) Addr() ble.Addr { return h.addr }
+func (h *HCI) Addr() ble.Addr { return ble.NewAddr(h.addr.String()) }
+func (h *HCI) Bytes() []byte {
+	return ble.NewAddr(h.addr.String()).Bytes()
+}
 
 // SetAdvHandler ...
 func (h *HCI) SetAdvHandler(ah ble.AdvHandler) error {
@@ -188,7 +191,7 @@ func (h *HCI) Accept() (ble.Conn, error) {
 	case c := <-h.chSlaveConn:
 		return c, nil
 	case <-tmo:
-		return nil, fmt.Errorf("listner timed out")
+		return nil, fmt.Errorf("listener timed out")
 	}
 }
 
@@ -201,7 +204,10 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	h.params.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
 	if _, ok := a.(RandomAddress); ok {
 		h.params.connParams.PeerAddressType = 1
+	} else if (b[0] & byte(0xc0)) == byte(0xc0) {
+		h.params.connParams.PeerAddressType = 1
 	}
+
 	if err = h.Send(&h.params.connParams, nil); err != nil {
 		return nil, err
 	}
@@ -217,9 +223,11 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 		return h.cancelDial()
 	case <-h.done:
 		return nil, h.err
-	case c := <-h.chMasterConn:
-		return gatt.NewClient(c)
-
+	case c, ok := <-h.chMasterConn:
+		if !ok {
+			return nil, fmt.Errorf("chMasterConn closed")
+		}
+		return gatt.NewClient(c, h.done)
 	}
 }
 
@@ -233,7 +241,12 @@ func (h *HCI) cancelDial() (ble.Client, error) {
 	// The connection has been established, the cancel command
 	// failed with ErrDisallowed.
 	if err == ErrDisallowed {
-		return gatt.NewClient(<-h.chMasterConn)
+		select {
+		case c := <-h.chMasterConn:
+			return gatt.NewClient(c, h.done)
+		default:
+			return nil, errors.Wrap(err, "cancel connection failed")
+		}
 	}
 	return nil, errors.Wrap(err, "cancel connection failed")
 }

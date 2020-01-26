@@ -3,7 +3,7 @@ package ble
 import (
 	"time"
 
-	"github.com/go-ble/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 // DeviceOption is an interface which the device should implement to allow using configuration options
@@ -16,6 +16,9 @@ type DeviceOption interface {
 	SetAdvParams(cmd.LESetAdvertisingParameters) error
 	SetPeripheralRole() error
 	SetCentralRole() error
+	SetAdvHandlerSync(bool) error
+	SetErrorHandler(handler func(error)) error
+	EnableSecurity(interface{}) error
 }
 
 // An Option is a configuration function, which configures the device.
@@ -81,6 +84,30 @@ func OptPeripheralRole() Option {
 func OptCentralRole() Option {
 	return func(opt DeviceOption) error {
 		opt.SetCentralRole()
+		return nil
+	}
+}
+
+// OptAdvHandlerSync sets sync adv handling
+func OptAdvHandlerSync(sync bool) Option {
+	return func(opt DeviceOption) error {
+		opt.SetAdvHandlerSync(sync)
+		return nil
+	}
+}
+
+// OptErrorHandler sets error handler
+func OptErrorHandler(handler func(error)) Option {
+	return func(opt DeviceOption) error {
+		opt.SetErrorHandler(handler)
+		return nil
+	}
+}
+
+// OptEnableSecurity enables bonding with devices
+func OptEnableSecurity(bondManager interface{}) Option {
+	return func(opt DeviceOption) error {
+		opt.EnableSecurity(bondManager)
 		return nil
 	}
 }

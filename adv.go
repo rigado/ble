@@ -16,9 +16,36 @@ type Advertisement interface {
 	TxPowerLevel() int
 	Connectable() bool
 	SolicitedService() []UUID
-
 	RSSI() int
 	Addr() Addr
+
+	ToMap() (map[string]interface{}, error)
+}
+
+var AdvertisementMapKeys = struct {
+	MAC         string
+	RSSI        string
+	Name        string
+	MFG         string
+	Services    string
+	ServiceData string
+	Connectable string
+	Solicited   string
+	EventType   string
+	Flags       string
+	TxPower     string
+}{
+	MAC:         "mac",
+	RSSI:        "rssi",
+	Name:        "name",
+	MFG:         "mfg",
+	Services:    "services",
+	ServiceData: "serviceData",
+	Connectable: "connectable",
+	Solicited:   "solicited",
+	EventType:   "eventType",
+	Flags:       "flags",
+	TxPower:     "txPower",
 }
 
 // ServiceData ...

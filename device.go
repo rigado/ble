@@ -37,7 +37,7 @@ type Device interface {
 	// AdvertiseIBeacon advertises iBeacon with specified parameters.
 	AdvertiseIBeacon(ctx context.Context, u UUID, major, minor uint16, pwr int8) error
 
-	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
+	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false, async handling
 	Scan(ctx context.Context, allowDup bool, h AdvHandler) error
 
 	// Dial ...

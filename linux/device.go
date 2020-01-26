@@ -2,13 +2,16 @@ package linux
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/att"
-	"github.com/go-ble/ble/linux/gatt"
-	"github.com/go-ble/ble/linux/hci"
+	smp2 "github.com/rigado/ble/linux/hci/smp"
+
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/att"
+	"github.com/rigado/ble/linux/gatt"
+	"github.com/rigado/ble/linux/hci"
 	"github.com/pkg/errors"
 )
 
@@ -23,7 +26,7 @@ func NewDeviceWithName(name string, opts ...ble.Option) (*Device, error) {
 }
 
 func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ...ble.Option) (*Device, error) {
-	dev, err := hci.NewHCI(opts...)
+	dev, err := hci.NewHCI(smp2.NewSmpFactory(nil), opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create hci")
 	}
@@ -38,7 +41,6 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 		return nil, errors.Wrap(err, "can't create server")
 	}
 
-	// mtu := ble.DefaultMTU
 	mtu := ble.MaxMTU // TODO: get this from user using Option.
 	if mtu > ble.MaxMTU {
 		dev.Close()
@@ -62,6 +64,11 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			return
 		}
 
+		if l2c == nil {
+			log.Printf("l2c nil")
+			return
+		}
+
 		// Initialize the per-connection cccd values.
 		l2c.SetContext(context.WithValue(l2c.Context(), ble.ContextKeyCCC, make(map[uint16]uint16)))
 		l2c.SetRxMTU(mtu)
@@ -72,8 +79,8 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		if err != nil {
 			log.Printf("can't create ATT server: %s", err)
 			continue
-
 		}
+		fmt.Println("starting server loop")
 		go as.Loop()
 	}
 }
@@ -167,11 +174,11 @@ func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor 
 	return ctx.Err()
 }
 
-// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false.
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
 	if err := d.HCI.SetAdvHandler(h); err != nil {
 		return err
 	}
+
 	if err := d.HCI.Scan(allowDup); err != nil {
 		return err
 	}
@@ -185,6 +192,13 @@ func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	// d.HCI.Dial is a blocking call, although most of time it should return immediately.
 	// But in case passing wrong device address or the device went non-connectable, it blocks.
 	cln, err := d.HCI.Dial(ctx, a)
+	if d.Server.DB() != nil {
+		//get client access to the local GATT DB
+		gattClient := cln.(*gatt.Client)
+		cln = gatt.ClientWithServer(gattClient, d.Server.DB())
+	}
+	//todo: test this more
+	//srv := d.Server
 	return cln, errors.Wrap(err, "can't dial")
 }
 

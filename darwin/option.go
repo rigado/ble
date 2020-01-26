@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-ble/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 // SetPeripheralRole configures the device to perform Peripheral tasks.
@@ -46,5 +46,15 @@ func (d *Device) SetScanParams(param cmd.LESetScanParameters) error {
 
 // SetAdvParams overrides default advertising parameters.
 func (d *Device) SetAdvParams(param cmd.LESetAdvertisingParameters) error {
+	return errors.New("Not supported")
+}
+
+// SetAdvHandlerSync overrides default advertising handler behavior (async)
+func (d *Device) SetAdvHandlerSync(sync bool) error {
+	d.advHandlerSync = sync
+	return nil
+}
+
+func (d *Device) EnableSecurity(bondManager interface{}) error {
 	return errors.New("Not supported")
 }

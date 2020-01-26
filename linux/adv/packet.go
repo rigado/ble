@@ -3,13 +3,34 @@ package adv
 import (
 	"encoding/binary"
 
-	"github.com/go-ble/ble"
+	"github.com/pkg/errors"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/parser"
 )
+
+var keys = struct {
+	flags       string
+	services    string
+	solicited   string
+	serviceData string
+	localName   string
+	txpwr       string
+	mfgdata     string
+}{
+	flags:       ble.AdvertisementMapKeys.Flags,
+	services:    ble.AdvertisementMapKeys.Services,
+	solicited:   ble.AdvertisementMapKeys.Solicited,
+	serviceData: ble.AdvertisementMapKeys.ServiceData,
+	localName:   ble.AdvertisementMapKeys.Name,
+	txpwr:       ble.AdvertisementMapKeys.TxPower,
+	mfgdata:     ble.AdvertisementMapKeys.MFG,
+}
 
 // Packet is an implemntation of ble.AdvPacket for crafting or parsing an advertising packet or scan response.
 // Refer to Supplement to Bluetooth Core Specification | CSSv6, Part A.
 type Packet struct {
 	b []byte
+	m map[string]interface{}
 }
 
 // Bytes returns the bytes of the packet.
@@ -20,6 +41,10 @@ func (p *Packet) Bytes() []byte {
 // Len returns the length of the packet.
 func (p *Packet) Len() int {
 	return len(p.b)
+}
+
+func (p *Packet) Map() map[string]interface{} {
+	return p.m
 }
 
 // NewPacket returns a new advertising Packet.
@@ -34,12 +59,21 @@ func NewPacket(fields ...Field) (*Packet, error) {
 }
 
 // NewRawPacket returns a new advertising Packet.
-func NewRawPacket(bytes ...[]byte) *Packet {
-	p := &Packet{b: make([]byte, 0, MaxEIRPacketLength)}
-	for _, b := range bytes {
-		p.b = append(p.b, b...)
+func NewRawPacket(bytes ...[]byte) (*Packet, error) {
+	//concatenate
+	b := make([]byte, 0, MaxEIRPacketLength)
+	for _, bb := range bytes {
+		b = append(b, bb...)
 	}
-	return p
+
+	//decode the bytes
+	m, err := parser.Parse(b)
+	if err != nil {
+		return nil, errors.Wrap(err, "pdu decode")
+	}
+
+	p := &Packet{b: b, m: m}
+	return p, nil
 }
 
 // Field is an advertising field which can be appended to a packet.
@@ -165,154 +199,77 @@ func ServiceData16(id uint16, b []byte) Field {
 	}
 }
 
-// Field returns the field data (excluding the initial length and typ byte).
-// It returns nil, if the specified field is not found.
-func (p *Packet) Field(typ byte) []byte {
-	b := p.b
-	for len(b) > 0 {
-		if len(b) < 2 {
-			return nil
-		}
-		l, t := b[0], b[1]
-		if int(l) < 1 || len(b) < int(1+l) {
-			return nil
-		}
-		if t == typ {
-			return b[2 : 2+l-1]
-		}
-		b = b[1+l:]
-	}
-	return nil
-}
-
-func (p *Packet) getUUIDsByType(typ byte, u []ble.UUID, w int) []ble.UUID {
-	pos := 0
-	var b []byte
-	for pos < len(p.b) {
-		if b, pos = p.fieldPos(typ, pos); b != nil {
-			u = uuidList(u, b, w)
-		}
-	}
-	return u
-}
-
-func (p *Packet) fieldPos(typ byte, offset int) ([]byte, int) {
-	if offset >= len(p.b) {
-		return nil, len(p.b)
-	}
-
-	b := p.b[offset:]
-	pos := offset
-
-	if len(b) < 2 {
-		return nil, pos + len(b)
-	}
-
-	for len(b) > 0 {
-		l, t := b[0], b[1]
-		if int(l) < 1 || len(b) < int(1+l) {
-			return nil, pos
-		}
-		if t == typ {
-			r := b[2 : 2+l-1]
-			return r, pos + 1 + int(l)
-		}
-		b = b[1+l:]
-		pos += 1 + int(l)
-		if len(b) < 2 {
-			break
-		}
-	}
-	return nil, pos
-}
-
 // Flags returns the flags of the packet.
 func (p *Packet) Flags() (flags byte, present bool) {
-	b := p.Field(flags)
-	if len(b) < 2 {
-		return 0, false
+	if b, ok := p.m[keys.flags].([]byte); ok {
+		return b[0], true
 	}
-	return b[2], true
+	return 0, false
 }
 
 // LocalName returns the ShortName or CompleteName if it presents.
 func (p *Packet) LocalName() string {
-	if b := p.Field(shortName); b != nil {
+	if b, ok := p.m[keys.localName].([]byte); ok {
 		return string(b)
 	}
-	return string(p.Field(completeName))
+	return ""
 }
 
 // TxPower returns the TxPower, if it presents.
 func (p *Packet) TxPower() (power int, present bool) {
-	b := p.Field(txPower)
-	if len(b) < 3 {
-		return 0, false
+	if b, ok := p.m[keys.txpwr].([]byte); ok {
+		txpwr := int(int8(b[0]))
+		return txpwr, true
 	}
-	return int(int8(b[2])), true
+	return 0, false
 }
 
 // UUIDs returns a list of service UUIDs.
 func (p *Packet) UUIDs() []ble.UUID {
-	var u []ble.UUID
-	u = p.getUUIDsByType(someUUID16, u, 2)
-	u = p.getUUIDsByType(allUUID16, u, 2)
-	u = p.getUUIDsByType(someUUID32, u, 4)
-	u = p.getUUIDsByType(allUUID32, u, 4)
-	u = p.getUUIDsByType(someUUID128, u, 16)
-	u = p.getUUIDsByType(allUUID128, u, 16)
-	return u
+	v, _ := p.m[keys.services].([]ble.UUID)
+	return v
 }
 
 // ServiceSol ...
 func (p *Packet) ServiceSol() []ble.UUID {
-	var u []ble.UUID
-	if b := p.Field(serviceSol16); b != nil {
-		u = uuidList(u, b, 2)
-	}
-	if b := p.Field(serviceSol32); b != nil {
-		u = uuidList(u, b, 16)
-	}
-	if b := p.Field(serviceSol128); b != nil {
-		u = uuidList(u, b, 16)
-	}
-	return u
+	v, _ := p.m[keys.solicited].([]ble.UUID)
+	return v
 }
 
 // ServiceData ...
 func (p *Packet) ServiceData() []ble.ServiceData {
-	var s []ble.ServiceData
-	if b := p.Field(serviceData16); b != nil {
-		s = serviceDataList(s, b, 2)
+	m, ok := p.m[keys.serviceData].(map[string]interface{})
+	if !ok {
+		return nil
 	}
-	if b := p.Field(serviceData32); b != nil {
-		s = serviceDataList(s, b, 4)
+
+	// map -> array
+	out := []ble.ServiceData{}
+	for su, val := range m {
+
+		arr, ok := val.([]interface{})
+		if !ok {
+			continue
+		}
+
+		for _, v := range arr {
+			sd, ok := v.([]byte)
+			if !ok {
+				continue
+			}
+			u, err := ble.Parse(su)
+			if err != nil {
+				continue
+			}
+			out = append(out, ble.ServiceData{UUID: u, Data: sd})
+		}
 	}
-	if b := p.Field(serviceData128); b != nil {
-		s = serviceDataList(s, b, 16)
-	}
-	return s
+
+	return out
 }
 
 // ManufacturerData returns the ManufacturerData field if it presents.
 func (p *Packet) ManufacturerData() []byte {
-	return p.Field(manufacturerData)
-}
-
-// Utility function for creating a list of uuids.
-func uuidList(u []ble.UUID, d []byte, w int) []ble.UUID {
-	for len(d) > 0 {
-		u = append(u, ble.UUID(d[:w]))
-		d = d[w:]
-	}
-	return u
-}
-
-func serviceDataList(sd []ble.ServiceData, d []byte, w int) []ble.ServiceData {
-	serviceData := ble.ServiceData{
-		UUID: ble.UUID(d[:w]),
-		Data: make([]byte, len(d)-w),
-	}
-	copy(serviceData.Data, d[2:])
-	return append(sd, serviceData)
+	v, _ := p.m[keys.mfgdata].([]byte)
+	return v
 }

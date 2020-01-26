@@ -1,5 +1,7 @@
 package ble
 
+import "time"
+
 // A Client is a GATT client.
 type Client interface {
 	// Addr returns platform specific unique ID of the remote peripheral, e.g. MAC on Linux, Client UUID on OS X.
@@ -69,4 +71,8 @@ type Client interface {
 
 	// Conn returns the client's current connection.
 	Conn() Conn
+
+	Pair(AuthData, time.Duration) error
+
+	StartEncryption() error
 }

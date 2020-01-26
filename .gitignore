@@ -1,7 +1,9 @@
 .*.swp
 .tags
 .tags1
+.DS_Store
 
+.idea/
 /examples/bin/*
 vendor
 .idea

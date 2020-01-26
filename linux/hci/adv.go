@@ -1,11 +1,14 @@
 package hci
 
 import (
-	"net"
+	"encoding/hex"
+	"strings"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/adv"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/pkg/errors"
+
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/adv"
+	"github.com/rigado/ble/linux/hci/evt"
 )
 
 // RandomAddress is a Random Device Address.
@@ -22,8 +25,24 @@ const (
 	evtTypScanRsp       = 0x04 // Scan Response (SCAN_RSP).
 )
 
-func newAdvertisement(e evt.LEAdvertisingReport, i int) *Advertisement {
-	return &Advertisement{e: e, i: i}
+func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) {
+	ad, err := e.DataWErr(i)
+	if err != nil {
+		return nil, err
+	}
+	p, err := adv.NewRawPacket(ad)
+	if err != nil {
+		//reverse for printing
+		a := e.Address(i)
+		for i := len(a)/2 - 1; i >= 0; i-- {
+			opp := len(a) - 1 - i
+			a[i], a[opp] = a[opp], a[i]
+		}
+		return nil, errors.Wrap(err, hex.EncodeToString(a[:]))
+	}
+
+	a := &Advertisement{e: e, i: i, p: p}
+	return a, nil
 }
 
 // Advertisement implements ble.Advertisement and other functions that are only
@@ -37,99 +56,173 @@ type Advertisement struct {
 	p *adv.Packet
 }
 
-// setScanResponse ssociate sca response to the existing advertisement.
-func (a *Advertisement) setScanResponse(sr *Advertisement) {
-	a.sr = sr
-	a.p = nil // clear the cached.
-}
+// setScanResponse associate scan response to the existing advertisement.
+func (a *Advertisement) setScanResponse(sr *Advertisement) error {
 
-// packets returns the combined advertising packet and scan response (if presents)
-func (a *Advertisement) packets() *adv.Packet {
-	if a.p != nil {
-		return a.p
+	ad, err := a.e.DataWErr(a.i)
+	if err != nil {
+		return err
 	}
-	return adv.NewRawPacket(a.Data(), a.ScanResponse())
+
+	srd, err := sr.e.DataWErr(sr.i)
+	if err != nil {
+		return err
+	}
+
+	//does this parse ok?
+	p, err := adv.NewRawPacket(ad, srd)
+	if err != nil {
+		return errors.Wrap(err, "setScanResp")
+	}
+
+	a.sr = sr
+	a.p = p
+
+	return nil
 }
 
 // LocalName returns the LocalName of the remote peripheral.
 func (a *Advertisement) LocalName() string {
-	return a.packets().LocalName()
+	v, _ := a.localNameWErr()
+	return v
 }
 
 // ManufacturerData returns the ManufacturerData of the advertisement.
 func (a *Advertisement) ManufacturerData() []byte {
-	return a.packets().ManufacturerData()
+	v, _ := a.manufacturerDataWErr()
+	return v
 }
 
 // ServiceData returns the service data of the advertisement.
 func (a *Advertisement) ServiceData() []ble.ServiceData {
-	return a.packets().ServiceData()
+	v, _ := a.serviceDataWErr()
+	return v
 }
 
 // Services returns the service UUIDs of the advertisement.
 func (a *Advertisement) Services() []ble.UUID {
-	return a.packets().UUIDs()
+	v, _ := a.servicesWErr()
+	return v
 }
 
 // OverflowService returns the UUIDs of overflowed service.
 func (a *Advertisement) OverflowService() []ble.UUID {
-	return a.packets().UUIDs()
+	v, _ := a.overflowServiceWErr()
+	return v
 }
 
 // TxPowerLevel returns the tx power level of the remote peripheral.
 func (a *Advertisement) TxPowerLevel() int {
-	pwr, _ := a.packets().TxPower()
-	return pwr
+	v, _ := a.txPowerLevelWErr()
+	return v
 }
 
 // SolicitedService returns UUIDs of solicited services.
 func (a *Advertisement) SolicitedService() []ble.UUID {
-	return a.packets().ServiceSol()
+	v, _ := a.solicitedServiceWErr()
+	return v
 }
 
 // Connectable indicates weather the remote peripheral is connectable.
 func (a *Advertisement) Connectable() bool {
-	return a.EventType() == evtTypAdvDirectInd || a.EventType() == evtTypAdvInd
+	v, _ := a.connectableWErr()
+	return v
 }
 
 // RSSI returns RSSI signal strength.
 func (a *Advertisement) RSSI() int {
-	return int(a.e.RSSI(a.i))
+	v, _ := a.rssiWErr()
+	return v
 }
 
 // Addr returns the address of the remote peripheral.
 func (a *Advertisement) Addr() ble.Addr {
-	b := a.e.Address(a.i)
-	addr := net.HardwareAddr([]byte{b[5], b[4], b[3], b[2], b[1], b[0]})
-	if a.e.AddressType(a.i) == 1 {
-		return RandomAddress{addr}
-	}
-	return addr
+	v, _ := a.addrWErr()
+	return v
 }
 
 // EventType returns the event type of Advertisement.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) EventType() uint8 {
-	return a.e.EventType(a.i)
+	v, _ := a.eventTypeWErr()
+	return v
 }
 
 // AddressType returns the address type of the Advertisement.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) AddressType() uint8 {
-	return a.e.AddressType(a.i)
+	v, _ := a.addressTypeWErr()
+	return v
 }
 
 // Data returns the advertising data of the packet.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) Data() []byte {
-	return a.e.Data(a.i)
+	v, _ := a.dataWErr()
+	return v
 }
 
 // ScanResponse returns the scan response of the packet, if it presents.
-// This is linux sepcific.
+// This is linux specific.
 func (a *Advertisement) ScanResponse() []byte {
-	if a.sr == nil {
-		return nil
+	v, _ := a.scanResponseWErr()
+	return v
+}
+
+func (a *Advertisement) ToMap() (map[string]interface{}, error) {
+	m := make(map[string]interface{})
+	keys := ble.AdvertisementMapKeys
+
+	addr, err := a.addrWErr()
+	if err != nil {
+		return nil, errors.Wrap(err, keys.MAC)
 	}
-	return a.sr.Data()
+	m[keys.MAC] = strings.Replace(addr.String(), ":", "", -1)
+
+	et, err := a.eventTypeWErr()
+	if err != nil {
+		return nil, errors.Wrap(err, keys.EventType)
+	}
+	m[keys.EventType] = et
+
+	c, err := a.connectableWErr()
+	if err != nil {
+		return nil, errors.Wrap(err, keys.Connectable)
+	}
+	m[keys.Connectable] = c
+
+	r, err := a.rssiWErr()
+	if err != nil {
+		return nil, errors.Wrap(err, keys.RSSI)
+	}
+	if r != 0 {
+		m[keys.RSSI] = r
+	} else {
+		m[keys.RSSI] = -128
+	}
+
+	//join the adv data maps
+	if a.p != nil {
+		for k, v := range a.p.Map() {
+			//some special processing requirements for certain keys
+			//todo: this should be handled better in the parser
+			if k == keys.Name {
+				if bytes, ok := v.([]byte); ok {
+					m[k] = string(bytes)
+				} else {
+					m[k] = v
+				}
+			} else if k == keys.TxPower {
+				if bytes, ok := v.([]byte); ok {
+					m[k] = int(bytes[0])
+				} else {
+					m[k] = v
+				}
+			} else {
+				m[k] = v
+			}
+		}
+	}
+
+	return m, nil
 }
