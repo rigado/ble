@@ -3,7 +3,7 @@ package parser
 import (
 	"fmt"
 
-	"github.com/go-ble/ble"
+	"github.com/rigado/ble"
 	"github.com/pkg/errors"
 )
 

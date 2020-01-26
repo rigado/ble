@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-ble/ble"
+	"github.com/rigado/ble"
 )
 
 func (a *Advertisement) localNameWErr() (string, error) {

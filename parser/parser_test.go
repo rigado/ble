@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-ble/ble"
+	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/adv"
 )
 

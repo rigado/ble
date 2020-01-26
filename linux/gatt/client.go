@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/att"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/att"
 )
 
 const (
-	cccNotify   = 0x0001
-	cccIndicate = 0x0002
+	cccNotify   = uint16(0x0001)
+	cccIndicate = uint16(0x0002)
 )
 
 // NewClient returns a GATT Client.
@@ -22,8 +23,26 @@ func NewClient(conn ble.Conn, done chan bool) (*Client, error) {
 		conn: conn,
 	}
 	p.ac = att.NewClient(conn, p, done)
+	//srv, err := NewServerWithName("test")
+	//if err != nil {
+	//	//todo: log error
+	//}
+
+	//p.srv = srv
+	//
+	//p.srv.Lock()
+	////todo: handle error
+	//p.as, _ = att.NewServer(p.srv.DB(), conn)
+	//p.srv.Unlock()
+
 	go p.ac.Loop()
+
 	return p, nil
+}
+
+func ClientWithServer(c *Client, db *att.DB) *Client {
+	c.ac = c.ac.WithServer(db)
+	return c
 }
 
 // A Client is a GATT Client.
@@ -35,6 +54,7 @@ type Client struct {
 	subs    map[uint16]*sub
 
 	ac   *att.Client
+
 	conn ble.Conn
 }
 
@@ -114,6 +134,10 @@ func (p *Client) DiscoverServices(filter []ble.UUID) ([]*ble.Service, error) {
 				p.profile.Services = append(p.profile.Services, s)
 			}
 			if endh == 0xFFFF {
+				return p.profile.Services, nil
+			}
+
+			if len(p.profile.Services) == len(filter) {
 				return p.profile.Services, nil
 			}
 			start = endh + 1
@@ -296,10 +320,12 @@ func (p *Client) Subscribe(c *ble.Characteristic, ind bool, h ble.NotificationHa
 	if c.CCCD == nil {
 		return fmt.Errorf("CCCD not found")
 	}
+	flag := cccNotify
 	if ind {
-		return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccIndicate, h)
+		flag = cccIndicate
 	}
-	return p.setHandlers(c.CCCD.Handle, c.ValueHandle, cccNotify, h)
+
+	return p.setHandlers(c.CCCD.Handle, c.ValueHandle, flag, h)
 }
 
 // Unsubscribe unsubscribes to indication (if ind is set true), or notification
@@ -340,7 +366,12 @@ func (p *Client) setHandlers(cccdh, vh, flag uint16, h ble.NotificationHandler) 
 	} else {
 		s.iHandler = h
 	}
-	return p.ac.Write(s.cccdh, v)
+
+	err := p.ac.Write(s.cccdh, v)
+	if err != nil {
+		delete(p.subs, vh)
+	}
+	return err
 }
 
 // ClearSubscriptions clears all subscriptions to notifications and indications.
@@ -396,8 +427,8 @@ func (p *Client) HandleNotification(req []byte) {
 	}
 }
 
-func (p *Client) Bond() error {
-	return p.conn.Bond()
+func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
+	return p.conn.Pair(authData, to)
 }
 
 func (p *Client) StartEncryption() error {

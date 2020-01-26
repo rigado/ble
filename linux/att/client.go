@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-ble/ble"
+	"github.com/rigado/ble"
 	"github.com/pkg/errors"
 )
 
@@ -18,12 +18,18 @@ type NotificationHandler interface {
 type Client struct {
 	l2c  ble.Conn
 	rspc chan []byte
+	inc  chan []byte
 
-	rxBuf   []byte
-	chTxBuf chan []byte
-	chErr   chan error
-	handler NotificationHandler
-	done    chan bool
+	rxBuf      []byte
+	chTxBuf    chan []byte
+	chErr      chan error
+	handler    NotificationHandler
+	done       chan bool
+	connClosed chan struct{}
+
+	reqHandler map[int]func ([]byte) error
+
+	server *Server
 }
 
 // NewClient returns an Attribute Protocol Client.
@@ -31,13 +37,31 @@ func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 	c := &Client{
 		l2c:     l2c,
 		rspc:    make(chan []byte),
+		inc:     make(chan []byte, 10),
 		chTxBuf: make(chan []byte, 1),
 		rxBuf:   make([]byte, ble.MaxMTU),
 		chErr:   make(chan error, 1),
 		handler: h,
 		done:    done,
+		connClosed: make(chan struct{}),
 	}
 	c.chTxBuf <- make([]byte, l2c.TxMTU(), l2c.TxMTU())
+
+	go func() {
+		<-l2c.Disconnected()
+		close(c.connClosed)
+	}()
+
+	return c
+}
+
+func (c *Client) WithServer(db *DB) *Client {
+	var err error
+	c.server, err = NewServer(db, c.l2c)
+	if err != nil {
+		logger.Info("failed to create server for client")
+	}
+
 	return c
 }
 
@@ -458,13 +482,13 @@ func (c *Client) ExecuteWrite(flags uint8) error {
 	req.SetAttributeOpcode()
 	req.SetFlags(flags)
 
-	b, err := c.sendReq(req)
+	rspBytes, err := c.sendReq(req)
 	if err != nil {
 		return err
 	}
 
 	// Convert and validate the response.
-	rsp := ExecuteWriteResponse(b)
+	rsp := ExecuteWriteResponse(rspBytes)
 	switch {
 	case rsp[0] == ErrorResponseCode && len(rsp) == 5:
 		return ble.ATTError(rsp[4])
@@ -504,8 +528,52 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			}
 		case err := <-c.chErr:
 			return nil, errors.Wrap(err, "ATT request failed")
-		case <-time.After(30 * time.Second):
+		case <-time.After(2 * time.Second):
 			return nil, errors.Wrap(ErrSeqProtoTimeout, "ATT request timeout")
+		}
+	}
+}
+
+func (c *Client) sendResp(rsp []byte) error {
+	// Acquire and reuse the txBuf, and release it after usage.
+	txBuf := <-c.chTxBuf
+	defer func() { c.chTxBuf <- txBuf }()
+	if c.l2c == nil {
+		return fmt.Errorf("ble conn was nil")
+	}
+	if _, err := c.l2c.Write(rsp); err != nil {
+		return errors.Wrap(err, "send ATT request failed")
+	}
+
+	return nil
+}
+
+func (c *Client) asyncReqLoop() {
+	for {
+		// keep trying?
+		select {
+		case <-c.done:
+			fmt.Println("exited client async loop: done")
+			return
+		case <-c.connClosed:
+			logger.Debug("exited client async loop: conn closed")
+			return
+		default:
+			if c.l2c == nil {
+				fmt.Println("exited client async loop: l2c nil")
+				return
+			}
+			//ok
+		}
+
+		in := <- c.inc
+		rsp := c.server.HandleRequest(in)
+		if rsp == nil {
+			continue
+		}
+		err := c.sendResp(rsp)
+		if err != nil {
+			logger.Info("client", "failed to send async att response for", fmt.Sprintf("%x", in[0]))
 		}
 	}
 }
@@ -526,6 +594,14 @@ func (c *Client) Loop() {
 		}
 	}()
 
+	//start up async response handling
+	if c.server != nil {
+		go c.asyncReqLoop()
+		defer func() {
+			close(c.inc)
+		}()
+	}
+
 	confirmation := []byte{HandleValueConfirmationCode}
 	for {
 		// keep trying?
@@ -533,7 +609,9 @@ func (c *Client) Loop() {
 		case <-c.done:
 			fmt.Println("exited client loop: done")
 			return
-
+		case <-c.connClosed:
+			logger.Debug("exited client async loop: conn closed")
+			return
 		default:
 			if c.l2c == nil {
 				fmt.Println("exited client loop: l2c nil")
@@ -543,8 +621,8 @@ func (c *Client) Loop() {
 		}
 
 		n, err := c.l2c.Read(c.rxBuf)
-		logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
 		if err != nil {
+			logger.Info("client", "read error", err.Error())
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
 			c.chErr <- err
@@ -554,23 +632,46 @@ func (c *Client) Loop() {
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
 
-		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
+		//all incoming requests are even numbered
+		//which means the last bit should be 0
+		if b[0] & 0x01 == 0x00 {
 			select {
 			case <-c.done:
-				fmt.Println("exited client loop: closed after notif rx")
+				fmt.Println("exited client loop: closed after async req rx")
+				return
+			case <-c.connClosed:
+				logger.Debug("exited client async loop: conn closed")
+				return
+			case c.inc <- b:
+				continue
+			default:
+				logger.Info("client", "failed to enqueue request for", fmt.Sprintf("%x", b[0]))
+				continue
+			}
+		}
+
+		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
+			logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
+			select {
+			case <-c.done:
+				fmt.Println("exited client loop: closed after rsp rx")
+				return
+			case <-c.connClosed:
+				logger.Debug("exited client async loop: conn closed")
 				return
 			case c.rspc <- b:
 				continue
-				// default:
-				// 	fmt.Println("exited client loop: response channel error")
-				// 	return
 			}
 		}
 
 		// Deliver the full request to upper layer.
+		logger.Debug("client", "notfi", fmt.Sprintf("% X", b))
 		select {
 		case <-c.done:
 			fmt.Println("exited client loop: closed after rx")
+			return
+		case <-c.connClosed:
+			logger.Debug("exited client async loop: conn closed")
 			return
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
 			// ok

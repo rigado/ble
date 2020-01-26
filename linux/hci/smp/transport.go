@@ -6,8 +6,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/go-ble/ble/linux/hci"
+	"github.com/rigado/ble/linux/hci"
 	"log"
+	"time"
 )
 
 func buildPairingReq(p hci.SmpConfig) []byte {
@@ -26,14 +27,27 @@ type transport struct {
 	encrypter   hci.Encrypter
 
 	nopFunc func() error //workaround stuff
+
+	result chan error
 }
 
 func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error) *transport {
-	return &transport{ctx, writePDU, bm, e, nopFunc}
+	return &transport{ctx, writePDU, bm, e, nopFunc, make(chan error)}
 }
 
 func (t *transport) SetContext(ctx *pairingContext) {
 	t.pairing = ctx
+}
+
+func (t *transport) StartPairing(to time.Duration) error {
+	t.pairing.state = WaitPairingResponse
+	err := t.sendPairingRequest()
+	if err != nil {
+		t.pairing.state = Error
+		return err
+	}
+
+	return nil
 }
 
 func (t *transport) saveBondInfo() error {
@@ -77,16 +91,13 @@ func (t *transport) sendPublicKey() error {
 	kp := t.pairing.scECDHKeys
 
 	k := MarshalPublicKeyXY(kp.public)
+
+	t.pairing.state = WaitPublicKey
 	out := append([]byte{pairingPublicKey}, k...)
 	err := t.send(out)
 
 	if err != nil {
 		return err
-	}
-
-	//workaround stuff
-	if t.nopFunc != nil {
-		t.nopFunc()
 	}
 
 	return nil
@@ -106,6 +117,7 @@ func (t *transport) sendPairingRandom() error {
 		t.pairing.localRandom = r
 	}
 
+	t.pairing.state = WaitRandom
 	out := append([]byte{pairingRandom}, t.pairing.localRandom...)
 
 	return t.send(out)
@@ -119,7 +131,7 @@ func (t *transport) sendDHKeyCheck() error {
 	log.Printf("send dhkey check")
 	p := t.pairing
 
-	//Ea = f6 (MacKey, Na, Nb, 0, IOcapA, A, B)
+	//Ea = f6 (MacKey, Na, Nb, rb, IOcapA, A, B)
 	la := append(p.localAddr, p.localAddrType)
 	ra := append(p.remoteAddr, p.remoteAddrType)
 	na := p.localRandom
@@ -127,11 +139,28 @@ func (t *transport) sendDHKeyCheck() error {
 
 	ioCap := swapBuf([]byte{t.pairing.request.AuthReq, t.pairing.request.OobFlag, t.pairing.request.IoCap})
 
-	ea, err := smpF6(t.pairing.scMacKey, na, nb, make([]byte, 16), ioCap, la, ra)
+	rb := make([]byte, 16)
+	if t.pairing.pairingType == Passkey {
+		keyBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(keyBytes, uint32(t.pairing.authData.Passkey))
+		rb[12] = keyBytes[0]
+		rb[13] = keyBytes[1]
+		rb[14] = keyBytes[2]
+		rb[15] = keyBytes[3]
+
+		//swap to little endian
+		rb = swapBuf(rb)
+	} else if t.pairing.pairingType == Oob {
+		rb = t.pairing.authData.OOBData
+		//todo: does this need to be swapped?
+	}
+
+	ea, err := smpF6(t.pairing.scMacKey, na, nb, rb, ioCap, la, ra)
 	if err != nil {
 		return err
 	}
 
+	t.pairing.state = WaitDhKeyCheck
 	out := append([]byte{pairingDHKeyCheck}, ea...)
 	return t.send(out)
 }
@@ -156,16 +185,19 @@ func (t *transport) sendMConfirm() error {
 	ra := t.pairing.remoteAddr
 	rat := t.pairing.remoteAddrType
 
-	c1, err := smpC1(make([]byte, 16), r, preq, pres,
-		lat,
-		rat,
-		la,
-		ra,
+	k := make([]byte, 16)
+	if t.pairing.pairingType == Passkey {
+		k = getLegacyParingTK(t.pairing.authData.Passkey)
+	}
+
+	c1, err := smpC1(k, r, preq, pres,
+		lat, rat, la, ra,
 	)
 	if err != nil {
 		return err
 	}
 
+	t.pairing.state = WaitConfirm
 	out := append([]byte{pairingConfirm}, c1...)
 	return t.send(out)
 }

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux"
 	"github.com/pkg/errors"
 )
 

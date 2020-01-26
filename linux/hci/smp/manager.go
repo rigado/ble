@@ -3,8 +3,22 @@ package smp
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/go-ble/ble/linux/hci"
-	"log"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci"
+	"time"
+)
+
+type PairingState int
+
+const (
+	Init PairingState = iota
+	WaitPairingResponse
+	WaitPublicKey
+	WaitConfirm
+	WaitRandom
+	WaitDhKeyCheck
+	Finished
+	Error
 )
 
 type manager struct {
@@ -13,13 +27,14 @@ type manager struct {
 	t           *transport
 	bondManager hci.BondManager
 	encrypt     func(info hci.BondInfo) error
+	result      chan error
 }
 
 //todo: need to have on instance per connection which requires a mutex in the bond manager
 //todo: remove bond manager from input parameters?
 func NewSmpManager(config hci.SmpConfig, bm hci.BondManager) *manager {
-	p := &pairingContext{request: config}
-	m := &manager{config: config, pairing: p, bondManager: bm}
+	p := &pairingContext{request: config, state: Init}
+	m := &manager{config: config, pairing: p, bondManager: bm, result: make(chan error)}
 	t := NewSmpTransport(p, bm, m, nil, nil)
 	m.t = t
 	return m
@@ -61,30 +76,28 @@ func (m *manager) Handle(in []byte) error {
 	code := payload[0]
 	data := payload[1:]
 	v, ok := dispatcher[code]
-	if !ok {
+	if !ok || v.handler == nil {
 		fmt.Println("smp:", "unhandled smp code %v", code)
+
+		// C.5.1 Pairing Not Supported
 		return m.t.send([]byte{pairingFailed, 0x05})
 	}
 
-	if v.handler != nil {
-		_, err := v.handler(m.t, data)
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		return nil
-		// return c.sendSMP(r)
+	_, err := v.handler(m.t, data)
+	if err != nil {
+		m.t.pairing.state = Error
+		m.result <- err
+		return err
 	}
 
-	fmt.Println("no smp handler...")
-	// FIXME: work around to the lack of SMP implementation - always return non-supported.
-	// C.5.1 Pairing Not Supported by Slave
-	return m.t.send([]byte{pairingFailed, 0x05})
+	if m.t.pairing.state == Finished {
+		close(m.result)
+	}
+
+	return nil
 }
 
-func (m *manager) Bond() error {
-
+func (m *manager) Pair(authData ble.AuthData, to time.Duration) error {
 	keys, err := GenerateKeys()
 	if err != nil {
 		fmt.Println("error generating secure keys:", err)
@@ -93,8 +106,32 @@ func (m *manager) Bond() error {
 	//todo: can this be made less bad??
 	m.pairing.scECDHKeys = keys
 	m.t.pairing = m.pairing
+	m.t.pairing.authData = authData
 
-	return m.t.sendPairingRequest()
+	//set a default timeout
+	if to <:= time.Duration(0) {
+		to = time.Minute
+	}
+
+	if len(authData.OOBData) > 0 {
+		m.t.pairing.request.OobFlag = byte(hci.OobPreset)
+	}
+
+	err = m.t.StartPairing(to)
+	if err != nil {
+		return err
+	}
+
+	return m.waitResult(to)
+}
+
+func (m *manager) waitResult(to time.Duration) error {
+	select {
+	case err := <-m.result:
+		return err
+	case <-time.After(to):
+		return fmt.Errorf("pairing operation timed out")
+	}
 }
 
 func (m *manager) StartEncryption() error {

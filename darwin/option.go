@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-ble/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 // SetPeripheralRole configures the device to perform Peripheral tasks.

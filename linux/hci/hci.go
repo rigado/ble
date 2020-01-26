@@ -3,19 +3,16 @@ package hci
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/hci/cmd"
-	"github.com/go-ble/ble/linux/hci/evt"
-	"github.com/go-ble/ble/linux/hci/h4"
-	"github.com/go-ble/ble/linux/hci/socket"
-	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/evt"
+	"github.com/rigado/ble/linux/hci/socket"
 )
 
 // Command ...
@@ -155,17 +152,7 @@ func (h *HCI) Init() error {
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	var err error
-	if true {
-		h.skt, err = socket.NewSocket(h.id)
-	} else {
-		h.skt, err = h4.New(serial.OpenOptions{
-			PortName:          "/dev/ttymxc2",
-			BaudRate:          1000000,
-			DataBits:          8,
-			StopBits:          1,
-			RTSCTSFlowControl: true,
-		})
-	}
+	h.skt, err = socket.NewSocket(h.id)
 	if err != nil {
 		return err
 	}
@@ -247,7 +234,7 @@ func (h *HCI) isOpen() bool {
 }
 
 func (h *HCI) init() error {
-	log.Println("hci reset")
+	logger.Info("hci reset")
 	h.Send(&cmd.Reset{}, nil)
 
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
@@ -256,6 +243,8 @@ func (h *HCI) init() error {
 	a := ReadBDADDRRP.BDADDR
 	h.addr = net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]})
 
+	//ES note: Per Core Spec 5.0, Part E, 7.4.5
+	//This command is _not_ to be supported by LE only controllers
 	ReadBufferSizeRP := cmd.ReadBufferSizeRP{}
 	h.Send(&cmd.ReadBufferSize{}, &ReadBufferSizeRP)
 

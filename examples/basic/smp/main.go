@@ -6,13 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux"
-	bonds "github.com/go-ble/ble/linux/hci/bond"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux"
+	bonds "github.com/rigado/ble/linux/hci/bond"
 	"github.com/pkg/errors"
 )
 
@@ -22,8 +23,9 @@ var (
 	addr         = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
 	sub          = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd           = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
-	bond         = flag.Bool("bond", true, "attempt to bond on connection")
-	forceEncrypt = flag.Bool("fe", false, "force encryption to be started if bond information is found")
+	pair         = flag.Bool("pair", true, "attempt to pair on connection")
+	forceEncrypt = flag.Bool("fe", false, "force encryption to be started if pair information is found")
+	passkey      = flag.Int("passkey", 0, "if passkey is required, use this passkey for pairing")
 )
 
 func main() {
@@ -34,18 +36,19 @@ func main() {
 
 	optid := ble.OptDeviceID(*device)
 
-	//To create a bond with a device, the bond manager needs a file
-	//to store and load bond information
+	//To create a pair with a device, the pair manager needs a file
+	//to store and load pair information
 	bondFilePath := filepath.Join("bonds.json")
 	bm := bonds.NewBondManager(bondFilePath)
 
-	//Enable security by putting the bond manager in the enable security option
+	//Enable security by putting the pair manager in the enable security option
 	optSecurity := ble.OptEnableSecurity(bm)
 	d, err := linux.NewDeviceWithNameAndHandler("", nil, optid, optSecurity)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
+
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
@@ -79,22 +82,30 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(2 * time.Second)
+	//<-time.After(2 * time.Second)
 
-	if *bond {
-		//bonds can be manually triggered by issuing the bond command
+	if *pair {
+		//pairing can be manually triggered by issuing the pair command
 		//however, the typical process is
 		/* 1. connect
 		   2. attempt to read or write to a characteristic which requires security
 		   3. peripheral responds with insufficient authentication
 		   4. central triggers bonding
 		*/
-		log.Println("creating a new bond")
-		err = cln.Bond()
+		log.Println("pairing with", cln.Addr().String())
+		ad := ble.AuthData{}
+		if passkey != nil {
+			ad.Passkey = *passkey
+		}
+		err = cln.Pair(ad, time.Minute)
 		if err != nil {
 			log.Println(err)
+			_ = cln.CancelConnection()
+			<-done
+			os.Exit(1)
+		} else {
+			log.Println("pairing successful!")
 		}
-		log.Println("bonded")
 	}
 
 	if *forceEncrypt {
@@ -107,7 +118,7 @@ func main() {
 
 		log.Println("starting encryption for", hex.EncodeToString(aBytes))
 		if exists := bm.Exists(hex.EncodeToString(aBytes)); exists == true {
-			log.Println("found bond info; starting encryption")
+			log.Println("found pair info; starting encryption")
 			if err := cln.StartEncryption(); err != nil {
 				log.Println("failed to start encryption:", err)
 			}

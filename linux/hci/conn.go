@@ -9,9 +9,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/go-ble/ble"
-	"github.com/go-ble/ble/linux/hci/cmd"
-	"github.com/go-ble/ble/linux/hci/evt"
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci/cmd"
+	"github.com/rigado/ble/linux/hci/evt"
 	"github.com/pkg/errors"
 )
 
@@ -100,7 +100,6 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		c.initPairingContext()
 		c.smp.SetWritePDUFunc(c.writePDU)
 		c.smp.SetEncryptFunc(c.encrypt)
-		c.smp.SetNOPFunc(h.NOP)
 	}
 
 	go func() {
@@ -133,8 +132,8 @@ func (c *Conn) SetContext(ctx context.Context) {
 	c.ctx = ctx
 }
 
-func (c *Conn) Bond() error {
-	return c.smp.Bond()
+func (c *Conn) Pair(authData ble.AuthData, to time.Duration) error {
+	return c.smp.Pair(authData, to)
 }
 
 func (c *Conn) StartEncryption() error {
