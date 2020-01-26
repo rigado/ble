@@ -109,7 +109,7 @@ func (m *manager) Pair(authData ble.AuthData, to time.Duration) error {
 	m.t.pairing.authData = authData
 
 	//set a default timeout
-	if to == time.Duration(0) {
+	if to <:= time.Duration(0) {
 		to = time.Minute
 	}
 

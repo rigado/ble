@@ -328,9 +328,18 @@ func determinePairingType(t *transport) int {
 		return JustWorks
 	}
 
+	pairingTypeTable := ioCapsTableSC
 	if t.pairing.legacy {
-		return ioCapsTableLegacy[rsp.IoCap][req.IoCap]
+		pairingTypeTable = ioCapsTableLegacy
 	}
 
-	return ioCapsTableSC[rsp.IoCap][req.IoCap]
+	if rsp.IoCap >= hci.IoCapsReservedStart ||
+		req.IoCap >= hci.IoCapsReservedStart {
+		fmt.Printf("invalid io capabilities specified: req: %x rsp: %x\n",
+			req.IoCap, rsp.IoCap)
+		fmt.Println("using just works")
+		//todo: is this a valid assumption or should this return an error instead?
+		return JustWorks
+	}
+	return pairingTypeTable[rsp.IoCap][req.IoCap]
 }
