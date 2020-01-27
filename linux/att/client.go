@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rigado/ble"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 )
 
 // NotificationHandler handles notification or indication.
@@ -78,9 +78,6 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	txBuf := <-c.chTxBuf
 	defer func() { c.chTxBuf <- txBuf }()
 
-	// Let L2CAP know the MTU we can handle.
-	c.l2c.SetRxMTU(clientRxMTU)
-
 	req := ExchangeMTURequest(txBuf[:3])
 	req.SetAttributeOpcode()
 	req.SetClientRxMTU(uint16(clientRxMTU))
@@ -102,6 +99,9 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	case len(rsp) != 3:
 		return 0, ErrInvalidResponse
 	}
+
+	//After successful exchange, let L2CAP know the MTU we can handle.
+	c.l2c.SetRxMTU(clientRxMTU)
 
 	txMTU := int(rsp.ServerRxMTU())
 	if len(txBuf) != txMTU {
