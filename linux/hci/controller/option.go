@@ -1,8 +1,9 @@
-package hci
+package controller
 
 import (
 	"errors"
 	"fmt"
+	"github.com/rigado/ble/linux/hci"
 	"time"
 
 	"github.com/rigado/ble/linux/hci/cmd"
@@ -33,7 +34,7 @@ func (h *HCI) SetConnParams(param cmd.LECreateConnection) error {
 }
 
 func (h *HCI) EnableSecurity(bm interface{}) error {
-	bondManager, ok := bm.(BondManager)
+	bondManager, ok := bm.(hci.BondManager)
 	if !ok {
 		return fmt.Errorf("unknown bond manager type")
 	}

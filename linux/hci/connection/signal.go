@@ -1,10 +1,11 @@
-package hci
+package connection
 
 import (
 	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/rigado/ble/linux/hci"
 	"time"
 
 	"github.com/rigado/ble/linux/hci/cmd"
@@ -101,12 +102,12 @@ func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 		return 0, err
 	}
-	logger.Debug("sig", "send", fmt.Sprintf("[%X]", buf.Bytes()))
+	hci.Logger.Debug("sig", "send", fmt.Sprintf("[%X]", buf.Bytes()))
 	return c.writePDU(buf.Bytes())
 }
 
-func (c *Conn) handleSignal(p pdu) error {
-	logger.Debug("sig", "recv", fmt.Sprintf("[%X]", p))
+func (c *Conn) handleSignal(p Pdu) error {
+	hci.Logger.Debug("sig", "recv", fmt.Sprintf("[%X]", p))
 	// When multiple commands are included in an L2CAP packet and the packet
 	// exceeds the signaling MTU (MTUsig) of the receiver, a single Command Reject
 	// packet shall be sent in response. The identifier shall match the first Request
@@ -114,14 +115,14 @@ func (c *Conn) handleSignal(p pdu) error {
 	// shall be silently discarded. [Vol3, Part A, 4.1]
 	if p.dlen() > c.sigRxMTU {
 		_, err := c.sendResponse(
-			SignalCommandReject,
+			hci.SignalCommandReject,
 			sigCmd(p.payload()).id(),
-			&CommandReject{
+			&hci.CommandReject{
 				Reason: 0x0001,                                            // Signaling MTU exceeded.
 				Data:   []byte{uint8(c.sigRxMTU), uint8(c.sigRxMTU >> 8)}, // Actual MTUsig.
 			})
 		if err != nil {
-			_ = logger.Error("send repsonse", fmt.Sprintf("%v", err))
+			_ = hci.Logger.Error("send repsonse", fmt.Sprintf("%v", err))
 		}
 		return nil
 	}
@@ -130,13 +131,13 @@ func (c *Conn) handleSignal(p pdu) error {
 	for len(s) > 0 {
 		// Check if it's a supported request.
 		switch s.code() {
-		case SignalDisconnectRequest:
+		case hci.SignalDisconnectRequest:
 			c.handleDisconnectRequest(s)
-		case SignalConnectionParameterUpdateRequest:
+		case hci.SignalConnectionParameterUpdateRequest:
 			c.handleConnectionParameterUpdateRequest(s)
-		case SignalLECreditBasedConnectionRequest:
+		case hci.SignalLECreditBasedConnectionRequest:
 			c.LECreditBasedConnectionRequest(s)
-		case SignalLEFlowControlCredit:
+		case hci.SignalLEFlowControlCredit:
 			c.LEFlowControlCredit(s)
 		default:
 			// Check if it's a response to a sent command.
@@ -147,9 +148,9 @@ func (c *Conn) handleSignal(p pdu) error {
 			}
 
 			c.sendResponse(
-				SignalCommandReject,
+				hci.SignalCommandReject,
 				s.id(),
-				&CommandReject{
+				&hci.CommandReject{
 					Reason: 0x0000, // Command not understood.
 				})
 		}
@@ -161,7 +162,7 @@ func (c *Conn) handleSignal(p pdu) error {
 
 // DisconnectRequest implements Disconnect Request (0x06) [Vol 3, Part A, 4.6].
 func (c *Conn) handleDisconnectRequest(s sigCmd) {
-	var req DisconnectRequest
+	var req hci.DisconnectRequest
 	if err := req.Unmarshal(s.data()); err != nil {
 		return
 	}
@@ -172,9 +173,9 @@ func (c *Conn) handleDisconnectRequest(s sigCmd) {
 		binary.LittleEndian.PutUint16(endpoints, req.SourceCID)
 		binary.LittleEndian.PutUint16(endpoints, req.DestinationCID)
 		c.sendResponse(
-			SignalCommandReject,
+			hci.SignalCommandReject,
 			s.id(),
-			&CommandReject{
+			&hci.CommandReject{
 				Reason: 0x0002, // Invalid CID in request
 				Data:   endpoints,
 			})
@@ -187,9 +188,9 @@ func (c *Conn) handleDisconnectRequest(s sigCmd) {
 	}
 
 	c.sendResponse(
-		SignalDisconnectResponse,
+		hci.SignalDisconnectResponse,
 		s.id(),
-		&DisconnectResponse{
+		&hci.DisconnectResponse{
 			DestinationCID: req.DestinationCID,
 			SourceCID:      req.SourceCID,
 		})
@@ -204,23 +205,23 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	// Section 5.1.7). If an LE slave Host receives a Connection Parameter Update
 	// Request packet it shall respond with a Command Reject packet with reason
 	// 0x0000 (Command not understood).
-	if c.param.Role() != roleMaster {
+	if c.param.Role() != hci.RoleMaster {
 		c.sendResponse(
-			SignalCommandReject,
+			hci.SignalCommandReject,
 			s.id(),
-			&CommandReject{
+			&hci.CommandReject{
 				Reason: 0x0000, // Command not understood.
 			})
 
 		return
 	}
-	var req ConnectionParameterUpdateRequest
+	var req hci.ConnectionParameterUpdateRequest
 	if err := req.Unmarshal(s.data()); err != nil {
 		return
 	}
 
 	// LE Connection Update (0x08|0x0013) [Vol 2, Part E, 7.8.18]
-	c.hci.Send(&cmd.LEConnectionUpdate{
+	c.ctrl.Send(&cmd.LEConnectionUpdate{
 		ConnectionHandle:   c.param.ConnectionHandle(),
 		ConnIntervalMin:    req.IntervalMin,
 		ConnIntervalMax:    req.IntervalMax,
@@ -236,9 +237,9 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 	// by its controller if the update actually happens.
 	// TODO: allow users to implement what parameters to accept.
 	c.sendResponse(
-		SignalConnectionParameterUpdateResponse,
+		hci.SignalConnectionParameterUpdateResponse,
 		s.id(),
-		&ConnectionParameterUpdateResponse{
+		&hci.ConnectionParameterUpdateResponse{
 			Result: 0, // Accept.
 		})
 }

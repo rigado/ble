@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rigado/ble/linux/hci"
+	"github.com/rigado/ble/linux/hci/connection"
 	"log"
 	"time"
 )
@@ -24,14 +25,14 @@ type transport struct {
 	writePDU func([]byte) (int, error)
 
 	bondManager hci.BondManager
-	encrypter   hci.Encrypter
+	encrypter   connection.Encrypter
 
 	nopFunc func() error //workaround stuff
 
 	result chan error
 }
 
-func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error) *transport {
+func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e connection.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error) *transport {
 	return &transport{ctx, writePDU, bm, e, nopFunc, make(chan error)}
 }
 
@@ -60,7 +61,7 @@ func (t *transport) send(pdu []byte) error {
 	if err := binary.Write(buf, binary.LittleEndian, uint16(len(pdu))); err != nil {
 		return err
 	}
-	if err := binary.Write(buf, binary.LittleEndian, hci.CidSMP); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, connection.CidSMP); err != nil {
 		return err
 	}
 	if err := binary.Write(buf, binary.LittleEndian, pdu); err != nil {

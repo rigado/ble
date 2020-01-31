@@ -21,3 +21,12 @@ const (
 	oobData
 	oobDataPreset = 0x01
 )
+
+// HCI Packet types
+const (
+	pktTypeCommand uint8 = 0x01
+	PktTypeACLData uint8 = 0x02
+	pktTypeSCOData uint8 = 0x03
+	pktTypeEvent   uint8 = 0x04
+	pktTypeVendor  uint8 = 0xFF
+)

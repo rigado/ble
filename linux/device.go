@@ -3,16 +3,17 @@ package linux
 import (
 	"context"
 	"fmt"
+	"github.com/rigado/ble/linux/hci/connection"
+	"github.com/rigado/ble/linux/hci/controller"
 	"io"
 	"log"
 
 	smp2 "github.com/rigado/ble/linux/hci/smp"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/att"
 	"github.com/rigado/ble/linux/gatt"
-	"github.com/rigado/ble/linux/hci"
-	"github.com/pkg/errors"
 )
 
 // NewDevice returns the default HCI device.
@@ -26,7 +27,8 @@ func NewDeviceWithName(name string, opts ...ble.Option) (*Device, error) {
 }
 
 func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ...ble.Option) (*Device, error) {
-	dev, err := hci.NewHCI(smp2.NewSmpFactory(nil), opts...)
+	dev, err := controller.NewHCI(
+		smp2.NewSmpFactory(nil), connection.NewFactory(), opts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't create hci")
 	}
@@ -52,7 +54,7 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 	return &Device{HCI: dev, Server: srv}, nil
 }
 
-func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
+func loop(dev *controller.HCI, s *gatt.Server, mtu int) {
 	for {
 		l2c, err := dev.Accept()
 		if err != nil {
@@ -87,7 +89,7 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 
 // Device ...
 type Device struct {
-	HCI    *hci.HCI
+	HCI    *controller.HCI
 	Server *gatt.Server
 }
 

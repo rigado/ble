@@ -18,14 +18,14 @@ type RandomAddress struct {
 
 // [Vol 6, Part B, 4.4.2] [Vol 3, Part C, 11]
 const (
-	evtTypAdvInd        = 0x00 // Connectable undirected advertising (ADV_IND).
-	evtTypAdvDirectInd  = 0x01 // Connectable directed advertising (ADV_DIRECT_IND).
-	evtTypAdvScanInd    = 0x02 // Scannable undirected advertising (ADV_SCAN_IND).
-	evtTypAdvNonconnInd = 0x03 // Non connectable undirected advertising (ADV_NONCONN_IND).
-	evtTypScanRsp       = 0x04 // Scan Response (SCAN_RSP).
+	EvtTypAdvInd        = 0x00 // Connectable undirected advertising (ADV_IND).
+	EvtTypAdvDirectInd  = 0x01 // Connectable directed advertising (ADV_DIRECT_IND).
+	EvtTypAdvScanInd    = 0x02 // Scannable undirected advertising (ADV_SCAN_IND).
+	EvtTypAdvNonconnInd = 0x03 // Non connectable undirected advertising (ADV_NONCONN_IND).
+	EvtTypScanRsp       = 0x04 // Scan Response (SCAN_RSP).
 )
 
-func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) {
+func NewAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) {
 	ad, err := e.DataWErr(i)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ type Advertisement struct {
 }
 
 // setScanResponse associate scan response to the existing advertisement.
-func (a *Advertisement) setScanResponse(sr *Advertisement) error {
+func (a *Advertisement) SetScanResponse(sr *Advertisement) error {
 
 	ad, err := a.e.DataWErr(a.i)
 	if err != nil {
@@ -137,7 +137,7 @@ func (a *Advertisement) RSSI() int {
 
 // Addr returns the address of the remote peripheral.
 func (a *Advertisement) Addr() ble.Addr {
-	v, _ := a.addrWErr()
+	v, _ := a.AddrWErr()
 	return v
 }
 
@@ -173,7 +173,7 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 	m := make(map[string]interface{})
 	keys := ble.AdvertisementMapKeys
 
-	addr, err := a.addrWErr()
+	addr, err := a.AddrWErr()
 	if err != nil {
 		return nil, errors.Wrap(err, keys.MAC)
 	}

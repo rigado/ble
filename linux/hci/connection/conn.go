@@ -1,23 +1,24 @@
-package hci
+package connection
 
 import (
 	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/rigado/ble/linux/hci"
 	"io"
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 	"github.com/rigado/ble/linux/hci/evt"
-	"github.com/pkg/errors"
 )
 
 // Conn ...
 type Conn struct {
-	hci *HCI
+	ctrl hci.Controller
 	ctx context.Context
 
 	param evt.LEConnectionComplete
@@ -48,13 +49,13 @@ type Conn struct {
 	sigSent chan []byte
 	// smpSent chan []byte
 
-	chInPkt chan packet
-	chInPDU chan pdu
+	chInPkt chan Packet
+	chInPDU chan Pdu
 
 	chDone chan struct{}
 	// Host to Controller Data Flow Control pkt-based Data flow control for LE-U [Vol 2, Part E, 4.1.1]
 	// chSentBufs tracks the HCI buffer occupied by this connection.
-	txBuffer *Client
+	txBuffer hci.BufferPool
 
 	// sigID is used to match responses with signaling requests.
 	// The requesting device sets this field and the responding device uses the
@@ -65,17 +66,17 @@ type Conn struct {
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
-	smp SmpManager
+	smp hci.SmpManager
 }
 
 type Encrypter interface {
 	Encrypt() error
 }
 
-func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
+func New(ctrl hci.Controller, param evt.LEConnectionComplete) *Conn {
 
 	c := &Conn{
-		hci:   h,
+		ctrl:  ctrl,
 		ctx:   context.Background(),
 		param: param,
 
@@ -87,16 +88,17 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		sigRxMTU: ble.MaxMTU,
 		sigTxMTU: ble.DefaultMTU,
 
-		chInPkt: make(chan packet, 16),
-		chInPDU: make(chan pdu, 16),
+		chInPkt: make(chan Packet, 16),
+		chInPDU: make(chan Pdu, 16),
 
-		txBuffer: NewClient(h.pool),
+		txBuffer: ctrl.RequestBufferPool(),
 
 		chDone: make(chan struct{}),
 	}
 
-	if c.hci.smpEnabled {
-		c.smp = c.hci.smp.Create(defaultSmpConfig)
+	smp, err := c.ctrl.RequestSmpManager(hci.DefaultSmpConfig)
+	if err == nil {
+		c.smp = smp
 		c.initPairingContext()
 		c.smp.SetWritePDUFunc(c.writePDU)
 		c.smp.SetEncryptFunc(c.encrypt)
@@ -107,12 +109,15 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 			if err := c.recombine(); err != nil {
 				if err != io.EOF {
 					err = errors.Wrap(err, "recombine")
-					c.hci.dispatchError(err)
+					c.ctrl.DispatchError(err)
 
 					//attempt to cleanup
-					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
-						fmt.Printf("recombine cleanup: %v\n", err)
-					}
+					//todo: this is the job of hci
+					//if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
+					//	fmt.Printf("recombine cleanup: %v\n", err)
+					//}
+				} else {
+					fmt.Println("recombine non io.EOF error:", err)
 				}
 				close(c.chInPDU)
 				return
@@ -225,7 +230,7 @@ func (c *Conn) initPairingContext() {
 	smp.InitContext(la, ra, lat, rat)
 }
 
-func (c *Conn) encrypt(bi BondInfo) error {
+func (c *Conn) encrypt(bi hci.BondInfo) error {
 	legacy, stk := c.smp.LegacyPairingInfo()
 	//if a short term key is present, use it as the long term key
 	if legacy && len(stk) > 0 {
@@ -266,7 +271,7 @@ func (c *Conn) encrypt(bi BondInfo) error {
 	m.EncryptedDiversifier = eDiv
 	m.RandomNumber = randVal
 
-	return c.hci.Send(&m, nil)
+	return c.ctrl.Send(&m, nil)
 }
 
 func (c *Conn) stkEncrypt(key []byte) error {
@@ -279,19 +284,19 @@ func (c *Conn) stkEncrypt(key []byte) error {
 	m.EncryptedDiversifier = 0
 	m.RandomNumber = 0
 
-	return c.hci.Send(&m, nil)
+	return c.ctrl.Send(&m, nil)
 }
 
 // writePDU breaks down a L2CAP PDU into fragments if it's larger than the HCI buffer size. [Vol 3, Part A, 7.2.1]
 func (c *Conn) writePDU(pdu []byte) (int, error) {
 	sent := 0
-	flags := uint16(pbfHostToControllerStart << 4) // ACL boundary flags
+	flags := uint16(hci.PbfHostToControllerStart << 4) // ACL boundary flags
 
 	// All L2CAP fragments associated with an L2CAP PDU shall be processed for
 	// transmission by the Controller before any other L2CAP PDU for the same
 	// logical transport shall be processed.
-	c.txBuffer.LockPool()
-	defer c.txBuffer.UnlockPool()
+	c.txBuffer.Lock()
+	defer c.txBuffer.Unlock()
 
 	// Fail immediately if the connection is already closed
 	// Check this with the pool locked to avoid race conditions
@@ -313,7 +318,7 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		// Prepare the Headers
 
 		// HCI Header: pkt Type
-		if err := binary.Write(pkt, binary.LittleEndian, pktTypeACLData); err != nil {
+		if err := binary.Write(pkt, binary.LittleEndian, hci.PktTypeACLData); err != nil {
 			return 0, err
 		}
 		// ACL Header: handle and flags
@@ -336,33 +341,39 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		default:
 		}
 
-		if _, err := c.hci.skt.Write(pkt.Bytes()); err != nil {
+		if _, err := c.ctrl.SocketWrite(pkt.Bytes()); err != nil {
 			return sent, err
 		}
 		sent += flen
 
-		flags = (pbfContinuing << 4) // Set "continuing" in the boundary flags for the rest of fragments, if any.
-		pdu = pdu[flen:]             // Advance the point
+		flags = hci.PbfContinuing << 4 // Set "continuing" in the boundary flags for the rest of fragments, if any.
+		pdu = pdu[flen:]                  // Advance the point
 	}
 	return sent, nil
 }
 
 // Recombines fragments into a L2CAP PDU. [Vol 3, Part A, 7.2.2]
 func (c *Conn) recombine() error {
-	var pkt packet
+	var pkt Packet
 	var ok bool
 	select {
-	case <-c.hci.done:
-		return io.EOF
+	//todo: hci should cancel a parent context
+	//case <-c.hci.done:
+	//	fmt.Println("hci is done; return io.EOF")
+	//	return io.EOF
 	case pkt, ok = <-c.chInPkt:
 		if !ok {
+			fmt.Println("c.chInPkt is closed; return io.EOF")
 			return io.EOF
 		}
 	case <-time.After(time.Minute * 10):
+		fmt.Println("recombine timed out")
 		return fmt.Errorf("idle timeout")
+	case <-c.ctx.Done():
+		return fmt.Errorf("connection cancelled: %s", c.ctx.Err())
 	}
 
-	p := pdu(pkt.data())
+	p := Pdu(pkt.data())
 
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
@@ -375,13 +386,13 @@ func (c *Conn) recombine() error {
 	// fragments, re-allocate the whole PDU (including Header).
 	if len(p.payload()) < p.dlen() {
 		p = make([]byte, 0, 4+p.dlen())
-		p = append(p, pdu(pkt.data())...)
+		p = append(p, Pdu(pkt.data())...)
 	}
 	for len(p) < 4+p.dlen() {
-		if pkt, ok = <-c.chInPkt; !ok || (pkt.pbf()&pbfContinuing) == 0 {
+		if pkt, ok = <-c.chInPkt; !ok || (pkt.Pbf()&hci.PbfContinuing) == 0 {
 			return io.ErrUnexpectedEOF
 		}
-		p = append(p, pdu(pkt.data())...)
+		p = append(p, Pdu(pkt.data())...)
 	}
 
 	// TODO: support dynamic or assigned channels for LE-Frames.
@@ -393,7 +404,8 @@ func (c *Conn) recombine() error {
 	case CidSMP:
 		_ = c.smp.Handle(p)
 	default:
-		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
+		//todo: change this back to a logger
+		fmt.Println("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
 	return nil
 }
@@ -410,7 +422,7 @@ func (c *Conn) Close() error {
 		// Return if it's already closed.
 		return nil
 	default:
-		return c.hci.Send(&cmd.Disconnect{
+		return c.ctrl.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
 		}, nil)
@@ -418,7 +430,7 @@ func (c *Conn) Close() error {
 }
 
 // LocalAddr returns local device's MAC address.
-func (c *Conn) LocalAddr() ble.Addr { return c.hci.Addr() }
+func (c *Conn) LocalAddr() ble.Addr { return c.ctrl.Addr() }
 
 // RemoteAddr returns remote device's MAC address.
 func (c *Conn) RemoteAddr() ble.Addr {
@@ -443,21 +455,21 @@ func (c *Conn) SetTxMTU(mtu int) { c.txMTU = mtu }
 // Broadcast flags. bit[7:8] of handle field's MSB
 // Not used in LE-U. Leave it as 0x00 (Point-to-Point).
 // Broadcasting in LE uses ADVB logical transport.
-type packet []byte
+type Packet []byte
 
-func (a packet) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
-func (a packet) pbf() int       { return (int(a[1]) >> 4) & 0x3 }
-func (a packet) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
-func (a packet) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
-func (a packet) data() []byte   { return a[4:] }
+func (a Packet) handle() uint16 { return uint16(a[0]) | (uint16(a[1]&0x0f) << 8) }
+func (a Packet) Pbf() int       { return (int(a[1]) >> 4) & 0x3 }
+func (a Packet) bcf() int       { return (int(a[1]) >> 6) & 0x3 }
+func (a Packet) dlen() int      { return int(a[2]) | (int(a[3]) << 8) }
+func (a Packet) data() []byte   { return a[4:] }
 
-type pdu []byte
+type Pdu []byte
 
-func (p pdu) dlen() int       { return int(binary.LittleEndian.Uint16(p[0:2])) }
-func (p pdu) cid() uint16     { return binary.LittleEndian.Uint16(p[2:4]) }
-func (p pdu) payload() []byte { return p[4:] }
+func (p Pdu) dlen() int       { return int(binary.LittleEndian.Uint16(p[0:2])) }
+func (p Pdu) cid() uint16     { return binary.LittleEndian.Uint16(p[2:4]) }
+func (p Pdu) payload() []byte { return p[4:] }
 
-type leFrameHdr pdu
+type leFrameHdr Pdu
 
 func (f leFrameHdr) slen() int       { return int(binary.LittleEndian.Uint16(f[4:6])) }
 func (f leFrameHdr) payload() []byte { return f[6:] }

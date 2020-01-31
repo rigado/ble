@@ -4,4 +4,4 @@ import (
 	"github.com/mgutz/logxi/v1"
 )
 
-var logger = log.New("hci")
+var Logger = log.New("hci")

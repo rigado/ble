@@ -35,12 +35,12 @@ func NewClient(p *Pool) *Client {
 }
 
 // LockPool ...
-func (c *Client) LockPool() {
+func (c *Client) Lock() {
 	c.p.Lock()
 }
 
 // UnlockPool ...
-func (c *Client) UnlockPool() {
+func (c *Client) Unlock() {
 	c.p.Unlock()
 }
 
