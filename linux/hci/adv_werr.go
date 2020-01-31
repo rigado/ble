@@ -64,7 +64,7 @@ func (a *Advertisement) connectableWErr() (bool, error) {
 		return false, err
 	}
 
-	c := (t == evtTypAdvDirectInd) || (t == evtTypAdvInd)
+	c := (t == EvtTypAdvDirectInd) || (t == EvtTypAdvInd)
 	return c, nil
 }
 
@@ -73,7 +73,7 @@ func (a *Advertisement) rssiWErr() (int, error) {
 	return int(r), err
 }
 
-func (a *Advertisement) addrWErr() (ble.Addr, error) {
+func (a *Advertisement) AddrWErr() (ble.Addr, error) {
 	b, err := a.e.AddressWErr(a.i)
 	if err != nil {
 		return nil, err

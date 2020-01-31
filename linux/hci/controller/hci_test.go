@@ -1,6 +1,7 @@
-package hci
+package controller
 
 import (
+	"github.com/rigado/ble/linux/hci"
 	"reflect"
 	"testing"
 
@@ -16,7 +17,7 @@ func BenchmarkAdv2Map(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		e := evt.LEAdvertisingReport{2, 1, 3, 1, 144, 17, 101, 210, 60, 246, 30, 2, 1, 2, 26, 255, 76, 0, 2, 21, 255, 254, 45, 18, 30, 75, 15, 164, 153, 78, 4, 99, 49, 239, 205, 171, 52, 18, 120, 86, 195, 205}
-		a, _ := newAdvertisement(e, 0)
+		a, _ := hci.NewAdvertisement(e, 0)
 		rr, _ = a.ToMap()
 	}
 	r = rr
@@ -43,7 +44,7 @@ func TestAdvDecode(t *testing.T) {
 		197 (rssi)
 	*/
 	bad := evt.LEAdvertisingReport{2, 1, 0, 0, 45, 58, 130, 157, 134, 122, 29, 2, 1, 6, 2, 5, 9, 67, 97, 115, 99, 97, 100, 101, 45, 67, 48, 51, 49, 48, 54, 49, 56, 51, 52, 45, 48, 48, 49, 57, 49, 197}
-	a, err := newAdvertisement(bad, 0)
+	a, err := hci.NewAdvertisement(bad, 0)
 	t.Log(a, err)
 	if err == nil {
 		t.Fatal("no error on malformed payload")
@@ -51,7 +52,7 @@ func TestAdvDecode(t *testing.T) {
 
 	//good ibeacon
 	good := evt.LEAdvertisingReport{2, 1, 3, 1, 144, 17, 101, 210, 60, 246, 30, 2, 1, 2, 26, 255, 76, 0, 2, 21, 255, 254, 45, 18, 30, 75, 15, 164, 153, 78, 4, 99, 49, 239, 205, 171, 52, 18, 120, 86, 195, 205}
-	a, err = newAdvertisement(good, 0)
+	a, err = hci.NewAdvertisement(good, 0)
 	t.Log(a, err)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +68,7 @@ func TestAdvDecode(t *testing.T) {
 		9, 1, 2, 3,
 		4, 5, 6, 7,
 		16}
-	a, err = newAdvertisement(good, 0)
+	a, err = hci.NewAdvertisement(good, 0)
 	t.Log(a, err)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +106,7 @@ func TestAdvDecode(t *testing.T) {
 
 	//good mfg data (ruuvi mode 3)
 	good = evt.LEAdvertisingReport{2, 1, 3, 1, 1, 2, 3, 4, 5, 6, 21, 0x02, 0x01, 0x06, 0x11, 0xFF, 0x99, 0x04, 0x03, 0x4B, 0x16, 0x19, 0xC7, 0x3B, 0xFF, 0xFF, 0x00, 0x0C, 0x03, 0xE0, 0x0B, 0x89, 255}
-	a, err = newAdvertisement(good, 0)
+	a, err = hci.NewAdvertisement(good, 0)
 	t.Log(a, err)
 	if err != nil {
 		t.Fatal(err)

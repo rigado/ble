@@ -1,19 +1,19 @@
-package hci
+package controller
 
 import (
 	"context"
 	"fmt"
+	"github.com/rigado/ble/linux/hci"
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/adv"
 	"github.com/rigado/ble/linux/gatt"
-	"github.com/pkg/errors"
 )
 
 // Addr ...
-func (h *HCI) Addr() ble.Addr { return ble.NewAddr(h.addr.String()) }
 func (h *HCI) Bytes() []byte {
 	return ble.NewAddr(h.addr.String()).Bytes()
 }
@@ -31,7 +31,7 @@ func (h *HCI) Scan(allowDup bool) error {
 		h.params.scanEnable.FilterDuplicates = 0
 	}
 	h.params.scanEnable.LEScanEnable = 1
-	h.adHist = make([]*Advertisement, 128)
+	h.adHist = make([]*hci.Advertisement, 128)
 	h.adLast = 0
 	return h.Send(&h.params.scanEnable, nil)
 }
@@ -199,10 +199,10 @@ func (h *HCI) Accept() (ble.Conn, error) {
 func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	b, err := net.ParseMAC(a.String())
 	if err != nil {
-		return nil, ErrInvalidAddr
+		return nil, hci.ErrInvalidAddr
 	}
 	h.params.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
-	if _, ok := a.(RandomAddress); ok {
+	if _, ok := a.(hci.RandomAddress); ok {
 		h.params.connParams.PeerAddressType = 1
 	} else if (b[0] & byte(0xc0)) == byte(0xc0) {
 		h.params.connParams.PeerAddressType = 1
@@ -240,7 +240,7 @@ func (h *HCI) cancelDial() (ble.Client, error) {
 	}
 	// The connection has been established, the cancel command
 	// failed with ErrDisallowed.
-	if err == ErrDisallowed {
+	if err == hci.ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
 			return gatt.NewClient(c, h.done)

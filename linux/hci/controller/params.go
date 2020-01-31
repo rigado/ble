@@ -1,4 +1,4 @@
-package hci
+package controller
 
 import (
 	"sync"

@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-type smpDispatcher struct {
-	desc    string
-	handler func(*Conn, pdu) ([]byte, error)
-}
-
 const (
 	IoCapsDisplayOnly		= 0x00
 	IoCapsDisplayYesNo      = 0x01
@@ -48,6 +43,6 @@ type SmpConfig struct {
 }
 
 //todo: make these configurable
-var defaultSmpConfig = SmpConfig{
+var DefaultSmpConfig = SmpConfig{
 	IoCapsKeyboardDisplay, byte(OobNotPresent), 0x09, 16, 0x00, 0x01,
 }
