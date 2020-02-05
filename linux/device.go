@@ -192,13 +192,20 @@ func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	// d.HCI.Dial is a blocking call, although most of time it should return immediately.
 	// But in case passing wrong device address or the device went non-connectable, it blocks.
 	cln, err := d.HCI.Dial(ctx, a)
+	if err != nil {
+		return nil, errors.Wrap(err, "device")
+	}
+
+	if cln == nil {
+		return nil, fmt.Errorf("device: unexpectedly received nil client")
+	}
+
 	if d.Server.DB() != nil {
 		//get client access to the local GATT DB
 		gattClient := cln.(*gatt.Client)
 		cln = gatt.ClientWithServer(gattClient, d.Server.DB())
 	}
-	//todo: test this more
-	//srv := d.Server
+
 	return cln, errors.Wrap(err, "can't dial")
 }
 
