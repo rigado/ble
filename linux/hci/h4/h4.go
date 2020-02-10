@@ -1,10 +1,10 @@
-
 package h4
 
 import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"time"
 
@@ -13,12 +13,13 @@ import (
 )
 
 const (
-	rxQueueSize = 64
-	txQueueSize = 64
+	rxQueueSize    = 64
+	txQueueSize    = 64
+	defaultTimeout = time.Second * 1
 )
 
 type h4 struct {
-	sp  io.ReadWriteCloser
+	rwc io.ReadWriteCloser
 	rmu sync.Mutex
 	wmu sync.Mutex
 
@@ -31,13 +32,26 @@ type h4 struct {
 	cmu  sync.Mutex
 }
 
-func New(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
+func DefaultSerialOptions() serial.OpenOptions {
+	return serial.OpenOptions{
+		PortName:              "/dev/ttyACM0",
+		BaudRate:              1000000,
+		DataBits:              8,
+		ParityMode:            serial.PARITY_NONE,
+		StopBits:              1,
+		RTSCTSFlowControl:     true,
+		MinimumReadSize:       0,
+		InterCharacterTimeout: 100,
+	}
+}
+
+func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	// force these
 	opts.MinimumReadSize = 0
 	opts.InterCharacterTimeout = 100
 
 	log.Println("opening...")
-	sp, err := serial.Open(opts)
+	rwc, err := serial.Open(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -46,18 +60,52 @@ func New(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	// todo this is mega slow and stupid, but I doubt we can change this on the fly
 	log.Println("flushing...")
 	b := make([]byte, 2048)
-	sp.Write([]byte{1, 3, 12, 0}) //dummy reset
+	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
 	<-time.After(time.Millisecond * 250)
-	_, err = sp.Read(b)
+	_, err = rwc.Read(b)
 	if err != nil {
-		sp.Close()
+		rwc.Close()
 		return nil, err
 	}
 
 	log.Println("opened", opts, err)
 
 	h := &h4{
-		sp:      sp,
+		rwc:     rwc,
+		done:    make(chan int),
+		rxQueue: make(chan []byte, rxQueueSize),
+		txQueue: make(chan []byte, txQueueSize),
+	}
+	h.frame = newFrame(h.rxQueue)
+
+	go h.rxLoop()
+
+	return h, nil
+}
+
+func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, error) {
+	log.Printf("Dialing %v ...", addr)
+	c, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+
+	rwc := &connWithTimeout{c, connTimeout}
+	log.Println("flushing...")
+	b := make([]byte, 2048)
+	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
+	for {
+		n, err := rwc.Read(b)
+		// log.Println(n, err)
+		if n == 0 || err != nil {
+			break
+		}
+	}
+
+	log.Println("connect", c.RemoteAddr().String(), err)
+
+	h := &h4{
+		rwc:     rwc,
 		done:    make(chan int),
 		rxQueue: make(chan []byte, rxQueueSize),
 		txQueue: make(chan []byte, txQueueSize),
@@ -91,7 +139,7 @@ func (h *h4) Read(p []byte) (int, error) {
 		return 0, nil //fmt.Errorf("timeout")
 	}
 
-	log.Printf("read [% 0x], %v, %v", p[:n], n, err)
+	// log.Printf("read [% 0x], %v, %v", p[:n], n, err)
 
 	// check if we are still open since the read could take a while
 	if !h.isOpen() {
@@ -107,8 +155,8 @@ func (h *h4) Write(p []byte) (int, error) {
 
 	h.wmu.Lock()
 	defer h.wmu.Unlock()
-	n, err := h.sp.Write(p)
-	log.Printf("write [% 0x], %v, %v", p, n, err)
+	n, err := h.rwc.Write(p)
+	// log.Printf("write [% 0x], %v, %v", p, n, err)
 
 	return n, errors.Wrap(err, "can't write h4")
 }
@@ -126,7 +174,7 @@ func (h *h4) Close() error {
 		close(h.done)
 		fmt.Println("closing h4")
 		h.rmu.Lock()
-		err := h.sp.Close()
+		err := h.rwc.Close()
 		h.rmu.Unlock()
 
 		return errors.Wrap(err, "can't close h4")
@@ -139,8 +187,8 @@ func (h *h4) isOpen() bool {
 		log.Printf("isOpen: <-h.done, false\n")
 		return false
 	default:
-		// log.Printf("isOpen: %v\n", h.sp != nil)
-		return h.sp != nil
+		// log.Printf("isOpen: %v\n", h.rwc != nil)
+		return h.rwc != nil
 	}
 }
 
@@ -152,14 +200,14 @@ func (h *h4) rxLoop() {
 			log.Printf("rxLoop killed")
 			return
 		default:
-			if h.sp == nil {
-				log.Printf("rxLoop nil sp")
+			if h.rwc == nil {
+				log.Printf("rxLoop nil rwc")
 				return
 			}
 		}
 
 		// read
-		n, err := h.sp.Read(tmp)
+		n, err := h.rwc.Read(tmp)
 		if err != nil || n == 0 {
 			continue
 		}
