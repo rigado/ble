@@ -52,7 +52,7 @@ func main() {
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
-		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
+		return strings.Contains(strings.ToUpper(a.LocalName()), strings.ToUpper(*name))
 	}
 
 	// If addr is specified, search for addr instead.
@@ -125,7 +125,14 @@ func main() {
 		}
 	}
 
-	<-time.After(60 * time.Second)
+	fmt.Printf("Discovering profile...\n")
+	p, err := cln.DiscoverProfile(true)
+	if err != nil {
+		log.Fatalf("can't discover profile: %s", err)
+	}
+
+	explore(cln, p)
+	<-time.After(5 * time.Second)
 
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())

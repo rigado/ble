@@ -188,6 +188,11 @@ func (s *Socket) Close() error {
 }
 
 func (s *Socket) isOpen() bool {
+	//this check must be performed under lock because we
+	//could be in the process of close the socket when this call is made
+	s.cmu.Lock()
+	defer s.cmu.Unlock()
+
 	select {
 	case <-s.done:
 		return false

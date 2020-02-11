@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/rigado/ble/linux/hci"
 	"io"
@@ -44,7 +45,10 @@ func NewHCI(smp hci.SmpManagerFactory, cf hci.ConnectionFactory, opts ...ble.Opt
 		muClose:   sync.Mutex{},
 		done:      make(chan bool),
 		sktRxChan: make(chan []byte, 16), //todo pick a real number
+
 	}
+
+	h.ctx, h.cancel = context.WithCancel(context.Background())
 
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -119,6 +123,9 @@ type HCI struct {
 	done    chan bool
 
 	sktRxChan chan []byte
+
+	ctx context.Context
+	cancel context.CancelFunc
 }
 
 // Init ...
