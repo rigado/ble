@@ -43,7 +43,7 @@ func (h *HCI) send(c hci.Command) ([]byte, error) {
 		return nil, err
 	}
 
-	b[0] = byte(hci.PktTypeCommand) // HCI header
+	b[0] = hci.PktTypeCommand // HCI header
 	b[1] = byte(c.OpCode())
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())

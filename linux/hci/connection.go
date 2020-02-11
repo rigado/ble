@@ -7,6 +7,7 @@ import (
 
 type Connection interface {
 	ble.Conn
+	Run()
 	PutPacket([]byte)
 	Role() uint8
 	BufferPool() BufferPool

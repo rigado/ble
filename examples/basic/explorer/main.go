@@ -16,7 +16,7 @@ import (
 var (
 	device = flag.Int("device", 1, "hci index")
 	name   = flag.String("name", "", "name of remote peripheral")
-	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	addr   = flag.String("addr", "f1:90:ad:12:5d:4d", "address of remote peripheral (MAC on Linux, UUID on OS X)")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
 	bond = flag.Bool("bond", false, "attempt to bond on connection")
@@ -38,6 +38,12 @@ func main() {
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
 		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
+	}
+
+	if len(*name) != 0 {
+		filter = func(a ble.Advertisement) bool {
+			return a.LocalName() == *name
+		}
 	}
 
 	// If addr is specified, search for addr instead.
@@ -67,7 +73,16 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(5 * time.Second)
+	<-time.After(250*time.Millisecond)
+
+	rxMtu := ble.MaxMTU
+	txMtu, err := cln.ExchangeMTU(rxMtu)
+	if err != nil {
+		fmt.Printf("%v - MTU exchange error: %v\n", *addr, err)
+		// stay connected
+	} else {
+		fmt.Printf("%v - MTU exchange success: rx %v, tx %v\n", *addr, rxMtu, txMtu)
+	}
 
 	fmt.Printf("Discovering profile...\n")
 	p, err := cln.DiscoverProfile(true)
