@@ -51,6 +51,7 @@ func (c *Conn) Read(sdu []byte) (n int, err error) {
 	buf.Reset()
 	buf.Write(data)
 	for buf.Len() < slen {
+		//todo: make this a select
 		p := <-c.chInPDU
 		buf.Write(p.payload())
 	}

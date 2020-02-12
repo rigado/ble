@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rigado/ble"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 )
 
 // NotificationHandler handles notification or indication.

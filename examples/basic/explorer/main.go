@@ -74,7 +74,7 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(250*time.Millisecond)
+	<-time.After(2000*time.Millisecond)
 
 	rxMtu := ble.MaxMTU
 	txMtu, err := cln.ExchangeMTU(rxMtu)
