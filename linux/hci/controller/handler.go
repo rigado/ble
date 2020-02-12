@@ -269,7 +269,6 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
 	c := h.cf.Create(h, e)
-	c.SetContext(h.ctx)
 	go c.Run() //start handling connection messages
 
 	h.muConns.Lock()

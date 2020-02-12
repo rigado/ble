@@ -133,8 +133,14 @@ func Connect(ctx context.Context, f AdvFilter) (Client, error) {
 		}
 	}()
 
+	//todo: this leaks a go routine!
 	ch := make(chan Advertisement)
 	fn := func(a Advertisement) {
+		select {
+		case <-ctx2.Done():
+			return
+		default:
+		}
 		cancel()
 		ch <- a
 	}

@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci"
-	)
+	"github.com/rigado/ble/linux/hci/cmd"
+	"time"
+)
 
 func (h *HCI) RequestBufferPool() hci.BufferPool {
 	return hci.NewClient(h.pool)
@@ -30,4 +33,36 @@ func (h *HCI) SocketWrite(b []byte) (int, error) {
 
 func (h *HCI) Addr() ble.Addr {
 	return ble.NewAddr(h.addr.String())
+}
+
+func (h *HCI) CloseConnection(handle uint16) error {
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[handle]
+	if !found {
+		return fmt.Errorf("disconnecting an invalid handle %04X", handle)
+	}
+
+	go func(handle uint16, addr string) {
+		select {
+		case <-c.Disconnected():
+		case <-time.After(10 * time.Second):
+			fmt.Printf("disconnect for %04X:%s timed out...\n", handle, c.RemoteAddr().String())
+			err := h.cleanupConnectionHandle(handle)
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}(handle, c.RemoteAddr().String())
+
+	c.CancelContext()
+
+	return h.Send(&cmd.Disconnect{
+		ConnectionHandle: handle,
+		Reason:           0x13,
+	}, nil)
+}
+
+func (h *HCI) Context() context.Context {
+	return h.ctx
 }

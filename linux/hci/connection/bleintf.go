@@ -3,10 +3,8 @@ package connection
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rigado/ble"
-	"github.com/rigado/ble/linux/hci/cmd"
 	"io"
 	"net"
 	"time"
@@ -22,7 +20,15 @@ func (c *Conn) StartEncryption() error {
 
 // Read copies re-assembled L2CAP PDUs into sdu.
 func (c *Conn) Read(sdu []byte) (n int, err error) {
-	p, ok := <-c.chInPDU
+	var p Pdu
+	var ok bool
+
+	select {
+	case p, ok = <-c.chInPDU:
+	case <-c.ctx.Done():
+		return 0, c.ctx.Err()
+	}
+
 	if !ok {
 		return 0, errors.Wrap(io.ErrClosedPipe, "input channel closed")
 	}
@@ -99,29 +105,11 @@ func (c *Conn) Disconnected() <-chan struct{} {
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
 	select {
-	case <-c.chDone:
+	case <-c.ctx.Done():
 		// Return if it's already closed.
 		return nil
 	default:
-		//if the disconnect times out (no response to the command or
-		//we never receive a DisconnectComplete), this go routine
-		//ensures the connection handle is cleaned up
-		go func(handle uint16, addr string) {
-			select {
-			case <-c.Disconnected():
-			case <-time.After(10 * time.Second):
-				fmt.Printf("disconnect for %04X:%s timed out...\n", handle, c.RemoteAddr().String())
-				err := c.ctrl.cleanupConnectionHandle(handle)
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		}(c.param.ConnectionHandle(), c.RemoteAddr().String())
-
-		return c.ctrl.Send(&cmd.Disconnect{
-			ConnectionHandle: c.param.ConnectionHandle(),
-			Reason:           0x13,
-		}, nil)
+		return c.ctrl.CloseConnection(c.param.ConnectionHandle())
 	}
 }
 

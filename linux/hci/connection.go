@@ -13,6 +13,7 @@ type Connection interface {
 	BufferPool() BufferPool
 	CloseInputChannel()
 	SetClosed()
+	CancelContext()
 }
 
 type ConnectionFactory interface {

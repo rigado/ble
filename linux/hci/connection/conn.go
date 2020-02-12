@@ -18,7 +18,9 @@ import (
 // Conn ...
 type Conn struct {
 	ctrl hci.Controller
+
 	ctx context.Context
+	cancel context.CancelFunc
 
 	param evt.LEConnectionComplete
 
@@ -76,7 +78,6 @@ func New(ctrl hci.Controller, param evt.LEConnectionComplete) *Conn {
 
 	c := &Conn{
 		ctrl:  ctrl,
-		ctx:   context.Background(),
 		param: param,
 
 		rxMTU: ble.DefaultMTU,
@@ -94,6 +95,8 @@ func New(ctrl hci.Controller, param evt.LEConnectionComplete) *Conn {
 
 		chDone: make(chan struct{}),
 	}
+
+	c.ctx, c.cancel = context.WithCancel(ctrl.Context())
 
 	smp, err := c.ctrl.RequestSmpManager(hci.DefaultSmpConfig)
 	if err == nil {
@@ -123,8 +126,10 @@ func (c *Conn) Run() {
 		case <-time.After(time.Minute * 10):
 			hci.Logger.Info("recombine timed out")
 			c.ctrl.DispatchError(fmt.Errorf("connection.Run idle timeout"))
+			return
 		case <-c.ctx.Done():
 			c.ctrl.DispatchError(fmt.Errorf("connection cancelled: %s", c.ctx.Err()))
+			return
 		}
 
 		if err := c.recombine(pkt); err != nil {

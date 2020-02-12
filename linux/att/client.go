@@ -1,6 +1,7 @@
 package att
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"time"
@@ -552,28 +553,30 @@ func (c *Client) asyncReqLoop() {
 	for {
 		// keep trying?
 		select {
+		case <-c.l2c.Context().Done():
+			fmt.Println("connection context done")
+			return
 		case <-c.done:
 			fmt.Println("[BLE ATT]: exited client async loop: done")
 			return
 		case <-c.connClosed:
 			logger.Debug("[BLE ATT]: exited client async loop: conn closed")
 			return
+		case in := <- c.inc:
+			rsp := c.server.HandleRequest(in)
+			if rsp == nil {
+				continue
+			}
+			err := c.sendResp(rsp)
+			if err != nil {
+				logger.Info("client", "failed to send async att response for", fmt.Sprintf("%x", in[0]))
+			}
 		default:
 			if c.l2c == nil {
 				fmt.Println("exited client async loop: l2c nil")
 				return
 			}
 			//ok
-		}
-
-		in := <- c.inc
-		rsp := c.server.HandleRequest(in)
-		if rsp == nil {
-			continue
-		}
-		err := c.sendResp(rsp)
-		if err != nil {
-			logger.Info("client", "failed to send async att response for", fmt.Sprintf("%x", in[0]))
 		}
 	}
 }
@@ -612,6 +615,8 @@ func (c *Client) Loop() {
 		case <-c.connClosed:
 			logger.Debug("exited client async loop: conn closed")
 			return
+		case <-c.l2c.Context().Done():
+			return
 		default:
 			if c.l2c == nil {
 				fmt.Println("exited client loop: l2c nil")
@@ -622,6 +627,10 @@ func (c *Client) Loop() {
 
 		n, err := c.l2c.Read(c.rxBuf)
 		if err != nil {
+			if errors.Cause(err) == context.Canceled {
+				logger.Debug("client", "context cancelled")
+				return
+			}
 			logger.Info("client", "read error", err.Error())
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
@@ -642,6 +651,8 @@ func (c *Client) Loop() {
 			case <-c.connClosed:
 				logger.Debug("exited client async loop: conn closed")
 				return
+			case <-c.l2c.Context().Done():
+				return
 			case c.inc <- b:
 				continue
 			default:
@@ -659,6 +670,8 @@ func (c *Client) Loop() {
 			case <-c.connClosed:
 				logger.Debug("exited client async loop: conn closed")
 				return
+			case <-c.l2c.Context().Done():
+				return
 			case c.rspc <- b:
 				continue
 			}
@@ -672,6 +685,8 @@ func (c *Client) Loop() {
 			return
 		case <-c.connClosed:
 			logger.Debug("exited client async loop: conn closed")
+			return
+		case <-c.l2c.Context().Done():
 			return
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
 			// ok
