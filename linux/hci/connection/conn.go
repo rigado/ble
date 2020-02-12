@@ -128,7 +128,8 @@ func (c *Conn) Run() {
 			c.ctrl.DispatchError(fmt.Errorf("connection.Run idle timeout"))
 			return
 		case <-c.ctx.Done():
-			c.ctrl.DispatchError(fmt.Errorf("connection cancelled: %s", c.ctx.Err()))
+			hci.Logger.Info("connection context cancelled", c.param.ConnectionHandle())
+			//c.ctrl.DispatchError(fmt.Errorf("connection cancelled: %s", c.ctx.Err()))
 			return
 		}
 
