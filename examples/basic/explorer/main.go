@@ -5,12 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -94,11 +95,23 @@ func main() {
 	// Start the exploration.
 	explore(cln, p)
 
+	// dump call stack
+	buf := make([]byte, 1<<16)
+	runtime.Stack(buf, true)
+	fmt.Printf("%s", buf)
+
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())
 	cln.CancelConnection()
 
 	<-done
+
+	time.Sleep(125 * time.Millisecond)
+
+	// dump call stack
+	buf = make([]byte, 1<<16)
+	runtime.Stack(buf, true)
+	fmt.Printf("%s", buf)
 }
 
 func explore(cln ble.Client, p *ble.Profile) error {

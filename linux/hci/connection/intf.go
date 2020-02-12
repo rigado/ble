@@ -21,3 +21,9 @@ func (c *Conn) CloseInputChannel() {
 func (c *Conn) SetClosed() {
 	close(c.chDone)
 }
+
+func (c *Conn) CancelContext() {
+	if c.cancel != nil {
+		c.cancel()
+	}
+}

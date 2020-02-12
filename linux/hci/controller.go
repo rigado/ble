@@ -1,6 +1,9 @@
 package hci
 
-import "github.com/rigado/ble"
+import (
+	"context"
+	"github.com/rigado/ble"
+)
 
 type Controller interface{
 	RequestBufferPool() BufferPool
@@ -9,4 +12,6 @@ type Controller interface{
 	SocketWrite([]byte) (int, error)
 	Send(Command, CommandRP) error
 	Addr() ble.Addr
+	CloseConnection(handle uint16) error
+	Context() context.Context
 }

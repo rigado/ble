@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"github.com/pkg/errors"
 	"github.com/rigado/ble"
-	"github.com/rigado/ble/linux/hci/cmd"
 	"io"
 	"net"
 	"time"
@@ -21,7 +20,15 @@ func (c *Conn) StartEncryption() error {
 
 // Read copies re-assembled L2CAP PDUs into sdu.
 func (c *Conn) Read(sdu []byte) (n int, err error) {
-	p, ok := <-c.chInPDU
+	var p Pdu
+	var ok bool
+
+	select {
+	case p, ok = <-c.chInPDU:
+	case <-c.ctx.Done():
+		return 0, c.ctx.Err()
+	}
+
 	if !ok {
 		return 0, errors.Wrap(io.ErrClosedPipe, "input channel closed")
 	}
@@ -98,14 +105,12 @@ func (c *Conn) Disconnected() <-chan struct{} {
 // Close disconnects the connection by sending hci disconnect command to the device.
 func (c *Conn) Close() error {
 	select {
-	case <-c.chDone:
+	case <-c.ctx.Done():
 		// Return if it's already closed.
 		return nil
 	default:
-		return c.ctrl.Send(&cmd.Disconnect{
-			ConnectionHandle: c.param.ConnectionHandle(),
-			Reason:           0x13,
-		}, nil)
+		return c.ctrl.CloseConnection(c.param.ConnectionHandle())
+
 	}
 }
 
