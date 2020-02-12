@@ -327,10 +327,13 @@ func (c *Conn) recombine(pkt Packet) error {
 	}
 
 	for len(p) < 4+p.dlen() {
-		if pkt, ok := <-c.chInPkt; !ok || (pkt.Pbf()&hci.PbfContinuing) == 0 {
+		var more Packet
+		var ok bool
+		if more, ok = <-c.chInPkt; !ok || (more.Pbf()&hci.PbfContinuing) == 0 {
 			return io.ErrUnexpectedEOF
 		}
-		p = append(p, Pdu(pkt.data())...)
+
+		p = append(p, Pdu(more.data())...)
 	}
 
 	// TODO: support dynamic or assigned channels for LE-Frames.
@@ -342,7 +345,6 @@ func (c *Conn) recombine(pkt Packet) error {
 	case CidSMP:
 		_ = c.smp.Handle(p)
 	default:
-		//todo: change this back to a logger
 		_ = hci.Logger.Error("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
 	return nil
