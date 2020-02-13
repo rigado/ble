@@ -10,6 +10,7 @@ import (
 
 	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -90,18 +91,20 @@ func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, erro
 		return nil, err
 	}
 
-	rwc := &connWithTimeout{c, connTimeout}
+	fast := time.Millisecond * 500
+	rwc := &connWithTimeout{c, fast}
 	log.Println("flushing...")
 	b := make([]byte, 2048)
 	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
 	for {
 		n, err := rwc.Read(b)
-		// log.Println(n, err)
 		if n == 0 || err != nil {
 			break
 		}
 	}
 
+	// set the real timeout
+	rwc.timeout = connTimeout
 	log.Println("connect", c.RemoteAddr().String(), err)
 
 	h := &h4{
@@ -208,11 +211,17 @@ func (h *h4) rxLoop() {
 
 		// read
 		n, err := h.rwc.Read(tmp)
-		if err != nil || n == 0 {
+		switch {
+		case err == io.EOF:
+			logrus.Error(err)
+			h.Close()
+			break
+		case err == nil && n > 0:
+			//process
+			h.frame.Assemble(tmp[:n])
+		default:
+			//nothing to do
 			continue
 		}
-
-		// put
-		h.frame.Assemble(tmp[:n])
 	}
 }
