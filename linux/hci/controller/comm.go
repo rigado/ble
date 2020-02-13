@@ -99,8 +99,11 @@ func (h *HCI) send(c hci.Command) ([]byte, error) {
 
 func (h *HCI) sktProcessLoop() {
 
-	defer h.cleanup()
-	defer h.dispatchError(h.err)
+	defer func(){
+		fmt.Println("defer sktProcessLoop cleanup, h.err is", h.err)
+		h.cleanup()
+		h.dispatchError(h.err)
+	}()
 
 	for {
 		var p []byte
@@ -128,6 +131,7 @@ func (h *HCI) sktProcessLoop() {
 				//todo: change this back to a logger
 				fmt.Printf("skt: %v\n", err)
 			} else {
+				fmt.Printf("handle pkt error: %s", err)
 				h.err = fmt.Errorf("skt handle error: %v", err)
 				return
 			}
