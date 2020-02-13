@@ -73,7 +73,7 @@ func (h *HCI) send(c hci.Command) ([]byte, error) {
 	var err error
 
 	// emergency timeout to prevent calls from locking up if the HCI
-	// interface doesn't respond.  Responsed here should normally be fast
+	// interface doesn't respond.  Responses here should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
 	case <-time.After(10 * time.Second):

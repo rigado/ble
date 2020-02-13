@@ -324,7 +324,8 @@ func (h *HCI) cleanupConnectionHandle(handle uint16) error {
 	}
 
 	delete(h.conns, handle)
-	fmt.Println("cleanupConnectionHandle: close c.chInPkt")
+	fmt.Println("cleanupConnectionHandle: close c.chInPkt and cancel the context")
+	c.CancelContext()
 	c.CloseInputChannel()
 
 	if !h.isOpen() && c.Role() == hci.RoleSlave {
