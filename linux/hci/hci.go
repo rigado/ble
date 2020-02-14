@@ -1,6 +1,7 @@
 package hci
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -346,8 +347,12 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// interface doesn't respond.  Responsed here should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(3 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
+		fmt.Println("no response to command")
+		fmt.Println("pending commands:")
+		fmt.Printf("cmd: %x pkt: %s", c.OpCode(), hex.EncodeToString(b))
+		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
 		err = h.err
