@@ -410,6 +410,21 @@ func (c *Conn) Close() error {
 		// Return if it's already closed.
 		return nil
 	default:
+		//if the disconnect times out (no response to the command or
+		//we never receive a DisconnectComplete), this go routine
+		//ensures the connection handle is cleaned up
+		go func(c *Conn) {
+			select {
+			case <-c.Disconnected():
+			case <-time.After(10 * time.Second):
+				fmt.Printf("disconnect for %s timed out...\n", c.RemoteAddr().String())
+				err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle())
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+		}(c)
+
 		return c.hci.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
