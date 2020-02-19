@@ -759,12 +759,14 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
+	fmt.Printf("[BLE] cleanupConnHan: looking for %04X\n", ch)
 	c, found := h.conns[ch]
 	if !found {
 		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
 	delete(h.conns, ch)
+	fmt.Printf("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -779,6 +781,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
+		fmt.Printf("[BLE] cleanupConnHan %04X: close c.chDone\n", ch)
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet

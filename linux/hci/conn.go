@@ -413,7 +413,7 @@ func (c *Conn) Close() error {
 		//if the disconnect times out (no response to the command or
 		//we never receive a DisconnectComplete), this go routine
 		//ensures the connection handle is cleaned up
-		go func(c *Conn) {
+		go func(handle uint16, addr string) {
 			select {
 			case <-c.Disconnected():
 			case <-time.After(10 * time.Second):
@@ -423,7 +423,7 @@ func (c *Conn) Close() error {
 					fmt.Println(err)
 				}
 			}
-		}(c)
+		}(c.param.ConnectionHandle(), c.RemoteAddr().String())
 
 		return c.hci.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
