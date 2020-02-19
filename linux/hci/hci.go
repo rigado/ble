@@ -711,6 +711,12 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
+
+	status := e.Status()
+	if status != 0 {
+		fmt.Println("[BLE] connection failed: %s\n", hex.EncodeToString(b))
+		return nil
+	}
 	c := newConn(h, e)
 	h.muConns.Lock()
 	pa := e.PeerAddress()
