@@ -417,8 +417,8 @@ func (c *Conn) Close() error {
 			select {
 			case <-c.Disconnected():
 			case <-time.After(10 * time.Second):
-				fmt.Printf("disconnect for %s timed out...\n", c.RemoteAddr().String())
-				err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle())
+				fmt.Printf("disconnect for %04X:%s timed out...\n", handle, c.RemoteAddr().String())
+				err := c.hci.cleanupConnectionHandle(handle)
 				if err != nil {
 					fmt.Println(err)
 				}
