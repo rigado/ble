@@ -713,6 +713,9 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
 	c := newConn(h, e)
 	h.muConns.Lock()
+	pa := e.PeerAddress()
+	addr := pa[:]
+	fmt.Printf("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -765,6 +768,8 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
+	fmt.Printf("[BLE] clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String())
+
 	delete(h.conns, ch)
 	fmt.Printf("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
 	close(c.chInPkt)
@@ -799,6 +804,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
+	fmt.Printf("[BLE] disconnect complete for handle %04X\n", ch)
 	return h.cleanupConnectionHandle(ch)
 }
 
