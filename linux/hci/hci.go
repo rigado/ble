@@ -714,14 +714,14 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	status := e.Status()
 	if status != 0 {
-		fmt.Println("[BLE] connection failed: %s\n", hex.EncodeToString(b))
+		fmt.Printf("[BLE] connection failed: %s\n", hex.EncodeToString(b))
 		return nil
 	}
 	c := newConn(h, e)
 	h.muConns.Lock()
 	pa := e.PeerAddress()
 	addr := pa[:]
-	fmt.Printf("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b))
+	logger.Debug("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -768,16 +768,16 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
-	fmt.Printf("[BLE] cleanupConnHan: looking for %04X\n", ch)
+	logger.Debug("[BLE] cleanupConnHan: looking for %04X\n", ch)
 	c, found := h.conns[ch]
 	if !found {
 		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
-	fmt.Printf("[BLE] clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String())
+	logger.Debug("[BLE] clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String())
 
 	delete(h.conns, ch)
-	fmt.Printf("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
+	logger.Debug("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -792,7 +792,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
-		fmt.Printf("[BLE] cleanupConnHan %04X: close c.chDone\n", ch)
+		logger.Debug("[BLE] cleanupConnHan %04X: close c.chDone\n", ch)
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
@@ -810,7 +810,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
-	fmt.Printf("[BLE] disconnect complete for handle %04X\n", ch)
+	logger.Debug("[BLE] disconnect complete for handle %04X\n", ch)
 	return h.cleanupConnectionHandle(ch)
 }
 
