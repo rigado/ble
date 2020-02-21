@@ -553,10 +553,10 @@ func (c *Client) asyncReqLoop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			fmt.Println("exited client async loop: done")
+			fmt.Println("[BLE ATT]: exited client async loop: done")
 			return
 		case <-c.connClosed:
-			logger.Debug("exited client async loop: conn closed")
+			logger.Debug("[BLE ATT]: exited client async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {

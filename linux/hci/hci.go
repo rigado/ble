@@ -1,6 +1,7 @@
 package hci
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -346,8 +347,12 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// interface doesn't respond.  Responsed here should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
-	case <-time.After(10 * time.Second):
+	case <-time.After(3 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
+		fmt.Println("no response to command")
+		fmt.Println("pending commands:")
+		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4 + c.Len()]))
+		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
 		err = h.err
@@ -706,8 +711,17 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
+
+	status := e.Status()
+	if status != 0 {
+		fmt.Printf("[BLE] connection failed: %s\n", hex.EncodeToString(b))
+		return nil
+	}
 	c := newConn(h, e)
 	h.muConns.Lock()
+	pa := e.PeerAddress()
+	addr := pa[:]
+	logger.Debug("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -754,12 +768,16 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
+	logger.Debug("[BLE] cleanupConnHan: looking for %04X\n", ch)
 	c, found := h.conns[ch]
 	if !found {
 		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
+	logger.Debug("[BLE] clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String())
+
 	delete(h.conns, ch)
+	logger.Debug("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -774,6 +792,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
+		logger.Debug("[BLE] cleanupConnHan %04X: close c.chDone\n", ch)
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
@@ -791,6 +810,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
+	logger.Debug("[BLE] disconnect complete for handle %04X\n", ch)
 	return h.cleanupConnectionHandle(ch)
 }
 
