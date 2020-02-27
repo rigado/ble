@@ -87,7 +87,7 @@ func (p *pairingContext) checkPasskeyConfirm() error {
 	key := p.authData.Passkey
 
 	//this gets the bit of the passkey for the current iteration
-	z := 0x80 | (byte)((key & (1 << i)) >> i)
+	z := 0x80 | (byte)((key&(1<<uint(i)))>>uint(i))
 
 	//Cb =f4(PKbx,PKax, Nb, rb)
 	calcConf, err := smpF4(kbx, kax, nb, z)
@@ -120,7 +120,7 @@ func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 	}
 
 	i := p.passKeyIteration
-	z := 0x80 | (byte)((p.authData.Passkey & (1 << i)) >> i)
+	z := 0x80 | (byte)((p.authData.Passkey&(1<<uint(i)))>>uint(i))
 
 	calcConf, err := smpF4(kax, kbx, nai, z)
 	if err != nil {
