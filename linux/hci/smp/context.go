@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/rigado/ble"
@@ -158,6 +159,43 @@ func (p *pairingContext) calcMacLtk() error {
 }
 
 func (p *pairingContext) checkDHKeyCheck() error {
+	//F6(MacKey, Na, Nb, ra, IOcapA, A, B)
+	la := p.localAddr
+	la = append(la, p.localAddrType)
+	rAddr := p.remoteAddr
+	rAddr = append(rAddr, p.remoteAddrType)
+	na := p.localRandom
+	nb := p.remoteRandom
+
+	ioCap := swapBuf([]byte{p.response.AuthReq, p.response.OobFlag, p.response.IoCap})
+
+	ra := make([]byte, 16)
+	if p.pairingType == Passkey {
+		keyBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(keyBytes, uint32(p.authData.Passkey))
+		ra[12] = keyBytes[0]
+		ra[13] = keyBytes[1]
+		ra[14] = keyBytes[2]
+		ra[15] = keyBytes[3]
+
+		//swap to little endian
+		ra = swapBuf(ra)
+	} else if p.pairingType == Oob {
+		ra = p.authData.OOBData
+		//todo: does this need to be swapped?
+	}
+
+	dhKeyCheck, err := smpF6(p.scMacKey, nb, na, ra, ioCap, rAddr, la)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("cdhk: %x\nrdhk: %x\n", dhKeyCheck, p.scRemoteDHKeyCheck)
+
+	if !bytes.Equal(p.scRemoteDHKeyCheck, dhKeyCheck) {
+		return fmt.Errorf("dhKeyCheck failed: expected %x, calculated %x",
+			p.scRemoteDHKeyCheck, dhKeyCheck)
+	}
 
 	return nil
 }
