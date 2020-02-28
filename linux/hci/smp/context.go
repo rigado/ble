@@ -190,8 +190,6 @@ func (p *pairingContext) checkDHKeyCheck() error {
 		return err
 	}
 
-	fmt.Printf("cdhk: %x\nrdhk: %x\n", dhKeyCheck, p.scRemoteDHKeyCheck)
-
 	if !bytes.Equal(p.scRemoteDHKeyCheck, dhKeyCheck) {
 		return fmt.Errorf("dhKeyCheck failed: expected %x, calculated %x",
 			p.scRemoteDHKeyCheck, dhKeyCheck)
