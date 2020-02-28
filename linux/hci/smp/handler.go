@@ -183,14 +183,14 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("no pairing context")
 	}
 
-	//todo: checkDHKeyCheck not implemented
-	t.pairing.scRemoteDHKeyCheck = []byte(in)
+	t.pairing.scRemoteDHKeyCheck = in
 	err := t.pairing.checkDHKeyCheck()
 	if err != nil {
 		//dhkeycheck failed!
 		return nil, err
 	}
 
+	fmt.Println("dhkey check pass!")
 	err = t.saveBondInfo()
 	if err != nil {
 		return nil, err
