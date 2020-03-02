@@ -3,7 +3,6 @@ package h4
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -51,7 +50,7 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	opts.MinimumReadSize = 0
 	opts.InterCharacterTimeout = 100
 
-	log.Println("opening...")
+	logrus.Infoln("opening...")
 	rwc, err := serial.Open(opts)
 	if err != nil {
 		return nil, err
@@ -59,7 +58,7 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 
 	// dump data
 	// todo this is mega slow and stupid, but I doubt we can change this on the fly
-	log.Println("flushing...")
+	logrus.Infoln("flushing...")
 	b := make([]byte, 2048)
 	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
 	<-time.After(time.Millisecond * 250)
@@ -69,7 +68,7 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 
-	log.Println("opened", opts, err)
+	logrus.Infof("opened %v, err: %v", opts, err)
 
 	h := &h4{
 		rwc:     rwc,
@@ -85,15 +84,16 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 }
 
 func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, error) {
-	log.Printf("Dialing %v ...", addr)
+	logrus.Infof("Dialing %v ...", addr)
 	c, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
 
+	// use a shorter timeout when flushing so we dont block for too long in init
 	fast := time.Millisecond * 500
 	rwc := &connWithTimeout{c, fast}
-	log.Println("flushing...")
+	logrus.Infoln("flushing...")
 	b := make([]byte, 2048)
 	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
 	for {
@@ -105,7 +105,7 @@ func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, erro
 
 	// set the real timeout
 	rwc.timeout = connTimeout
-	log.Println("connect", c.RemoteAddr().String(), err)
+	logrus.Debugf("connect %v, err: %v", c.RemoteAddr().String(), err)
 
 	h := &h4{
 		rwc:     rwc,
@@ -139,10 +139,8 @@ func (h *h4) Read(p []byte) (int, error) {
 		n = copy(p, t)
 
 	case <-time.After(time.Second):
-		return 0, nil //fmt.Errorf("timeout")
+		return 0, nil
 	}
-
-	// log.Printf("read [% 0x], %v, %v", p[:n], n, err)
 
 	// check if we are still open since the read could take a while
 	if !h.isOpen() {
@@ -170,12 +168,12 @@ func (h *h4) Close() error {
 
 	select {
 	case <-h.done:
-		fmt.Println("h4 already closed!")
+		logrus.Infoln("h4 already closed!")
 		return nil
 
 	default:
 		close(h.done)
-		fmt.Println("closing h4")
+		logrus.Infoln("closing h4")
 		h.rmu.Lock()
 		err := h.rwc.Close()
 		h.rmu.Unlock()
@@ -187,10 +185,9 @@ func (h *h4) Close() error {
 func (h *h4) isOpen() bool {
 	select {
 	case <-h.done:
-		log.Printf("isOpen: <-h.done, false\n")
+		logrus.Infoln("isOpen: <-h.done, false")
 		return false
 	default:
-		// log.Printf("isOpen: %v\n", h.rwc != nil)
 		return h.rwc != nil
 	}
 }
@@ -200,11 +197,11 @@ func (h *h4) rxLoop() {
 	for {
 		select {
 		case <-h.done:
-			log.Printf("rxLoop killed")
+			logrus.Infoln("rxLoop killed")
 			return
 		default:
 			if h.rwc == nil {
-				log.Printf("rxLoop nil rwc")
+				logrus.Infoln("rxLoop nil rwc")
 				return
 			}
 		}

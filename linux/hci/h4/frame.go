@@ -139,8 +139,6 @@ func (f *frame) aclLength() (int, error) {
 	}
 
 	l := int(f.b[3]) | (int(f.b[4]) << 8)
-	// fmt.Printf("expecting %v bytes acl data\n", l)
-
 	return l + 5, nil
 }
 
