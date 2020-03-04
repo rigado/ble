@@ -28,10 +28,12 @@ func ioctl(fd, op, arg uintptr) error {
 }
 
 const (
-	ioctlSize     = 4
-	hciMaxDevices = 16
-	typHCI        = 72 // 'H'
-	readTimeout   = 1000
+	ioctlSize      = 4
+	hciMaxDevices  = 16
+	typHCI         = 72 // 'H'
+	readTimeout    = 1000
+	unixPollErrors = int16(unix.POLLHUP | unix.POLLNVAL | unix.POLLERR)
+	unixPollIn     = int16(unix.POLLIN)
 )
 
 var (
@@ -134,17 +136,22 @@ func (s *Socket) Read(p []byte) (int, error) {
 
 	var err error
 	n := 0
-
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unix.POLLIN}}
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: (unixPollIn | unixPollErrors)}}
 	unix.Poll(pfds, readTimeout)
+	evts := pfds[0].Revents
 
-	// poll for data success?
-	if pfds[0].Revents&unix.POLLIN > 0 {
+	switch {
+	case evts&unixPollErrors != 0:
+		fmt.Printf("socket error: poll events 0x%04x", evts)
+		return 0, io.EOF
+
+	case evts&unixPollIn != 0:
 		// there is data!
 		n, err = unix.Read(s.fd, p)
-	} else {
+
+	default:
 		// no data, read timeout
 		return 0, nil
 	}

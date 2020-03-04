@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	smp2 "github.com/rigado/ble/linux/hci/smp"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/att"
 	"github.com/rigado/ble/linux/gatt"
 	"github.com/rigado/ble/linux/hci"
-	"github.com/pkg/errors"
 )
 
 // NewDevice returns the default HCI device.
@@ -59,13 +58,13 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			// An EOF error indicates that the HCI socket was closed during
 			// the read.  Don't report this as an error.
 			if err != io.EOF {
-				log.Printf("can't accept: %s", err)
+				fmt.Printf("can't accept: %s\n", err)
 			}
 			return
 		}
 
 		if l2c == nil {
-			log.Printf("l2c nil")
+			fmt.Printf("l2c nil\n")
 			return
 		}
 
@@ -77,7 +76,7 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		as, err := att.NewServer(s.DB(), l2c)
 		s.Unlock()
 		if err != nil {
-			log.Printf("can't create ATT server: %s", err)
+			fmt.Printf("can't create ATT server: %s\n", err)
 			continue
 		}
 		fmt.Println("starting server loop")
