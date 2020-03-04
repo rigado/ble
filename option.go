@@ -8,7 +8,6 @@ import (
 
 // DeviceOption is an interface which the device should implement to allow using configuration options
 type DeviceOption interface {
-	SetDeviceID(int) error
 	SetDialerTimeout(time.Duration) error
 	SetListenerTimeout(time.Duration) error
 	SetConnParams(cmd.LECreateConnection) error
@@ -19,17 +18,18 @@ type DeviceOption interface {
 	SetAdvHandlerSync(bool) error
 	SetErrorHandler(handler func(error)) error
 	EnableSecurity(interface{}) error
+
+	SetTransportHCISocket(id int) error
+	SetTransportH4Socket(addr string, timeout time.Duration) error
+	SetTransportH4Uart(path string) error
 }
 
 // An Option is a configuration function, which configures the device.
 type Option func(DeviceOption) error
 
-// OptDeviceID sets HCI device ID.
+// DEPRECATED: legacy stuff
 func OptDeviceID(id int) Option {
-	return func(opt DeviceOption) error {
-		opt.SetDeviceID(id)
-		return nil
-	}
+	return OptTransportHCISocket(id)
 }
 
 // OptDialerTimeout sets dialing timeout for Dialer.
@@ -108,6 +108,30 @@ func OptErrorHandler(handler func(error)) Option {
 func OptEnableSecurity(bondManager interface{}) Option {
 	return func(opt DeviceOption) error {
 		opt.EnableSecurity(bondManager)
+		return nil
+	}
+}
+
+// OptTransportHCISocket set hci socket transport
+func OptTransportHCISocket(id int) Option {
+	return func(opt DeviceOption) error {
+		opt.SetTransportHCISocket(id)
+		return nil
+	}
+}
+
+// OptTransportH4Socket set h4 socket transport
+func OptTransportH4Socket(addr string, timeout time.Duration) Option {
+	return func(opt DeviceOption) error {
+		opt.SetTransportH4Socket(addr, timeout)
+		return nil
+	}
+}
+
+// OptTransportH4Uart set h4 uart transport
+func OptTransportH4Uart(path string) Option {
+	return func(opt DeviceOption) error {
+		opt.SetTransportH4Uart(path)
 		return nil
 	}
 }

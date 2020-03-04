@@ -13,7 +13,6 @@ import (
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 	"github.com/rigado/ble/linux/hci/evt"
-	"github.com/rigado/ble/linux/hci/socket"
 )
 
 // Command ...
@@ -38,7 +37,6 @@ type pkt struct {
 // NewHCI returns a hci device.
 func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 	h := &HCI{
-		id:        -1,
 		smp:       smp,
 		chCmdPkt:  make(chan *pkt),
 		chCmdBufs: make(chan []byte, chCmdBufChanSize),
@@ -74,8 +72,8 @@ type HCI struct {
 	smp        SmpManagerFactory
 	smpEnabled bool
 
-	skt io.ReadWriteCloser
-	id  int
+	transport transport
+	skt       io.ReadWriteCloser
 
 	// Host to Controller command flow control [Vol 2, Part E, 4.4]
 	chCmdPkt  chan *pkt
@@ -153,7 +151,7 @@ func (h *HCI) Init() error {
 	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	var err error
-	h.skt, err = socket.NewSocket(h.id)
+	h.skt, err = getTransport(h.transport)
 	if err != nil {
 		return err
 	}

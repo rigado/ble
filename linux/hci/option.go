@@ -8,12 +8,6 @@ import (
 	"github.com/rigado/ble/linux/hci/cmd"
 )
 
-// SetDeviceID sets HCI device ID.
-func (h *HCI) SetDeviceID(id int) error {
-	h.id = id
-	return nil
-}
-
 // SetDialerTimeout sets dialing timeout for Dialer.
 func (h *HCI) SetDialerTimeout(d time.Duration) error {
 	h.dialerTmo = d
@@ -75,5 +69,29 @@ func (h *HCI) SetAdvHandlerSync(sync bool) error {
 // SetErrorHandler ...
 func (h *HCI) SetErrorHandler(handler func(error)) error {
 	h.errorHandler = handler
+	return nil
+}
+
+// SetTransportHCISocket sets HCI device for hci socket
+func (h *HCI) SetTransportHCISocket(id int) error {
+	h.transport = transport{
+		hci: &transportHci{id},
+	}
+	return nil
+}
+
+// SetTransportH4Socket sets h4 socket server
+func (h *HCI) SetTransportH4Socket(addr string, timeout time.Duration) error {
+	h.transport = transport{
+		h4socket: &transportH4Socket{addr, timeout},
+	}
+	return nil
+}
+
+// SetTransportH4Uart sets h4 uart path
+func (h *HCI) SetTransportH4Uart(path string) error {
+	h.transport = transport{
+		h4uart: &transportH4Uart{path},
+	}
 	return nil
 }

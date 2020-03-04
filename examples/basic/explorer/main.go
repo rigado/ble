@@ -5,31 +5,44 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux"
-	"github.com/pkg/errors"
 )
 
 var (
-	device = flag.Int("device", 1, "hci index")
+	device = flag.Int("device", -1, "hci index")
 	name   = flag.String("name", "", "name of remote peripheral")
-	addr   = flag.String("addr", "C5:74:7A:BA:49:32", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	addr   = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	h4addr = flag.String("h4", "localhost:9001", "h4 socket server address")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
-	bond = flag.Bool("bond", false, "attempt to bond on connection")
+	bond   = flag.Bool("bond", false, "attempt to bond on connection")
+	dump   = flag.Bool("dump", true, "dump stack?")
 )
 
 func main() {
 	flag.Parse()
 	log.Printf("device: hci%v", *device)
+	log.Printf("h4addr: %v", *h4addr)
 	log.Printf("name: %v", *name)
 	log.Printf("addr: %v", *addr)
 
-	optid := ble.OptDeviceID(*device)
-	d, err := linux.NewDeviceWithNameAndHandler("", nil, optid)
+	var opt ble.Option
+	switch {
+	case *device >= 0:
+		opt = ble.OptTransportHCISocket(*device)
+	case len(*h4addr) > 0:
+		opt = ble.OptTransportH4Socket(*h4addr, 2*time.Second)
+	default:
+		log.Fatalf("no valid device to init")
+	}
+
+	d, err := linux.NewDeviceWithNameAndHandler("", nil, opt)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
@@ -37,12 +50,14 @@ func main() {
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
+		fmt.Println(a.Addr(), a.LocalName())
 		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
 	}
 
 	// If addr is specified, search for addr instead.
 	if len(*addr) != 0 {
 		filter = func(a ble.Advertisement) bool {
+			fmt.Println(a.Addr())
 			return strings.ToUpper(a.Addr().String()) == strings.ToUpper(*addr)
 		}
 	}
@@ -67,7 +82,16 @@ func main() {
 	}()
 
 	log.Println("connected!")
-	<-time.After(5 * time.Second)
+	<-time.After(2000 * time.Millisecond)
+
+	rxMtu := ble.MaxMTU
+	txMtu, err := cln.ExchangeMTU(rxMtu)
+	if err != nil {
+		fmt.Printf("%v - MTU exchange error: %v\n", *addr, err)
+		// stay connected
+	} else {
+		fmt.Printf("%v - MTU exchange success: rx %v, tx %v\n", *addr, rxMtu, txMtu)
+	}
 
 	fmt.Printf("Discovering profile...\n")
 	p, err := cln.DiscoverProfile(true)
@@ -79,11 +103,27 @@ func main() {
 	// Start the exploration.
 	explore(cln, p)
 
+	dumpStack()
+
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())
 	cln.CancelConnection()
 
 	<-done
+
+	time.Sleep(125 * time.Millisecond)
+
+	dumpStack()
+}
+
+func dumpStack() {
+	if !*dump {
+		return
+	}
+	// dump call stack
+	buf := make([]byte, 1<<16)
+	runtime.Stack(buf, true)
+	fmt.Printf("%s", buf)
 }
 
 func explore(cln ble.Client, p *ble.Profile) error {
