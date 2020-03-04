@@ -138,13 +138,14 @@ func (s *Socket) Read(p []byte) (int, error) {
 	n := 0
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: (unixPollIn | unixPollErrors)}}
+	// dont need to add unixPollErrors, they are always returned
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unixPollIn)}}
 	unix.Poll(pfds, readTimeout)
 	evts := pfds[0].Revents
 
 	switch {
 	case evts&unixPollErrors != 0:
-		fmt.Printf("socket error: poll events 0x%04x", evts)
+		fmt.Printf("hci socket error: poll events 0x%04x\n", evts)
 		return 0, io.EOF
 
 	case evts&unixPollIn != 0:
@@ -180,7 +181,6 @@ func (s *Socket) Close() error {
 
 	select {
 	case <-s.done:
-		fmt.Println("hci socket already closed!")
 		return nil
 
 	default:
