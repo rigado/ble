@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -33,7 +34,7 @@ const (
 	typHCI         = 72 // 'H'
 	readTimeout    = 1000
 	unixPollErrors = int16(unix.POLLHUP | unix.POLLNVAL | unix.POLLERR)
-	unixPollIn     = int16(unix.POLLIN)
+	unixPollDataIn = int16(unix.POLLIN)
 )
 
 var (
@@ -118,12 +119,28 @@ func open(fd, id int) (*Socket, error) {
 		return nil, errors.Wrap(err, "can't bind socket to hci user channel")
 	}
 
-	// poll for 20ms to see if any data becomes available, then clear it
-	pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
-	unix.Poll(pfds, 20)
-	if pfds[0].Revents&unix.POLLIN > 0 {
-		b := make([]byte, 100)
-		unix.Read(fd, b)
+	timeout := time.Now().Add(time.Second * 10)
+	for {
+		// poll for 20ms to see if any data becomes available, then clear it
+		pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+		unix.Poll(pfds, 20)
+		b := make([]byte, 2048)
+		evts := pfds[0].Revents
+
+		switch {
+		case time.Now().After(timeout):
+			return nil, fmt.Errorf("socket flush timeout")
+
+		case evts&unixPollErrors != 0:
+			return nil, io.EOF
+
+		case evts&unixPollDataIn != 0:
+			unix.Read(fd, b)
+
+		default:
+			//nothing left,
+			break
+		}
 	}
 
 	return &Socket{fd: fd, done: make(chan int)}, nil
@@ -139,7 +156,7 @@ func (s *Socket) Read(p []byte) (int, error) {
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
 	// dont need to add unixPollErrors, they are always returned
-	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unixPollIn)}}
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unixPollDataIn}}
 	unix.Poll(pfds, readTimeout)
 	evts := pfds[0].Revents
 
@@ -148,7 +165,7 @@ func (s *Socket) Read(p []byte) (int, error) {
 		fmt.Printf("hci socket error: poll events 0x%04x\n", evts)
 		return 0, io.EOF
 
-	case evts&unixPollIn != 0:
+	case evts&unixPollDataIn != 0:
 		// there is data!
 		n, err = unix.Read(s.fd, p)
 
