@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -119,28 +118,18 @@ func open(fd, id int) (*Socket, error) {
 		return nil, errors.Wrap(err, "can't bind socket to hci user channel")
 	}
 
-	timeout := time.Now().Add(time.Second * 10)
-	for {
-		// poll for 20ms to see if any data becomes available, then clear it
-		pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
-		unix.Poll(pfds, 20)
+	// poll for 20ms to see if any data becomes available, then clear it
+	pfds := []unix.PollFd{{Fd: int32(fd), Events: unixPollDataIn}}
+	unix.Poll(pfds, 20)
+	evts := pfds[0].Revents
+
+	switch {
+	case evts&unixPollErrors != 0:
+		return nil, io.EOF
+
+	case evts&unixPollDataIn != 0:
 		b := make([]byte, 2048)
-		evts := pfds[0].Revents
-
-		switch {
-		case time.Now().After(timeout):
-			return nil, fmt.Errorf("socket flush timeout")
-
-		case evts&unixPollErrors != 0:
-			return nil, io.EOF
-
-		case evts&unixPollDataIn != 0:
-			unix.Read(fd, b)
-
-		default:
-			//nothing left,
-			break
-		}
+		unix.Read(fd, b)
 	}
 
 	return &Socket{fd: fd, done: make(chan int)}, nil
