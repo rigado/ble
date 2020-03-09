@@ -358,8 +358,6 @@ func (c *Conn) recombine() error {
 		if !ok {
 			return io.EOF
 		}
-	case <-time.After(time.Minute * 10):
-		return fmt.Errorf("idle timeout")
 	}
 
 	p := pdu(pkt.data())
@@ -378,8 +376,14 @@ func (c *Conn) recombine() error {
 		p = append(p, pdu(pkt.data())...)
 	}
 	for len(p) < 4+p.dlen() {
-		if pkt, ok = <-c.chInPkt; !ok || (pkt.pbf()&pbfContinuing) == 0 {
-			return io.ErrUnexpectedEOF
+		//need to wait on more data
+		select {
+		case <-c.hci.done:
+			return io.EOF
+		case pkt, ok = <-c.chInPkt:
+			if !ok || (pkt.pbf()&pbfContinuing) == 0 {
+				return io.ErrUnexpectedEOF
+			}
 		}
 		p = append(p, pdu(pkt.data())...)
 	}
