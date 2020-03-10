@@ -7,8 +7,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci"
+	"github.com/rigado/ble/sliceops"
 )
 
 const (
@@ -26,33 +28,33 @@ var pairingTypeStrings = []string{
 }
 
 type pairingContext struct {
-	request hci.SmpConfig
-	response hci.SmpConfig
-	remoteAddr []byte
+	request        hci.SmpConfig
+	response       hci.SmpConfig
+	remoteAddr     []byte
 	remoteAddrType byte
-	remoteRandom []byte
-	remoteConfirm []byte
+	remoteRandom   []byte
+	remoteConfirm  []byte
 
-	localAddr []byte
+	localAddr     []byte
 	localAddrType byte
-	localRandom []byte
-	localConfirm []byte
+	localRandom   []byte
+	localConfirm  []byte
 
-	scECDHKeys *ECDHKeys
-	scMacKey []byte
-	scRemotePubKey crypto.PublicKey
-	scDHKey []byte
+	scECDHKeys         *ECDHKeys
+	scMacKey           []byte
+	scRemotePubKey     crypto.PublicKey
+	scDHKey            []byte
 	scRemoteDHKeyCheck []byte
 
-	legacy bool
+	legacy       bool
 	shortTermKey []byte
 
 	passKeyIteration int
 
 	pairingType int
-	state PairingState
-	authData ble.AuthData
-	bond hci.BondInfo
+	state       PairingState
+	authData    ble.AuthData
+	bond        hci.BondInfo
 }
 
 func (p *pairingContext) checkConfirm() error {
@@ -167,7 +169,7 @@ func (p *pairingContext) checkDHKeyCheck() error {
 	na := p.localRandom
 	nb := p.remoteRandom
 
-	ioCap := swapBuf([]byte{p.response.AuthReq, p.response.OobFlag, p.response.IoCap})
+	ioCap := sliceops.SwapBuf([]byte{p.response.AuthReq, p.response.OobFlag, p.response.IoCap})
 
 	ra := make([]byte, 16)
 	if p.pairingType == Passkey {
@@ -179,7 +181,7 @@ func (p *pairingContext) checkDHKeyCheck() error {
 		ra[15] = keyBytes[3]
 
 		//swap to little endian
-		ra = swapBuf(ra)
+		ra = sliceops.SwapBuf(ra)
 	} else if p.pairingType == Oob {
 		ra = p.authData.OOBData
 		//todo: does this need to be swapped?
@@ -221,8 +223,8 @@ func (p *pairingContext) checkLegacyConfirm() error {
 	preq := buildPairingReq(p.request)
 	pres := buildPairingRsp(p.response)
 	la := p.localAddr
-	ra:= p.remoteAddr
-	sRand:= p.remoteRandom
+	ra := p.remoteAddr
+	sRand := p.remoteRandom
 
 	k := make([]byte, 16)
 	if p.pairingType == Passkey {
@@ -238,7 +240,7 @@ func (p *pairingContext) checkLegacyConfirm() error {
 		return err
 	}
 
-	sConfirm:= p.remoteConfirm
+	sConfirm := p.remoteConfirm
 
 	if !bytes.Equal(sConfirm, c1) {
 		return fmt.Errorf("sConfirm does not match: exp %s calc %s",

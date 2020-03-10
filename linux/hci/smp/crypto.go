@@ -3,6 +3,8 @@ package smp
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/rigado/ble/sliceops"
 )
 
 func smpF4(u, v, x []byte, z uint8) ([]byte, error) {
@@ -110,15 +112,15 @@ func smpG2(u, v, x, y []byte) (uint32, error) {
 
 //smpE: From Bluetooth Core Spec 5.0: Part H, Section 2, 2.2.1
 func smpE(key, msg []byte) ([]byte, error) {
-	tk := swapBuf(key)
-	msgMsb := swapBuf(msg)
+	tk := sliceops.SwapBuf(key)
+	msgMsb := sliceops.SwapBuf(msg)
 
 	out := aes128(tk, msgMsb)
 	if out == nil {
 		return nil, fmt.Errorf("failed to encrypt message")
 	}
 
-	return swapBuf(out), nil
+	return sliceops.SwapBuf(out), nil
 }
 
 //smpC1: From Bluetooth Core Spec 5.0: Part H, Section 2, 2.2.3

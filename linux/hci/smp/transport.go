@@ -6,9 +6,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/rigado/ble/linux/hci"
 	"log"
 	"time"
+
+	"github.com/rigado/ble/linux/hci"
+	"github.com/rigado/ble/sliceops"
 )
 
 func buildPairingReq(p hci.SmpConfig) []byte {
@@ -81,7 +83,7 @@ func (t *transport) sendPairingRequest() error {
 	for _, v := range laBE {
 		la = append(la, v)
 	}
-	la = swapBuf(la)
+	la = sliceops.SwapBuf(la)
 
 	cmd := buildPairingReq(t.pairing.request)
 	return t.send(cmd)
@@ -137,7 +139,7 @@ func (t *transport) sendDHKeyCheck() error {
 	na := p.localRandom
 	nb := p.remoteRandom
 
-	ioCap := swapBuf([]byte{t.pairing.request.AuthReq, t.pairing.request.OobFlag, t.pairing.request.IoCap})
+	ioCap := sliceops.SwapBuf([]byte{t.pairing.request.AuthReq, t.pairing.request.OobFlag, t.pairing.request.IoCap})
 
 	rb := make([]byte, 16)
 	if t.pairing.pairingType == Passkey {
@@ -149,7 +151,7 @@ func (t *transport) sendDHKeyCheck() error {
 		rb[15] = keyBytes[3]
 
 		//swap to little endian
-		rb = swapBuf(rb)
+		rb = sliceops.SwapBuf(rb)
 	} else if t.pairing.pairingType == Oob {
 		rb = t.pairing.authData.OOBData
 		//todo: does this need to be swapped?

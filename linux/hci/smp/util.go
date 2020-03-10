@@ -3,17 +3,20 @@ package smp
 import (
 	"crypto/aes"
 	"encoding/binary"
+
+	"github.com/rigado/ble/sliceops"
+
 	"github.com/enceve/crypto/cmac"
 )
 
 func aesCMAC(key, msg []byte) ([]byte, error) {
-	tmp := swapBuf(key)
+	tmp := sliceops.SwapBuf(key)
 	mCipher, err := aes.NewCipher(tmp)
 	if err != nil {
 		return nil, err
 	}
 
-	msgMsb := swapBuf(msg)
+	msgMsb := sliceops.SwapBuf(msg)
 
 	mMac, err := cmac.New(mCipher)
 	if err != nil {
@@ -22,7 +25,7 @@ func aesCMAC(key, msg []byte) ([]byte, error) {
 
 	mMac.Write(msgMsb)
 
-	return swapBuf(mMac.Sum(nil)), nil
+	return sliceops.SwapBuf(mMac.Sum(nil)), nil
 }
 
 func xorSlice(a, b []byte) []byte {
@@ -44,19 +47,8 @@ func aes128(key, msg []byte) []byte {
 	return out
 }
 
-func swapBuf(in []byte) []byte {
-	a := make([]byte, 0, len(in))
-	a = append(a, in...)
-	for i := len(a)/2 - 1; i >= 0; i-- {
-		opp := len(a) - 1 - i
-		a[i], a[opp] = a[opp], a[i]
-	}
-
-	return a
-}
-
 func isLegacy(authReq byte) bool {
-	if authReq & 0x08 == 0x08 {
+	if authReq&0x08 == 0x08 {
 		return false
 	}
 
@@ -72,7 +64,7 @@ func getLegacyParingTK(key int) []byte {
 	tk[14] = keyBytes[2]
 	tk[15] = keyBytes[3]
 
-	tk = swapBuf(tk)
+	tk = sliceops.SwapBuf(tk)
 
 	return tk
 }
