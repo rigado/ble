@@ -17,10 +17,11 @@ const (
 )
 
 // NewClient returns a GATT Client.
-func NewClient(conn ble.Conn, done chan bool) (*Client, error) {
+func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool) (*Client, error) {
 	p := &Client{
 		subs: make(map[uint16]*sub),
 		conn: conn,
+		cache: cache,
 	}
 	p.ac = att.NewClient(conn, p, done)
 
@@ -45,6 +46,7 @@ type Client struct {
 	ac   *att.Client
 
 	conn ble.Conn
+	cache ble.GattCache
 }
 
 // Addr returns the address of the client.
@@ -91,6 +93,30 @@ func (p *Client) DiscoverProfile(force bool) (*ble.Profile, error) {
 	}
 	p.profile = &ble.Profile{Services: ss}
 	return p.profile, nil
+}
+
+func (p *Client) DiscoverAndCacheProfile(force bool) (*ble.Profile, error) {
+	if !force {
+		//check cache to see if we have the profile already
+		if p.cache != nil {
+			profile, err := p.cache.Load(p.Addr())
+			if err == nil {
+				return &profile, nil
+			}
+		}
+	}
+
+	profile, err := p.DiscoverProfile(force)
+	if err != nil {
+		return nil, err
+	}
+
+	err = p.cache.Store(p.Addr(), *profile, true)
+	if err != nil {
+		return profile, err
+	}
+
+	return profile, nil
 }
 
 // DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]

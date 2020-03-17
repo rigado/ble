@@ -227,7 +227,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 		if !ok {
 			return nil, fmt.Errorf("chMasterConn closed")
 		}
-		return gatt.NewClient(c, h.done)
+		return gatt.NewClient(c, h.cache, h.done)
 	}
 }
 
@@ -243,7 +243,7 @@ func (h *HCI) cancelDial() (ble.Client, error) {
 	if err == ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
-			return gatt.NewClient(c, h.done)
+			return gatt.NewClient(c, nil, h.done)
 		default:
 			return nil, errors.Wrap(err, "cancel connection failed")
 		}

@@ -126,6 +126,8 @@ type HCI struct {
 	done    chan bool
 
 	sktRxChan chan []byte
+
+	cache ble.GattCache
 }
 
 // Init ...
