@@ -101,6 +101,7 @@ func (p *Client) DiscoverAndCacheProfile(force bool) (*ble.Profile, error) {
 		if p.cache != nil {
 			profile, err := p.cache.Load(p.Addr())
 			if err == nil {
+				p.profile = &profile
 				return &profile, nil
 			}
 		}
