@@ -11,7 +11,7 @@ import (
 
 type gattCache struct {
 	filename string
-	lock sync.RWMutex
+	sync.RWMutex
 }
 
 func New(filename string) ble.GattCache {
@@ -23,8 +23,8 @@ func New(filename string) ble.GattCache {
 }
 
 func (gc *gattCache) Store(mac ble.Addr, profile ble.Profile, replace bool) error {
-	gc.lock.Lock()
-	defer gc.lock.Unlock()
+	gc.Lock()
+	defer gc.Unlock()
 
 	cache, err := gc.loadExisting()
 	if err != nil {
@@ -47,8 +47,8 @@ func (gc *gattCache) Store(mac ble.Addr, profile ble.Profile, replace bool) erro
 }
 
 func (gc *gattCache) Load(mac ble.Addr) (ble.Profile, error) {
-	gc.lock.RLock()
-	defer gc.lock.RUnlock()
+	gc.RLock()
+	defer gc.RUnlock()
 
 	cache, err := gc.loadExisting()
 	if err != nil {
@@ -64,8 +64,8 @@ func (gc *gattCache) Load(mac ble.Addr) (ble.Profile, error) {
 }
 
 func (gc *gattCache) Clear() error {
-	gc.lock.Lock()
-	defer gc.lock.Unlock()
+	gc.Lock()
+	defer gc.Unlock()
 
 	err := os.Remove(gc.filename)
 	if err != nil {
