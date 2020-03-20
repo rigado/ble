@@ -22,6 +22,7 @@ type DeviceOption interface {
 	SetTransportHCISocket(id int) error
 	SetTransportH4Socket(addr string, timeout time.Duration) error
 	SetTransportH4Uart(path string) error
+	SetGattCacheFile(filename string)
 }
 
 // An Option is a configuration function, which configures the device.
@@ -132,6 +133,13 @@ func OptTransportH4Socket(addr string, timeout time.Duration) Option {
 func OptTransportH4Uart(path string) Option {
 	return func(opt DeviceOption) error {
 		opt.SetTransportH4Uart(path)
+		return nil
+	}
+}
+
+func OptGattCacheFile(filename string) Option {
+	return func(opt DeviceOption) error {
+		opt.SetGattCacheFile(filename)
 		return nil
 	}
 }

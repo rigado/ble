@@ -17,6 +17,10 @@ type Client interface {
 	// DiscoverProfile discovers the whole hierarchy of a server.
 	DiscoverProfile(force bool) (*Profile, error)
 
+	// DiscoverAndCacheProfile discovers the whole hierarchy of a server and caches it to a local file
+	// If a cache file is not designated via an option, this function will return an error
+	DiscoverAndCacheProfile(force bool) (*Profile, error)
+
 	// DiscoverServices finds all the primary services on a server. [Vol 3, Part G, 4.4.1]
 	// If filter is specified, only filtered services are returned.
 	DiscoverServices(filter []UUID) ([]*Service, error)

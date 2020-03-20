@@ -3,6 +3,7 @@ package hci
 import (
 	"errors"
 	"fmt"
+	"github.com/rigado/ble/cache"
 	"time"
 
 	"github.com/rigado/ble/linux/hci/cmd"
@@ -94,4 +95,8 @@ func (h *HCI) SetTransportH4Uart(path string) error {
 		h4uart: &transportH4Uart{path},
 	}
 	return nil
+}
+
+func (h *HCI) SetGattCacheFile(filename string) {
+	h.cache = cache.New(filename)
 }
