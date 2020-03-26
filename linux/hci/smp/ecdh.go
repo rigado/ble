@@ -4,6 +4,8 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"crypto/rand"
+
+	"github.com/rigado/ble/sliceops"
 	"github.com/wsddn/go-ecdh"
 )
 
@@ -27,8 +29,8 @@ func GenerateKeys() (*ECDHKeys, error) {
 
 func UnmarshalPublicKey(b []byte) (crypto.PublicKey, bool) {
 	e := ecdh.NewEllipticECDH(elliptic.P256())
-	xs := swapBuf(b[:32])
-	ys := swapBuf(b[32:])
+	xs := sliceops.SwapBuf(b[:32])
+	ys := sliceops.SwapBuf(b[32:])
 
 	//add header
 	r := append([]byte{0x04}, xs...)
@@ -44,8 +46,8 @@ func MarshalPublicKeyXY(k crypto.PublicKey) []byte {
 
 	ba := e.Marshal(k)
 	ba = ba[1:] //remove header
-	x := swapBuf(ba[:32])
-	y := swapBuf(ba[32:])
+	x := sliceops.SwapBuf(ba[:32])
+	y := sliceops.SwapBuf(ba[32:])
 
 	out := append(x, y...)
 
@@ -57,7 +59,7 @@ func MarshalPublicKeyX(k crypto.PublicKey) []byte {
 
 	ba := e.Marshal(k)
 	ba = ba[1:] //remove header
-	x := swapBuf(ba[:32])
+	x := sliceops.SwapBuf(ba[:32])
 
 	return x
 }
@@ -65,6 +67,6 @@ func MarshalPublicKeyX(k crypto.PublicKey) []byte {
 func GenerateSecret(prv crypto.PrivateKey, pub crypto.PublicKey) ([]byte, error) {
 	e := ecdh.NewEllipticECDH(elliptic.P256())
 	b, err := e.GenerateSharedSecret(prv, pub)
-	b = swapBuf(b)
+	b = sliceops.SwapBuf(b)
 	return b, err
 }

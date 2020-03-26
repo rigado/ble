@@ -150,7 +150,7 @@ func (a *Advertisement) EventType() uint8 {
 
 // AddressType returns the address type of the Advertisement.
 // This is linux specific.
-func (a *Advertisement) AddressType() uint8 {
+func (a *Advertisement) AddrType() uint8 {
 	v, _ := a.addressTypeWErr()
 	return v
 }
@@ -178,6 +178,12 @@ func (a *Advertisement) ToMap() (map[string]interface{}, error) {
 		return nil, errors.Wrap(err, keys.MAC)
 	}
 	m[keys.MAC] = strings.Replace(addr.String(), ":", "", -1)
+
+	at, err := a.addressTypeWErr()
+	if err != nil {
+		return nil, errors.Wrap(err, keys.AddressType)
+	}
+	m[keys.AddressType] = at
 
 	et, err := a.eventTypeWErr()
 	if err != nil {

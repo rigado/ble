@@ -3,9 +3,11 @@ package smp
 import (
 	"encoding/hex"
 	"fmt"
+	"time"
+
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci"
-	"time"
+	"github.com/rigado/ble/sliceops"
 )
 
 type PairingState int
@@ -62,9 +64,9 @@ func (m *manager) InitContext(localAddr, remoteAddr []byte,
 		m.pairing = &pairingContext{}
 	}
 
-	m.pairing.localAddr = swapBuf(localAddr)
+	m.pairing.localAddr = sliceops.SwapBuf(localAddr)
 	m.pairing.localAddrType = localAddrType
-	m.pairing.remoteAddr = swapBuf(remoteAddr)
+	m.pairing.remoteAddr = sliceops.SwapBuf(remoteAddr)
 	m.pairing.remoteAddrType = remoteAddrType
 
 	m.t.pairing = m.pairing

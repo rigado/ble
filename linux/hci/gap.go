@@ -6,10 +6,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/adv"
 	"github.com/rigado/ble/linux/gatt"
-	"github.com/pkg/errors"
+	"github.com/rigado/ble/sliceops"
 )
 
 // Addr ...
@@ -197,16 +198,26 @@ func (h *HCI) Accept() (ble.Conn, error) {
 
 // Dial ...
 func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
-	b, err := net.ParseMAC(a.String())
+	_, err := net.ParseMAC(a.String())
 	if err != nil {
 		return nil, ErrInvalidAddr
 	}
-	h.params.connParams.PeerAddress = [6]byte{b[5], b[4], b[3], b[2], b[1], b[0]}
+
+	ab := a.Bytes()
+	if len(ab) != 6 {
+		return nil, ErrInvalidAddr
+	}
+
 	if _, ok := a.(RandomAddress); ok {
 		h.params.connParams.PeerAddressType = 1
-	} else if (b[0] & byte(0xc0)) == byte(0xc0) {
-		h.params.connParams.PeerAddressType = 1
+	} else {
+		h.params.connParams.PeerAddressType = 0
 	}
+
+	ab = sliceops.SwapBuf(ab)
+	copy(h.params.connParams.PeerAddress[:], ab)
+
+	logger.Info("dialing addr %v, type %v", a.String(), h.params.connParams.PeerAddressType)
 
 	if err = h.Send(&h.params.connParams, nil); err != nil {
 		return nil, err

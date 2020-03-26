@@ -18,6 +18,7 @@ type Advertisement interface {
 	SolicitedService() []UUID
 	RSSI() int
 	Addr() Addr
+	AddrType() uint8
 
 	ToMap() (map[string]interface{}, error)
 }
@@ -34,6 +35,7 @@ var AdvertisementMapKeys = struct {
 	EventType   string
 	Flags       string
 	TxPower     string
+	AddressType string
 }{
 	MAC:         "mac",
 	RSSI:        "rssi",
@@ -46,6 +48,7 @@ var AdvertisementMapKeys = struct {
 	EventType:   "eventType",
 	Flags:       "flags",
 	TxPower:     "txPower",
+	AddressType: "addressType",
 }
 
 // ServiceData ...
