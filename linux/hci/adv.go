@@ -42,7 +42,7 @@ func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) 
 		return nil, errors.Wrap(err, hex.EncodeToString(a[:]))
 	}
 
-	ts := int64(time.Now().UTC().Nanosecond() / 1000)
+	ts := int64(time.Now().UnixNano() / 1000)
 	a := &Advertisement{e: e, i: i, p: p, ts: ts}
 	return a, nil
 }
