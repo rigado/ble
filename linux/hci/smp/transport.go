@@ -90,9 +90,15 @@ func (t *transport) sendPairingRequest() error {
 }
 
 func (t *transport) sendPublicKey() error {
-	kp := t.pairing.scECDHKeys
+	if t.pairing.scECDHKeys == nil {
+		keys, err := GenerateKeys()
+		if err != nil {
+			fmt.Println("error generating secure keys:", err)
+		}
+		t.pairing.scECDHKeys = keys
+	}
 
-	k := MarshalPublicKeyXY(kp.public)
+	k := MarshalPublicKeyXY(t.pairing.scECDHKeys.public)
 
 	t.pairing.state = WaitPublicKey
 	out := append([]byte{pairingPublicKey}, k...)

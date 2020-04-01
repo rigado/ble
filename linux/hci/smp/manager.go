@@ -100,13 +100,12 @@ func (m *manager) Handle(in []byte) error {
 }
 
 func (m *manager) Pair(authData ble.AuthData, to time.Duration) error {
-	keys, err := GenerateKeys()
-	if err != nil {
-		fmt.Println("error generating secure keys:", err)
+
+	if m.t.pairing.state != Init {
+		return fmt.Errorf("Pairing already in progress")
 	}
 
 	//todo: can this be made less bad??
-	m.pairing.scECDHKeys = keys
 	m.t.pairing = m.pairing
 	m.t.pairing.authData = authData
 
@@ -119,7 +118,7 @@ func (m *manager) Pair(authData ble.AuthData, to time.Duration) error {
 		m.t.pairing.request.OobFlag = byte(hci.OobPreset)
 	}
 
-	err = m.t.StartPairing(to)
+	err := m.t.StartPairing(to)
 	if err != nil {
 		return err
 	}
