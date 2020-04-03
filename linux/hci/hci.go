@@ -351,7 +351,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
 		fmt.Println("no response to command")
 		fmt.Println("pending commands:")
-		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4 + c.Len()]))
+		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4+c.Len()]))
 		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
@@ -811,7 +811,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
 	logger.Debug("[BLE] disconnect complete for handle %04X\n", ch)
-	return h.cleanupConnectionHandle(ch)
+	return nil //h.cleanupConnectionHandle(ch)
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
