@@ -9,10 +9,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 	"github.com/rigado/ble/linux/hci/evt"
-	"github.com/pkg/errors"
 )
 
 // Conn ...
@@ -417,22 +417,25 @@ func (c *Conn) Close() error {
 		//if the disconnect times out (no response to the command or
 		//we never receive a DisconnectComplete), this go routine
 		//ensures the connection handle is cleaned up
-		go func(handle uint16, addr string) {
-			select {
-			case <-c.Disconnected():
-			case <-time.After(10 * time.Second):
-				fmt.Printf("disconnect for %04X:%s timed out...\n", handle, c.RemoteAddr().String())
-				err := c.hci.cleanupConnectionHandle(handle)
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		}(c.param.ConnectionHandle(), c.RemoteAddr().String())
+		//go func(handle uint16, addr string) {
+		//	select {
+		//	case <-c.Disconnected():
+		//	case <-time.After(10 * time.Second):
+		//		fmt.Printf("disconnect for %04X:%s timed out...\n", handle, c.RemoteAddr().String())
+		//		err := c.hci.cleanupConnectionHandle(handle)
+		//		if err != nil {
+		//			fmt.Println(err)
+		//		}
+		//	}
+		//}(c.param.ConnectionHandle(), c.RemoteAddr().String())
 
-		return c.hci.Send(&cmd.Disconnect{
+		err := c.hci.Send(&cmd.Disconnect{
 			ConnectionHandle: c.param.ConnectionHandle(),
 			Reason:           0x13,
 		}, nil)
+
+		_ = c.hci.cleanupConnectionHandle(c.param.ConnectionHandle())
+		return err
 	}
 }
 
