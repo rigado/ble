@@ -622,6 +622,7 @@ func (c *Client) Loop() {
 		}
 
 		n, err := c.l2c.Read(c.rxBuf)
+
 		if err != nil {
 			logger.Info("client", "read error", err.Error())
 			// We don't expect any error from the bearer (L2CAP ACL-U)
@@ -632,6 +633,7 @@ func (c *Client) Loop() {
 
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
+		logger.Debug("client", "data in", fmt.Sprintf("% X", b))
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
