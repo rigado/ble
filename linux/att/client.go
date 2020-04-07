@@ -528,10 +528,11 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			}
 		case err := <-c.chErr:
 			return nil, errors.Wrap(err, "ATT request failed")
-		case <-time.After(1 * time.Minute):
+		case <-time.After(2 * time.Second):
 			return nil, errors.Wrap(ErrSeqProtoTimeout, "ATT request timeout")
 		}
 	}
+
 }
 
 func (c *Client) sendResp(rsp []byte) error {
