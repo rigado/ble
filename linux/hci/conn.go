@@ -361,7 +361,7 @@ func (c *Conn) recombine() error {
 	}
 
 	p := pdu(pkt.data())
-
+	logger.Debug("recombine", "pdu in:", fmt.Sprintf("% X", pkt.data()))
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
 	// according to CID.
