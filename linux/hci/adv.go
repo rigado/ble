@@ -3,6 +3,7 @@ package hci
 import (
 	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -41,7 +42,8 @@ func newAdvertisement(e evt.LEAdvertisingReport, i int) (*Advertisement, error) 
 		return nil, errors.Wrap(err, hex.EncodeToString(a[:]))
 	}
 
-	a := &Advertisement{e: e, i: i, p: p}
+	ts := int64(time.Now().UnixNano() / 1000)
+	a := &Advertisement{e: e, i: i, p: p, ts: ts}
 	return a, nil
 }
 
@@ -51,6 +53,7 @@ type Advertisement struct {
 	e  evt.LEAdvertisingReport
 	i  int
 	sr *Advertisement
+	ts int64
 
 	// cached packets.
 	p *adv.Packet
@@ -167,6 +170,10 @@ func (a *Advertisement) Data() []byte {
 func (a *Advertisement) ScanResponse() []byte {
 	v, _ := a.scanResponseWErr()
 	return v
+}
+
+func (a *Advertisement) Timestamp() int64 {
+	return a.ts
 }
 
 func (a *Advertisement) ToMap() (map[string]interface{}, error) {

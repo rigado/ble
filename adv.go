@@ -19,6 +19,7 @@ type Advertisement interface {
 	RSSI() int
 	Addr() Addr
 	AddrType() uint8
+	Timestamp() int64
 
 	ToMap() (map[string]interface{}, error)
 }
@@ -36,6 +37,8 @@ var AdvertisementMapKeys = struct {
 	Flags       string
 	TxPower     string
 	AddressType string
+	Controller  string
+	Timestamp   string
 }{
 	MAC:         "mac",
 	RSSI:        "rssi",
@@ -49,6 +52,8 @@ var AdvertisementMapKeys = struct {
 	Flags:       "flags",
 	TxPower:     "txPower",
 	AddressType: "addressType",
+	Controller:  "controllerMac",
+	Timestamp:   "timestamp",
 }
 
 // ServiceData ...
