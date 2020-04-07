@@ -1,7 +1,6 @@
 package att
 
-import (
-	"github.com/mgutz/logxi/v1"
-)
+import "github.com/rigado/ble"
 
-var logger = log.New("att")
+var logger = ble.Logger
+
