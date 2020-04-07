@@ -1,7 +1,7 @@
 package darwin
 
 import (
-	"github.com/mgutz/logxi/v1"
+	"github.com/rigado/ble"
 )
 
-var logger = log.New("darwin")
+var logger = ble.Logger
