@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rigado/ble"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 )
 
 // NotificationHandler handles notification or indication.
@@ -27,7 +27,7 @@ type Client struct {
 	done       chan bool
 	connClosed chan struct{}
 
-	reqHandler map[int]func ([]byte) error
+	reqHandler map[int]func([]byte) error
 
 	server *Server
 }
@@ -35,14 +35,14 @@ type Client struct {
 // NewClient returns an Attribute Protocol Client.
 func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 	c := &Client{
-		l2c:     l2c,
-		rspc:    make(chan []byte),
-		inc:     make(chan []byte, 10),
-		chTxBuf: make(chan []byte, 1),
-		rxBuf:   make([]byte, ble.MaxMTU),
-		chErr:   make(chan error, 1),
-		handler: h,
-		done:    done,
+		l2c:        l2c,
+		rspc:       make(chan []byte),
+		inc:        make(chan []byte, 10),
+		chTxBuf:    make(chan []byte, 1),
+		rxBuf:      make([]byte, ble.MaxMTU),
+		chErr:      make(chan error, 1),
+		handler:    h,
+		done:       done,
 		connClosed: make(chan struct{}),
 	}
 	c.chTxBuf <- make([]byte, l2c.TxMTU(), l2c.TxMTU())
@@ -528,7 +528,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			}
 		case err := <-c.chErr:
 			return nil, errors.Wrap(err, "ATT request failed")
-		case <-time.After(2 * time.Second):
+		case <-time.After(1 * time.Minute):
 			return nil, errors.Wrap(ErrSeqProtoTimeout, "ATT request timeout")
 		}
 	}
@@ -566,7 +566,7 @@ func (c *Client) asyncReqLoop() {
 			//ok
 		}
 
-		in := <- c.inc
+		in := <-c.inc
 		rsp := c.server.HandleRequest(in)
 		if rsp == nil {
 			continue
@@ -634,7 +634,7 @@ func (c *Client) Loop() {
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
-		if b[0] & 0x01 == 0x00 {
+		if b[0]&0x01 == 0x00 {
 			select {
 			case <-c.done:
 				fmt.Println("exited client loop: closed after async req rx")
