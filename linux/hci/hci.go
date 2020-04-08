@@ -768,16 +768,17 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
-	//logger.Debug("hci", "[BLE] cleanupConnHan: looking for %04X\n", ch)
+	logger.Debug("hci", "cleanupConnHan: looking for", fmt.Sprintf("%04X", ch))
 	c, found := h.conns[ch]
 	if !found {
-		return fmt.Errorf("disconnecting an invalid handle %04X", ch)
+		return nil
+		//return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
-	//logger.Debug("hci", "[BLE] clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String())
+	logger.Debug("hci", "", fmt.Sprintf("clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
 
 	delete(h.conns, ch)
-	//logger.Debug("[BLE] cleanupConnHan %04X: close c.chInPkt\n", ch)
+	logger.Debug("hci", "[BLE] cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -792,7 +793,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
-		//logger.Debug("[BLE] cleanupConnHan %04X: close c.chDone\n", ch)
+		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprint("%04X", ch))
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
@@ -811,7 +812,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
 	logger.Debug("hci", "[BLE] disconnect complete for handle", fmt.Sprintf("%04x", ch))
-	return nil //h.cleanupConnectionHandle(ch)
+	return h.cleanupConnectionHandle(ch)
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
