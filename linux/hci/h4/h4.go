@@ -7,7 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jacobsa/go-serial/serial"
+	"github.com/donaldschen/go-serial2/serial"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )

@@ -3,9 +3,8 @@ module github.com/rigado/ble
 go 1.13
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/donaldschen/go-serial2 v0.0.0-20200220231354-9e69aa115133
 	github.com/enceve/crypto v0.0.0-20160707101852-34d48bb93815
-	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
 	github.com/json-iterator/go v1.1.9
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
