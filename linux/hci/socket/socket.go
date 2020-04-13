@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -72,11 +73,20 @@ func NewSocket(id int) (*Socket, error) {
 	}
 
 	if id != -1 {
-		s, err := open(fd, id)
-		if err == nil {
-			return s, nil
+		to := time.Now().Add(time.Second * 60)
+		var err error
+		var s *Socket
+		for time.Now().Before(to) {
+			s, err = open(fd, id)
+			if err == nil {
+				fmt.Printf("hci%v: ok", id)
+				return s, nil
+			}
+			unix.Close(fd)
+			fmt.Printf("hci%v: %v", id, err)
+			<-time.After(time.Second)
 		}
-		unix.Close(fd)
+
 		return nil, err
 	}
 
