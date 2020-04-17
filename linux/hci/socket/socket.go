@@ -79,11 +79,9 @@ func NewSocket(id int) (*Socket, error) {
 		for time.Now().Before(to) {
 			s, err = open(fd, id)
 			if err == nil {
-				fmt.Printf("hci%v: ok", id)
 				return s, nil
 			}
 			unix.Close(fd)
-			fmt.Printf("hci%v: %v", id, err)
 			<-time.After(time.Second)
 		}
 
