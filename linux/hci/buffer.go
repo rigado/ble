@@ -2,6 +2,7 @@ package hci
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 )
 
@@ -15,12 +16,15 @@ type Pool struct {
 }
 
 // NewPool ...
-func NewPool(sz int, cnt int) *Pool {
+func NewPool(sz int, cnt int) (*Pool, error) {
+	if cnt == 0 {
+		return nil, fmt.Errorf("invalid buffer size")
+	}
 	ch := make(chan *bytes.Buffer, cnt)
 	for len(ch) < cnt {
 		ch <- bytes.NewBuffer(make([]byte, sz))
 	}
-	return &Pool{sz: sz, cnt: cnt, ch: ch}
+	return &Pool{sz: sz, cnt: cnt, ch: ch}, nil
 }
 
 // Client ...
