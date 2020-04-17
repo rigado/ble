@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/pkg/errors"
@@ -28,10 +29,12 @@ func ioctl(fd, op, arg uintptr) error {
 }
 
 const (
-	ioctlSize     = 4
-	hciMaxDevices = 16
-	typHCI        = 72 // 'H'
-	readTimeout   = 1000
+	ioctlSize      = 4
+	hciMaxDevices  = 16
+	typHCI         = 72 // 'H'
+	readTimeout    = 1000
+	unixPollErrors = int16(unix.POLLHUP | unix.POLLNVAL | unix.POLLERR)
+	unixPollDataIn = int16(unix.POLLIN)
 )
 
 var (
@@ -70,11 +73,18 @@ func NewSocket(id int) (*Socket, error) {
 	}
 
 	if id != -1 {
-		s, err := open(fd, id)
-		if err == nil {
-			return s, nil
+		to := time.Now().Add(time.Second * 60)
+		var err error
+		var s *Socket
+		for time.Now().Before(to) {
+			s, err = open(fd, id)
+			if err == nil {
+				return s, nil
+			}
+			unix.Close(fd)
+			<-time.After(time.Second)
 		}
-		unix.Close(fd)
+
 		return nil, err
 	}
 
@@ -117,10 +127,16 @@ func open(fd, id int) (*Socket, error) {
 	}
 
 	// poll for 20ms to see if any data becomes available, then clear it
-	pfds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+	pfds := []unix.PollFd{{Fd: int32(fd), Events: unixPollDataIn}}
 	unix.Poll(pfds, 20)
-	if pfds[0].Revents&unix.POLLIN > 0 {
-		b := make([]byte, 100)
+	evts := pfds[0].Revents
+
+	switch {
+	case evts&unixPollErrors != 0:
+		return nil, io.EOF
+
+	case evts&unixPollDataIn != 0:
+		b := make([]byte, 2048)
 		unix.Read(fd, b)
 	}
 
@@ -134,17 +150,23 @@ func (s *Socket) Read(p []byte) (int, error) {
 
 	var err error
 	n := 0
-
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unix.POLLIN}}
+	// dont need to add unixPollErrors, they are always returned
+	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unixPollDataIn}}
 	unix.Poll(pfds, readTimeout)
+	evts := pfds[0].Revents
 
-	// poll for data success?
-	if pfds[0].Revents&unix.POLLIN > 0 {
+	switch {
+	case evts&unixPollErrors != 0:
+		fmt.Printf("hci socket error: poll events 0x%04x\n", evts)
+		return 0, io.EOF
+
+	case evts&unixPollDataIn != 0:
 		// there is data!
 		n, err = unix.Read(s.fd, p)
-	} else {
+
+	default:
 		// no data, read timeout
 		return 0, nil
 	}
@@ -173,7 +195,6 @@ func (s *Socket) Close() error {
 
 	select {
 	case <-s.done:
-		fmt.Println("hci socket already closed!")
 		return nil
 
 	default:

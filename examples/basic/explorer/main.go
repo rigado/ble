@@ -15,29 +15,33 @@ import (
 )
 
 var (
-	device = flag.Int("device", -1, "hci index")
-	name   = flag.String("name", "", "name of remote peripheral")
+	name   = flag.String("name", "Thingy", "name of remote peripheral")
 	addr   = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
-	h4addr = flag.String("h4", "localhost:9001", "h4 socket server address")
+	h4skt  = flag.String("h4s", "", "h4 socket server address")
+	h4uart = flag.String("h4u", "/dev/ttyACM0", "h4 uart")
+	hciSkt = flag.Int("device", -1, "hci index")
 	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
 	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
 	bond   = flag.Bool("bond", false, "attempt to bond on connection")
-	dump   = flag.Bool("dump", true, "dump stack?")
+	dump   = flag.Bool("dump", false, "dump stack?")
 )
 
 func main() {
 	flag.Parse()
-	log.Printf("device: hci%v", *device)
-	log.Printf("h4addr: %v", *h4addr)
+	log.Printf("hciSkt: hci%v", *hciSkt)
+	log.Printf("h4skt: %v", *h4skt)
+	log.Printf("h4uart: %v", *h4uart)
 	log.Printf("name: %v", *name)
 	log.Printf("addr: %v", *addr)
 
 	var opt ble.Option
 	switch {
-	case *device >= 0:
-		opt = ble.OptTransportHCISocket(*device)
-	case len(*h4addr) > 0:
-		opt = ble.OptTransportH4Socket(*h4addr, 2*time.Second)
+	case *hciSkt >= 0:
+		opt = ble.OptTransportHCISocket(*hciSkt)
+	case len(*h4skt) > 0:
+		opt = ble.OptTransportH4Socket(*h4skt, 2*time.Second)
+	case len(*h4uart) > 0:
+		opt = ble.OptTransportH4Uart(*h4uart)
 	default:
 		log.Fatalf("no valid device to init")
 	}

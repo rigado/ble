@@ -554,14 +554,14 @@ func (c *Client) asyncReqLoop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			fmt.Println("[BLE ATT]: exited client async loop: done")
+			logger.Debug("[BLE ATT]: exited client async loop: done")
 			return
 		case <-c.connClosed:
 			logger.Debug("[BLE ATT]: exited client async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				fmt.Println("exited client async loop: l2c nil")
+				logger.Debug("[BLE ATT] exited client async loop: l2c nil")
 				return
 			}
 			//ok
@@ -608,14 +608,14 @@ func (c *Client) Loop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			fmt.Println("exited client loop: done")
+			logger.Debug("exited client loop: done")
 			return
 		case <-c.connClosed:
 			logger.Debug("exited client async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				fmt.Println("exited client loop: l2c nil")
+				logger.Debug("exited client loop: l2c nil")
 				return
 			}
 			//ok
@@ -640,7 +640,7 @@ func (c *Client) Loop() {
 		if b[0]&0x01 == 0x00 {
 			select {
 			case <-c.done:
-				fmt.Println("exited client loop: closed after async req rx")
+				logger.Info("exited client loop: closed after async req rx")
 				return
 			case <-c.connClosed:
 				logger.Debug("exited client async loop: conn closed")
@@ -657,7 +657,7 @@ func (c *Client) Loop() {
 			logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
 			select {
 			case <-c.done:
-				fmt.Println("exited client loop: closed after rsp rx")
+				logger.Info("exited client loop: closed after rsp rx")
 				return
 			case <-c.connClosed:
 				logger.Debug("exited client async loop: conn closed")
@@ -671,7 +671,7 @@ func (c *Client) Loop() {
 		logger.Debug("client", "notfi", fmt.Sprintf("% X", b))
 		select {
 		case <-c.done:
-			fmt.Println("exited client loop: closed after rx")
+			logger.Info("exited client loop: closed after rx")
 			return
 		case <-c.connClosed:
 			logger.Debug("exited client async loop: conn closed")
