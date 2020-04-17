@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"time"
 
-	"github.com/donaldschen/go-serial2/serial"
-
+	"github.com/jacobsa/go-serial/serial"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -51,25 +51,19 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	opts.MinimumReadSize = 0
 	opts.InterCharacterTimeout = 100
 
-	logrus.Infoln("opening...")
+	logrus.Debugf("opening h4 uart %v...", opts.PortName)
 	rwc, err := serial.Open(opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// dump data
-	// todo this is mega slow and stupid, but I doubt we can change this on the fly
-	logrus.Infoln("flushing...")
-	b := make([]byte, 2048)
-	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
-	<-time.After(time.Millisecond * 250)
-	_, err = rwc.Read(b)
-	if err != nil {
+	// eof is ok (read timeout)
+	eofAsError := false
+	if err := resetAndWaitIdle(rwc, time.Second*2, eofAsError); err != nil {
 		rwc.Close()
 		return nil, err
 	}
-
-	logrus.Infof("opened %v, err: %v", opts, err)
+	logrus.Debugf("opened %v", opts)
 
 	h := &h4{
 		rwc:     rwc,
@@ -79,13 +73,13 @@ func NewSerial(opts serial.OpenOptions) (io.ReadWriteCloser, error) {
 	}
 	h.frame = newFrame(h.rxQueue)
 
-	go h.rxLoop()
+	go h.rxLoop(eofAsError)
 
 	return h, nil
 }
 
 func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, error) {
-	logrus.Infof("Dialing %v ...", addr)
+	logrus.Debugf("opening h4 socket %v ...", addr)
 	c, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
 		return nil, err
@@ -94,19 +88,17 @@ func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, erro
 	// use a shorter timeout when flushing so we dont block for too long in init
 	fast := time.Millisecond * 500
 	rwc := &connWithTimeout{c, fast}
-	logrus.Infoln("flushing...")
-	b := make([]byte, 2048)
-	rwc.Write([]byte{1, 3, 12, 0}) //dummy reset
-	for {
-		n, err := rwc.Read(b)
-		if n == 0 || err != nil {
-			break
-		}
+
+	// eof not ok (skt closed)
+	eofAsError := true
+	if err := resetAndWaitIdle(rwc, time.Second*2, eofAsError); err != nil {
+		rwc.Close()
+		return nil, err
 	}
+	logrus.Debugf("opened %v", c.RemoteAddr().String())
 
 	// set the real timeout
 	rwc.timeout = connTimeout
-	logrus.Debugf("connect %v, err: %v", c.RemoteAddr().String(), err)
 
 	h := &h4{
 		rwc:     rwc,
@@ -116,7 +108,7 @@ func NewSocket(addr string, connTimeout time.Duration) (io.ReadWriteCloser, erro
 	}
 	h.frame = newFrame(h.rxQueue)
 
-	go h.rxLoop()
+	go h.rxLoop(eofAsError)
 
 	return h, nil
 }
@@ -158,7 +150,6 @@ func (h *h4) Write(p []byte) (int, error) {
 	h.wmu.Lock()
 	defer h.wmu.Unlock()
 	n, err := h.rwc.Write(p)
-	// log.Printf("write [% 0x], %v, %v", p, n, err)
 
 	return n, errors.Wrap(err, "can't write h4")
 }
@@ -193,8 +184,10 @@ func (h *h4) isOpen() bool {
 	}
 }
 
-func (h *h4) rxLoop() {
+func (h *h4) rxLoop(eofAsError bool) {
+	defer h.Close()
 	tmp := make([]byte, 512)
+
 	for {
 		select {
 		case <-h.done:
@@ -210,16 +203,53 @@ func (h *h4) rxLoop() {
 		// read
 		n, err := h.rwc.Read(tmp)
 		switch {
-		case err == io.EOF:
-			logrus.Error(err)
-			h.Close()
-			break
-		case err == nil && n > 0:
-			//process
+		case err == nil:
+			// ok, process it
 			h.frame.Assemble(tmp[:n])
-		default:
-			//nothing to do
+		case os.IsTimeout(err):
 			continue
+		case !eofAsError && err == io.EOF:
+			// trap eof, read timeout
+			continue
+		default:
+			// uhoh!
+			logrus.Error(err)
+			return
+		}
+	}
+}
+
+func resetAndWaitIdle(rw io.ReadWriter, d time.Duration, eofAsError bool) error {
+	to := time.Now().Add(d)
+
+	// send dummy reset
+	if _, err := rw.Write([]byte{1, 3, 12, 0}); err != nil {
+		return err
+	}
+	<-time.After(time.Millisecond * 100)
+
+	b := make([]byte, 2048)
+	for {
+		n, err := rw.Read(b)
+		switch {
+		case err == nil && n == 0:
+			// there was nothing to read, we are done
+			return nil
+		case time.Now().After(to):
+			// timeout, done waiting
+			return fmt.Errorf("timeout waiting for idle state")
+		case err == nil && n != 0:
+			// got data, wait again
+			continue
+		case os.IsTimeout(err):
+			// nothing to read, we are done
+			return nil
+		case !eofAsError && err == io.EOF:
+			// trap eof, nothing to read, we are done
+			return nil
+		default:
+			// real error
+			return err
 		}
 	}
 }
