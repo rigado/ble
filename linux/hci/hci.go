@@ -816,6 +816,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 }
 
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
+	logger.Debug("hci", "disconnect complete:", fmt.Sprintf("% X", b))
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
 	logger.Debug("hci", "[BLE] disconnect complete for handle", fmt.Sprintf("%04x", ch))
