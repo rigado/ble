@@ -110,6 +110,7 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 					c.hci.dispatchError(err)
 
 					//attempt to cleanup
+					logger.Error("conn", "error in recombine, cleaning up connection handle")
 					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
 						fmt.Printf("recombine cleanup: %v\n", err)
 					}
@@ -419,6 +420,7 @@ func (c *Conn) Close() error {
 			Reason:           0x13,
 		}, nil)
 
+		logger.Debug("conn", "connection close called")
 		_ = c.hci.cleanupConnectionHandle(c.param.ConnectionHandle())
 		return err
 	}

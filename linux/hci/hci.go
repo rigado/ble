@@ -192,6 +192,7 @@ func (h *HCI) cleanup() {
 
 	// kill all open connections w/o disconnect
 	for ch := range h.conns {
+		logger.Debug("hci", "cleanup(): cleanup all connection handles")
 		h.cleanupConnectionHandle(ch)
 	}
 
@@ -721,14 +722,14 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	status := e.Status()
 	if status != 0 {
-		fmt.Printf("[BLE] connection failed: %s\n", hex.EncodeToString(b))
+		logger.Error("hci", "connection failed:", fmt.Sprintf("% X", b))
 		return nil
 	}
 	c := newConn(h, e)
 	h.muConns.Lock()
 	pa := e.PeerAddress()
 	addr := pa[:]
-	logger.Debug("hci", fmt.Sprintf("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
+	logger.Debug("hci", "connection complete", fmt.Sprintf("%04X: addr: %s, lecc evt: %s", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -819,10 +820,12 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	logger.Debug("hci", "disconnect complete:", fmt.Sprintf("% X", b))
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
-	logger.Debug("hci", "[BLE] disconnect complete for handle", fmt.Sprintf("%04x", ch))
+	logger.Debug("hci", "disconnect complete for handle", fmt.Sprintf("%04x", ch))
 	if ErrCommand(e.Reason()) == ErrLocalHost {
 		return nil
 	}
+
+	logger.Debug("hci", "cleaning up connection handle due to disconnect complete")
 	return h.cleanupConnectionHandle(ch)
 }
 
