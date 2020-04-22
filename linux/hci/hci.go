@@ -820,7 +820,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
 	logger.Debug("hci", "[BLE] disconnect complete for handle", fmt.Sprintf("%04x", ch))
-	if ErrCommand(e.Reason()) != ErrRemoteUser {
+	if ErrCommand(e.Reason()) == ErrLocalHost {
 		return nil
 	}
 	return h.cleanupConnectionHandle(ch)
