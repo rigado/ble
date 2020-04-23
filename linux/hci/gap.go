@@ -254,8 +254,10 @@ func (h *HCI) cancelDial() (ble.Client, error) {
 	if err == ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
-			return gatt.NewClient(c, nil, h.done)
-		default:
+			logger.Debug("hci", "got connection complete obj after disallowed")
+			return gatt.NewClient(c, h.cache, h.done)
+		case <-time.After(50 * time.Millisecond):
+			logger.Debug("hci", "connection req timed out even though a connection was made...")
 			return nil, errors.Wrap(err, "cancel connection failed")
 		}
 	}

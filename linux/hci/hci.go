@@ -48,7 +48,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 
 		muConns:      sync.Mutex{},
 		conns:        make(map[uint16]*Conn),
-		chMasterConn: make(chan *Conn),
+		chMasterConn: make(chan *Conn, 1),
 		chSlaveConn:  make(chan *Conn),
 
 		muClose:   sync.Mutex{},
@@ -192,6 +192,7 @@ func (h *HCI) cleanup() {
 
 	// kill all open connections w/o disconnect
 	for ch := range h.conns {
+		logger.Debug("hci", "cleanup(): cleanup all connection handles")
 		h.cleanupConnectionHandle(ch)
 	}
 
@@ -721,14 +722,14 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	status := e.Status()
 	if status != 0 {
-		fmt.Printf("[BLE] connection failed: %s\n", hex.EncodeToString(b))
+		logger.Warn("hci", "connection failed:", fmt.Sprintf("% X", b))
 		return nil
 	}
 	c := newConn(h, e)
 	h.muConns.Lock()
 	pa := e.PeerAddress()
 	addr := pa[:]
-	logger.Debug("hci", fmt.Sprintf("[BLE] connection complete for %04X: addr: %s, lecc evt: %s\n", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
+	logger.Debug("hci", "connection complete", fmt.Sprintf("%04X: addr: %s, lecc evt: %s", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -736,7 +737,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 		if e.Status() == 0x00 {
 			select {
 			case h.chMasterConn <- c:
-			default:
+			case <-time.After(100 * time.Millisecond):
 				go c.Close()
 			}
 			return nil
@@ -785,7 +786,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	logger.Debug("hci", "", fmt.Sprintf("clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
 
 	delete(h.conns, ch)
-	logger.Debug("hci", "[BLE] cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
+	logger.Debug("hci", "cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -816,9 +817,18 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 }
 
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
+	logger.Debug("hci", "disconnect complete:", fmt.Sprintf("% X", b))
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
-	logger.Debug("hci", "[BLE] disconnect complete for handle", fmt.Sprintf("%04x", ch))
+	logger.Debug("hci", "disconnect complete for handle", fmt.Sprintf("%04x", ch))
+	if ErrCommand(e.Reason()) == ErrLocalHost {
+		//if the local host triggered the disconnect, the connection handle was already
+		//cleaned up. otherwise, the connection handle will be cleaned up because this
+		//was more likely an async disconnect
+		return nil
+	}
+
+	logger.Debug("hci", "cleaning up connection handle due to disconnect complete")
 	return h.cleanupConnectionHandle(ch)
 }
 
