@@ -786,7 +786,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	logger.Debug("hci", "", fmt.Sprintf("clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
 
 	delete(h.conns, ch)
-	logger.Debug("hci", "[BLE] cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
+	logger.Debug("hci", "cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -822,6 +822,9 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 	ch := e.ConnectionHandle()
 	logger.Debug("hci", "disconnect complete for handle", fmt.Sprintf("%04x", ch))
 	if ErrCommand(e.Reason()) == ErrLocalHost {
+		//if the local host triggered the disconnect, the connection handle was already
+		//cleaned up. otherwise, the connection handle will be cleaned up because this
+		//was more likely an async disconnect
 		return nil
 	}
 
