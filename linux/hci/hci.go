@@ -737,7 +737,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 		if e.Status() == 0x00 {
 			select {
 			case h.chMasterConn <- c:
-			default:
+			case <-time.After(100 * time.Millisecond):
 				go c.Close()
 			}
 			return nil
