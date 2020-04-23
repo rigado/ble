@@ -48,7 +48,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 
 		muConns:      sync.Mutex{},
 		conns:        make(map[uint16]*Conn),
-		chMasterConn: make(chan *Conn),
+		chMasterConn: make(chan *Conn, 1),
 		chSlaveConn:  make(chan *Conn),
 
 		muClose:   sync.Mutex{},
