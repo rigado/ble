@@ -722,7 +722,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	status := e.Status()
 	if status != 0 {
-		logger.Error("hci", "connection failed:", fmt.Sprintf("% X", b))
+		logger.Warn("hci", "connection failed:", fmt.Sprintf("% X", b))
 		return nil
 	}
 	c := newConn(h, e)
