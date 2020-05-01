@@ -190,9 +190,17 @@ func (h *HCI) cleanup() {
 	close(h.chMasterConn)
 	h.chMasterConn = nil
 
-	// kill all open connections w/o disconnect
+	// get the list under lock, process later since h.cleanupConnectionHandle() takes the lock
+	h.muConns.Lock()
+	hh := make([]uint16, 0, len(h.conns))
 	for ch := range h.conns {
-		logger.Debug("hci", "cleanup(): cleanup all connection handles")
+		hh = append(hh, ch)
+	}
+	h.muConns.Unlock()
+
+	// kill all open connections w/o disconnect
+	logger.Debug("hci", "cleanup(): cleanup %v connection handles", len(hh))
+	for _, ch := range hh {
 		h.cleanupConnectionHandle(ch)
 	}
 
