@@ -149,7 +149,7 @@ func Connect(ctx context.Context, f AdvFilter) (Client, error) {
 }
 
 // A NotificationHandler handles notification or indication from a server.
-type NotificationHandler func(req []byte)
+type NotificationHandler func(id uint, bb []byte)
 
 // WithSigHandler ...
 func WithSigHandler(ctx context.Context, cancel func()) context.Context {
