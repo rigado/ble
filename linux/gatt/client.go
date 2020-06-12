@@ -2,6 +2,7 @@ package gatt
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"sync"
@@ -16,11 +17,33 @@ const (
 	cccIndicate = uint16(0x0002)
 )
 
+// A Client is a GATT Client.
+type Client struct {
+	sync.RWMutex
+
+	profile *ble.Profile
+	name    string
+	subs    map[uint16]*sub
+
+	ac *att.Client
+
+	conn  ble.Conn
+	cache ble.GattCache
+}
+
+type sub struct {
+	cccdh    uint16
+	ccc      uint16
+	nHandler ble.NotificationHandler
+	iHandler ble.NotificationHandler
+	id       uint
+}
+
 // NewClient returns a GATT Client.
 func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool) (*Client, error) {
 	p := &Client{
-		subs: make(map[uint16]*sub),
-		conn: conn,
+		subs:  make(map[uint16]*sub),
+		conn:  conn,
 		cache: cache,
 	}
 	p.ac = att.NewClient(conn, p, done)
@@ -33,20 +56,6 @@ func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool) (*Client, err
 func ClientWithServer(c *Client, db *att.DB) *Client {
 	c.ac = c.ac.WithServer(db)
 	return c
-}
-
-// A Client is a GATT Client.
-type Client struct {
-	sync.RWMutex
-
-	profile *ble.Profile
-	name    string
-	subs    map[uint16]*sub
-
-	ac   *att.Client
-
-	conn ble.Conn
-	cache ble.GattCache
 }
 
 // Addr returns the address of the client.
@@ -361,7 +370,7 @@ func (p *Client) Unsubscribe(c *ble.Characteristic, ind bool) error {
 func (p *Client) setHandlers(cccdh, vh, flag uint16, h ble.NotificationHandler) error {
 	s, ok := p.subs[vh]
 	if !ok {
-		s = &sub{cccdh, 0x0000, nil, nil}
+		s = &sub{cccdh: cccdh}
 		p.subs[vh] = s
 	}
 	switch {
@@ -431,16 +440,22 @@ func (p *Client) HandleNotification(req []byte) {
 	sub, ok := p.subs[vh]
 	if !ok {
 		// FIXME: disconnects and propagate an error to the user.
-		log.Printf("Got an unregistered notification")
+		log.Printf("got an unregistered notification")
 		return
 	}
-	fn := sub.nHandler
-	if req[0] == att.HandleValueIndicationCode {
-		fn = sub.iHandler
+
+	indication := req[0] == att.HandleValueIndicationCode
+	nd := req[3:]
+
+	switch {
+	case indication && sub.iHandler != nil:
+		sub.iHandler(sub.id, nd)
+	case sub.nHandler != nil:
+		sub.nHandler(sub.id, nd)
+	default:
+		log.Printf("no handler, dropping data vh 0x%x, indication %v, id %v, %v", vh, indication, sub.id, hex.EncodeToString(nd))
 	}
-	if fn != nil {
-		fn(req[3:])
-	}
+	sub.id++
 }
 
 func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
@@ -449,11 +464,4 @@ func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
 
 func (p *Client) StartEncryption() error {
 	return p.conn.StartEncryption()
-}
-
-type sub struct {
-	cccdh    uint16
-	ccc      uint16
-	nHandler ble.NotificationHandler
-	iHandler ble.NotificationHandler
 }
