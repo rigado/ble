@@ -106,13 +106,6 @@ func NewSocket(id int) (*Socket, error) {
 }
 
 func open(fd, id int) (*Socket, error) {
-	// Reset the device in case previous session didn't cleanup properly.
-	if err := ioctl(uintptr(fd), hciDownDevice, uintptr(id)); err != nil {
-		return nil, errors.Wrap(err, "can't down device")
-	}
-	if err := ioctl(uintptr(fd), hciUpDevice, uintptr(id)); err != nil {
-		return nil, errors.Wrap(err, "can't up device")
-	}
 
 	// HCI User Channel requires exclusive access to the device.
 	// The device has to be down at the time of binding.
