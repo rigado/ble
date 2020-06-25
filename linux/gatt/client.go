@@ -462,6 +462,6 @@ func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
 	return p.conn.Pair(authData, to)
 }
 
-func (p *Client) StartEncryption() error {
-	return p.conn.StartEncryption()
+func (p *Client) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
+	return p.conn.StartEncryption(ch)
 }

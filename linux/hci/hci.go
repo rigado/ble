@@ -841,6 +841,17 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
+	e := evt.EncryptionChange(b)
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[e.ConnectionHandle()]
+	if !found {
+		_ = logger.Error("encryption changed event for unknown connection handle:", e.ConnectionHandle())
+	}
+
+	//pass to connection to handle status
+	c.handleEncryptionChanged(e.Status(), e.EncryptionEnabled())
+
 	return nil
 }
 
