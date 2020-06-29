@@ -368,7 +368,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		fmt.Println("no response to command")
 		fmt.Println("pending commands:")
 		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4+c.Len()]))
-		h.dispatchError(err)
+		//h.dispatchError(err)
 		ret = nil
 	case <-h.done:
 		err = h.err
