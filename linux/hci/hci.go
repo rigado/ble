@@ -371,7 +371,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	var err error
 
 	// emergency timeout to prevent calls from locking up if the HCI
-	// interface doesn't respond.  Responsed here should normally be fast
+	// interface doesn't respond. Responses should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
 	case <-time.After(3 * time.Second):
@@ -379,7 +379,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		fmt.Println("no response to command")
 		fmt.Println("pending commands:")
 		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4+c.Len()]))
-		//h.dispatchError(err)
+		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
 		err = h.err
