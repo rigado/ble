@@ -310,12 +310,28 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 	return nil
 }
 
+func (h *HCI) checkOpCodeFree(opCode int) error {
+	h.muSent.Lock()
+	defer h.muSent.Unlock()
+
+	_, ok := h.sent[opCode]
+	if ok {
+		return fmt.Errorf("command with opcode %v pending", opCode)
+	}
+
+	return nil
+}
+
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
 	}
 
 	p := &pkt{c, make(chan []byte)}
+
+	if h.checkOpCodeFree(c.OpCode()) != nil {
+		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
+	}
 
 	// get buffer w/timeout
 	var b []byte
@@ -330,7 +346,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		return nil, err
 	}
 
-	b[0] = byte(pktTypeCommand) // HCI header
+	//HCI header
+	b[0] = pktTypeCommand
 	b[1] = byte(c.OpCode())
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())
@@ -339,12 +356,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 
 	h.muSent.Lock()
-	_, ok := h.sent[c.OpCode()]
-	if ok {
-		h.muSent.Unlock()
-		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
-	}
-
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
 
