@@ -329,6 +329,9 @@ func (h *HCI) send(c Command) ([]byte, error) {
 
 	p := &pkt{c, make(chan []byte)}
 
+	//verify opcode is free before asking for the command buffer
+	//this ensures that the command buffer is only taken if
+	//the command can be sent
 	if h.checkOpCodeFree(c.OpCode()) != nil {
 		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
 	}
@@ -868,6 +871,7 @@ func (h *HCI) handleEncryptionChange(b []byte) error {
 
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
+	logger.Debug("hci", "number of comp packets:", fmt.Sprintf("% X", b))
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles()); i++ {

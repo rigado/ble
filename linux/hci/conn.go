@@ -422,15 +422,15 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 	}
 
 	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: enabled == 0x01}
-	if c.encChanged == nil {
-		logger.Info("encryption changed result - status:", status, "; err:", err)
-	} else {
+	if c.encChanged != nil {
 		select {
 		case c.encChanged <- info:
 			return
 		default:
 			_ = logger.Error("failed to send encryption changed status to channel:", info)
 		}
+	} else {
+		logger.Info("encryption changed result - status:", status, "; err:", err)
 	}
 }
 
