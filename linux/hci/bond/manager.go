@@ -13,15 +13,15 @@ import (
 
 type manager struct {
 	filePath string
-	lock sync.RWMutex
-	bonds map[string]bondData
+	lock     sync.RWMutex
+	bonds    map[string]bondData
 }
 
 type bondData struct {
-	LongTermKey string `json:"longTermKey"`
+	LongTermKey           string `json:"longTermKey"`
 	EncryptionDiversifier string `json:"encryptionDiversifier"`
-	RandomValue string `json:"randomValue"`
-	Legacy bool `json:"legacy"`
+	RandomValue           string `json:"randomValue"`
+	Legacy                bool   `json:"legacy"`
 }
 
 const (
@@ -122,6 +122,29 @@ func (m *manager) Save(addr string, bond hci.BondInfo) error {
 	return m.storeBonds(bonds)
 }
 
+func (m *manager) Delete(addr string) error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	bonds, err := m.loadBonds()
+	if err != nil {
+		return err
+	}
+
+	if _, ok := bonds[addr]; ok {
+		delete(bonds, addr)
+	} else {
+		return fmt.Errorf("bond for mac %v not found", addr)
+	}
+
+	err = m.storeBonds(bonds)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //this is mutex protected at the public function level
 func (m *manager) loadBonds() (map[string]bondData, error) {
 	//open local file
@@ -130,7 +153,7 @@ func (m *manager) loadBonds() (map[string]bondData, error) {
 	if os.IsNotExist(err) {
 		f, err = os.Create(m.filePath)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create bondData file: %s",err)
+			return nil, fmt.Errorf("unable to create bondData file: %s", err)
 		}
 		_ = f.Close()
 	}
@@ -213,4 +236,3 @@ func createBondInfo(b bondData) (hci.BondInfo, error) {
 	bi := hci.NewBondInfo(ltk, binary.LittleEndian.Uint16(eDiv), binary.LittleEndian.Uint64(randVal), b.Legacy)
 	return bi, nil
 }
-

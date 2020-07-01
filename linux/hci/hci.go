@@ -310,12 +310,31 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 	return nil
 }
 
+func (h *HCI) checkOpCodeFree(opCode int) error {
+	h.muSent.Lock()
+	defer h.muSent.Unlock()
+
+	_, ok := h.sent[opCode]
+	if ok {
+		return fmt.Errorf("command with opcode %v pending", opCode)
+	}
+
+	return nil
+}
+
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
 	}
 
 	p := &pkt{c, make(chan []byte)}
+
+	//verify opcode is free before asking for the command buffer
+	//this ensures that the command buffer is only taken if
+	//the command can be sent
+	if h.checkOpCodeFree(c.OpCode()) != nil {
+		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
+	}
 
 	// get buffer w/timeout
 	var b []byte
@@ -330,7 +349,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 		return nil, err
 	}
 
-	b[0] = byte(pktTypeCommand) // HCI header
+	//HCI header
+	b[0] = pktTypeCommand
 	b[1] = byte(c.OpCode())
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())
@@ -339,12 +359,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 
 	h.muSent.Lock()
-	_, ok := h.sent[c.OpCode()]
-	if ok {
-		h.muSent.Unlock()
-		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
-	}
-
 	h.sent[c.OpCode()] = p
 	h.muSent.Unlock()
 
@@ -360,7 +374,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	var err error
 
 	// emergency timeout to prevent calls from locking up if the HCI
-	// interface doesn't respond.  Responsed here should normally be fast
+	// interface doesn't respond. Responses should normally be fast
 	// a timeout indicates a major problem with HCI.
 	select {
 	case <-time.After(3 * time.Second):
@@ -841,11 +855,23 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
+	e := evt.EncryptionChange(b)
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[e.ConnectionHandle()]
+	if !found {
+		_ = logger.Error("encryption changed event for unknown connection handle:", e.ConnectionHandle())
+	}
+
+	//pass to connection to handle status
+	c.handleEncryptionChanged(e.Status(), e.EncryptionEnabled())
+
 	return nil
 }
 
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
+	logger.Debug("hci", "number of comp packets:", fmt.Sprintf("% X", b))
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles()); i++ {

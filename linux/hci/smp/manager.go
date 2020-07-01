@@ -100,7 +100,6 @@ func (m *manager) Handle(in []byte) error {
 }
 
 func (m *manager) Pair(authData ble.AuthData, to time.Duration) error {
-
 	if m.t.pairing.state != Init {
 		return fmt.Errorf("Pairing already in progress")
 	}
@@ -152,6 +151,10 @@ func (m *manager) BondInfoFor(addr string) hci.BondInfo {
 	}
 
 	return bi
+}
+
+func (m *manager) DeleteBondInfo() error {
+	return m.bondManager.Delete(hex.EncodeToString(m.pairing.remoteAddr))
 }
 
 func (m *manager) LegacyPairingInfo() (bool, []byte) {

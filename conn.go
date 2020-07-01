@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+type EncryptionChangedInfo struct {
+	Status  int
+	Err     error
+	Enabled bool
+}
+
 // Conn implements a L2CAP connection.
 type Conn interface {
 	io.ReadWriteCloser
@@ -39,5 +45,5 @@ type Conn interface {
 
 	Pair(AuthData, time.Duration) error
 
-	StartEncryption() error
+	StartEncryption(change chan EncryptionChangedInfo) error
 }

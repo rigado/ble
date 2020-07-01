@@ -11,12 +11,12 @@ type smpDispatcher struct {
 }
 
 const (
-	IoCapsDisplayOnly		= 0x00
-	IoCapsDisplayYesNo      = 0x01
-	IoCapsKeyboardOnly      = 0x02
-	IoCapsNone              = 0x03
-	IoCapsKeyboardDisplay   = 0x04
-	IoCapsReservedStart     = 0x05
+	IoCapsDisplayOnly     = 0x00
+	IoCapsDisplayYesNo    = 0x01
+	IoCapsKeyboardOnly    = 0x02
+	IoCapsNone            = 0x03
+	IoCapsKeyboardDisplay = 0x04
+	IoCapsReservedStart   = 0x05
 )
 
 type OobDataFlag byte
@@ -37,6 +37,7 @@ type SmpManager interface {
 	Handle(data []byte) error
 	Pair(authData ble.AuthData, to time.Duration) error
 	BondInfoFor(addr string) BondInfo
+	DeleteBondInfo() error
 	StartEncryption() error
 	SetWritePDUFunc(func([]byte) (int, error))
 	SetEncryptFunc(func(BondInfo) error)

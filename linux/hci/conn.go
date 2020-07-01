@@ -65,7 +65,8 @@ type Conn struct {
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
-	smp SmpManager
+	smp        SmpManager
+	encChanged chan ble.EncryptionChangedInfo
 }
 
 type Encrypter interface {
@@ -137,8 +138,14 @@ func (c *Conn) Pair(authData ble.AuthData, to time.Duration) error {
 	return c.smp.Pair(authData, to)
 }
 
-func (c *Conn) StartEncryption() error {
-	return c.smp.StartEncryption()
+func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
+	c.encChanged = ch
+	err := c.smp.StartEncryption()
+	if err != nil {
+		c.encChanged = nil
+	}
+
+	return err
 }
 
 // Read copies re-assembled L2CAP PDUs into sdu.
@@ -401,6 +408,30 @@ func (c *Conn) recombine() error {
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
 	return nil
+}
+
+func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
+	var err error
+	if status != 0x00 {
+		cmdErr := ErrCommand(status)
+		err = fmt.Errorf(errCmd[cmdErr])
+		e := c.smp.DeleteBondInfo()
+		if e != nil {
+			_ = logger.Error("failed to delete bond info", e)
+		}
+	}
+
+	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: enabled == 0x01}
+	if c.encChanged != nil {
+		select {
+		case c.encChanged <- info:
+			return
+		default:
+			_ = logger.Error("failed to send encryption changed status to channel:", info)
+		}
+	} else {
+		logger.Info("encryption changed result - status:", status, "; err:", err)
+	}
 }
 
 // Disconnected returns a receiving channel, which is closed when the connection disconnects.
