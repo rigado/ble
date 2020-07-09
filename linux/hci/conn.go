@@ -403,7 +403,10 @@ func (c *Conn) recombine() error {
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:
-		_ = c.smp.Handle(p)
+		if err := c.smp.Handle(p); err != nil {
+			logger.Error("smp.Handle: ", err.Error())
+		}
+
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
