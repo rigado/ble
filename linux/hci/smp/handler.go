@@ -226,11 +226,12 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 	if (rx.AuthReq & authReqBondMask) == authReqBond {
 		ra := hex.EncodeToString(t.pairing.remoteAddr)
 		bi, err := t.bondManager.Find(ra)
-		fmt.Println("smpOnSecurityRequest bond err:", err)
 		if err == nil {
 			t.pairing.bond = bi
 			return nil, t.encrypter.Encrypt()
 		}
+		fmt.Println("smpOnSecurityRequest bond manager error:", err)
+		// will re-bond below
 	}
 
 	//match the incoming request parameters
