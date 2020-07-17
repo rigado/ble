@@ -16,8 +16,12 @@ const (
 	pairingDHKeyCheck       = 0x0D // Pairing DHKey Check LE-U
 	pairingKeypress         = 0x0E // Pairing Keypress Notification LE-U
 
-	passkeyIterationCount   = 20
+	passkeyIterationCount = 20
 
 	oobData
 	oobDataPreset = 0x01
+
+	authReqBondMask = byte(0x03)
+	authReqBond     = byte(0x01)
+	authReqNoBond   = byte(0x00)
 )

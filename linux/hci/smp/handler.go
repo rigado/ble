@@ -148,7 +148,7 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	stk, err := smpS1(k, rRand, lRand)
 	t.pairing.shortTermKey = stk
 
-	if t.pairing.request.AuthReq&0x01 == 0x00 {
+	if t.pairing.request.AuthReq&authReqBondMask == authReqNoBond {
 		t.pairing.state = Finished
 	}
 
@@ -219,17 +219,19 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("%v, invalid length %v", hex.EncodeToString(in), len(in))
 	}
 
-	ra := hex.EncodeToString(t.pairing.remoteAddr)
-	bi, err := t.bondManager.Find(ra)
-	fmt.Println(err)
-	if err == nil {
-		t.pairing.bond = bi
-		return nil, t.encrypter.Encrypt()
-	}
-
 	//todo: clean this up
 	rx := hci.SmpConfig{}
 	rx.AuthReq = in[0]
+
+	if (rx.AuthReq & authReqBondMask) == authReqBond {
+		ra := hex.EncodeToString(t.pairing.remoteAddr)
+		bi, err := t.bondManager.Find(ra)
+		fmt.Println("smpOnSecurityRequest bond err:", err)
+		if err == nil {
+			t.pairing.bond = bi
+			return nil, t.encrypter.Encrypt()
+		}
+	}
 
 	//match the incoming request parameters
 	t.pairing.request.AuthReq = rx.AuthReq
@@ -252,13 +254,11 @@ func smpOnMasterIdentification(t *transport, in pdu) ([]byte, error) {
 	ltk := t.pairing.bond.LongTermKey()
 	t.pairing.bond = hci.NewBondInfo(ltk, ediv, randVal, true)
 
-	err := t.saveBondInfo()
-	if err != nil {
+	if err := t.saveBondInfo(); err != nil {
 		return nil, err
 	}
 
 	t.pairing.state = Finished
-
 	return nil, nil
 }
 

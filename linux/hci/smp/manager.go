@@ -85,7 +85,6 @@ func (m *manager) Handle(in []byte) error {
 		return m.t.send([]byte{pairingFailed, 0x05})
 	}
 
-	fmt.Printf("handling smp code %v: %v\n", code, v.desc)
 	_, err := v.handler(m.t, data)
 	if err != nil {
 		m.t.pairing.state = Error
@@ -96,10 +95,7 @@ func (m *manager) Handle(in []byte) error {
 	if m.t.pairing.state == Finished {
 		select {
 		case <-m.result:
-			fmt.Println("got smp event after finish!")
-			//debug.PrintStack()
 		default:
-			fmt.Println("smp finished!")
 			close(m.result)
 		}
 	}

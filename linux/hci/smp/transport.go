@@ -53,6 +53,9 @@ func (t *transport) StartPairing(to time.Duration) error {
 }
 
 func (t *transport) saveBondInfo() error {
+	if t.pairing.request.AuthReq&authReqBondMask != authReqBond {
+		return nil
+	}
 	addr := hex.EncodeToString(t.pairing.remoteAddr)
 	return t.bondManager.Save(addr, t.pairing.bond)
 }
