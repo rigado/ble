@@ -823,7 +823,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
-		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprint("%04X", ch))
+		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprintf("%04X", ch))
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
