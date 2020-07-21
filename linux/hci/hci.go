@@ -283,7 +283,7 @@ func (h *HCI) init() error {
 	h.txPwrLv = int(LEReadAdvertisingChannelTxPowerRP.TransmitPowerLevel)
 
 	LESetEventMaskRP := cmd.LESetEventMaskRP{}
-	h.Send(&cmd.LESetEventMask{LEEventMask: 0x000000000000001F}, &LESetEventMaskRP)
+	h.Send(&cmd.LESetEventMask{LEEventMask: 0x000000000000003f}, &LESetEventMaskRP)
 
 	SetEventMaskRP := cmd.SetEventMaskRP{}
 	h.Send(&cmd.SetEventMask{EventMask: 0x3dbff807fffbffff}, &SetEventMaskRP)
@@ -790,12 +790,13 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleLEConnectionParameterRequest(b []byte) error {
-	logger.Error("got a conn params request")
+	logger.Warn("got le conn params request", hex.EncodeToString(b))
 	return nil
 }
 
 func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
-	logger.Error("got a conn params update")
+	e := evt.LEConnectionUpdateComplete(b)
+	logger.Info(fmt.Sprintf("le connection update complete: handle %v, status %v, intvl %v, lat %v, to %v", e.ConnectionHandle(), e.Status(), e.ConnInterval(), e.ConnLatency(), e.SupervisionTimeout()))
 	return nil
 }
 
