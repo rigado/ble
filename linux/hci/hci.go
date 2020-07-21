@@ -143,14 +143,13 @@ func (h *HCI) Init() error {
 	h.subh[evt.LEConnectionCompleteSubCode] = h.handleLEConnectionComplete
 	h.subh[evt.LEConnectionUpdateCompleteSubCode] = h.handleLEConnectionUpdateComplete
 	h.subh[evt.LELongTermKeyRequestSubCode] = h.handleLELongTermKeyRequest
-	h.subh[evt.EncryptionChangeCode] = h.handleEncryptionChange
+	h.subh[evt.LERemoteConnectionParameterRequestSubCode] = h.handleLEConnectionParameterRequest
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),
 	// evt.EncryptionKeyRefreshCompleteCode:         todo),
 	// evt.AuthenticatedPayloadTimeoutExpiredCode:   todo),
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
-	// evt.LERemoteConnectionParameterRequestSubCode: todo),
 
 	var err error
 	h.skt, err = getTransport(h.transport)
@@ -199,7 +198,7 @@ func (h *HCI) cleanup() {
 	h.muConns.Unlock()
 
 	// kill all open connections w/o disconnect
-	logger.Debug("hci", "cleanup(): cleanup %v connection handles", len(hh))
+	logger.Debug("hci", fmt.Sprintf("cleanup(): found %v connection handles", len(hh)))
 	for _, ch := range hh {
 		h.cleanupConnectionHandle(ch)
 	}
@@ -790,12 +789,17 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	return nil
 }
 
+func (h *HCI) handleLEConnectionParameterRequest(b []byte) error {
+	logger.Error("got a conn params request")
+	return nil
+}
+
 func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
+	logger.Error("got a conn params update")
 	return nil
 }
 
 func (h *HCI) cleanupConnectionHandle(ch uint16) error {
-
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	logger.Debug("hci", "cleanupConnHan: looking for", fmt.Sprintf("%04X", ch))
@@ -805,7 +809,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		//return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
-	logger.Debug("hci", "", fmt.Sprintf("clenupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
+	logger.Debug("hci", "", fmt.Sprintf("cleanupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
 
 	delete(h.conns, ch)
 	logger.Debug("hci", "cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
@@ -860,7 +864,7 @@ func (h *HCI) handleEncryptionChange(b []byte) error {
 	defer h.muConns.Unlock()
 	c, found := h.conns[e.ConnectionHandle()]
 	if !found {
-		_ = logger.Error("encryption changed event for unknown connection handle:", e.ConnectionHandle())
+		logger.Error("encryption changed event for unknown connection handle:", fmt.Sprint(e.ConnectionHandle()))
 	}
 
 	//pass to connection to handle status

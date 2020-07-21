@@ -217,7 +217,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	ab = sliceops.SwapBuf(ab)
 	copy(h.params.connParams.PeerAddress[:], ab)
 
-	logger.Info("dialing addr %v, type %v", a.String(), h.params.connParams.PeerAddressType)
+	logger.Info(fmt.Sprintf("dialing addr %v, type %v", a.String(), h.params.connParams.PeerAddressType))
 
 	if err = h.Send(&h.params.connParams, nil); err != nil {
 		return nil, err

@@ -420,7 +420,7 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		err = fmt.Errorf(errCmd[cmdErr])
 		e := c.smp.DeleteBondInfo()
 		if e != nil {
-			_ = logger.Error("failed to delete bond info", e)
+			logger.Error("failed to delete bond info", e.Error())
 		}
 	}
 
@@ -430,10 +430,10 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		case c.encChanged <- info:
 			return
 		default:
-			_ = logger.Error("failed to send encryption changed status to channel:", info)
+			logger.Error("failed to send encryption changed status to channel:", fmt.Sprint(info))
 		}
 	} else {
-		logger.Info("encryption changed result - status:", status, "; err:", err)
+		logger.Info(fmt.Sprintf("encryption changed - status: %v, err %v", status, err))
 	}
 }
 
