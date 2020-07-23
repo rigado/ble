@@ -432,6 +432,7 @@ func (h *HCI) sktProcessLoop() {
 				_ = logger.Error("hci", "skt: ", err)
 			} else {
 				h.err = fmt.Errorf("skt handle error: %v", err)
+				fmt.Println("---------------- skt handle err:", err)
 				return
 			}
 		}
@@ -727,7 +728,9 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 	p, found := h.sent[int(e.CommandOpcode())]
 	h.muSent.Unlock()
 	if !found {
-		return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
+		logger.Warn("can't find the cmd for CommandStatusEP:", hex.EncodeToString(e))
+		return nil
+		//return fmt.Errorf("can't find the cmd for CommandStatusEP: % X", e)
 	}
 
 	select {

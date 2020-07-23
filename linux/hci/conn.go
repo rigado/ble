@@ -369,7 +369,10 @@ func (c *Conn) recombine() error {
 	}
 
 	p := pdu(pkt.data())
-	logger.Debug("recombine", "pdu in:", fmt.Sprintf("% X", pkt.data()))
+	if logger.IsDebug() {
+		logger.Debug("recombine", "pdu in:", fmt.Sprintf("% X", pkt.data()))
+	}
+
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
 	// according to CID.
@@ -399,14 +402,15 @@ func (c *Conn) recombine() error {
 	// TODO: support dynamic or assigned channels for LE-Frames.
 	switch p.cid() {
 	case cidLEAtt:
+		fmt.Println("start c.chInPDU <- p")
 		c.chInPDU <- p
+		fmt.Println("finish c.chInPDU <- p")
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:
 		if err := c.smp.Handle(p); err != nil {
 			logger.Error("smp.Handle: ", err.Error())
 		}
-
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
