@@ -582,20 +582,16 @@ func (c *Client) asyncReqLoop() {
 // Loop ...
 func (c *Client) Loop() {
 
-	type asyncWork struct {
-		handle func([]byte)
-		data   []byte
-	}
-
-	ch := make(chan asyncWork, 10000)
-	defer close(ch)
+	// async notification handler loop
+	nc := make(chan []byte, 10000)
+	defer close(nc)
 	go func() {
-		for w := range ch {
-			w.handle(w.data)
+		for bb := range nc {
+			c.handler.HandleNotification(bb)
 		}
 	}()
 
-	//start up async response handling
+	// start up async response handling
 	if c.server != nil {
 		go c.asyncReqLoop()
 		defer func() {
@@ -622,7 +618,6 @@ func (c *Client) Loop() {
 		}
 
 		n, err := c.l2c.Read(c.rxBuf)
-
 		if err != nil {
 			logger.Info("client", "read error", err.Error())
 			// We don't expect any error from the bearer (L2CAP ACL-U)
@@ -633,7 +628,9 @@ func (c *Client) Loop() {
 
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
-		logger.Debug("client", "data in", fmt.Sprintf("% X", b))
+		if logger.IsDebug() {
+			logger.Debug("client", "data in", fmt.Sprintf("% X", b))
+		}
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
@@ -654,7 +651,9 @@ func (c *Client) Loop() {
 		}
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
-			logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
+			if logger.IsDebug() {
+				logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
+			}
 			select {
 			case <-c.done:
 				logger.Info("exited client loop: closed after rsp rx")
@@ -668,7 +667,10 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		logger.Debug("client", "notfi", fmt.Sprintf("% X", b))
+		if logger.IsDebug() {
+			logger.Debug("client", "notfi", fmt.Sprintf("% X", b))
+		}
+
 		select {
 		case <-c.done:
 			logger.Info("exited client loop: closed after rx")
@@ -676,16 +678,18 @@ func (c *Client) Loop() {
 		case <-c.connClosed:
 			logger.Debug("exited client async loop: conn closed")
 			return
-		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
-			// ok
+		case nc <- b:
+			// ok, sent to the async handler loop
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.
-			_ = logger.Error("client", "req", "can't enqueue incoming notification.")
+			logger.Error("client", "req", "can't enqueue incoming notification.")
 		}
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
-			logger.Debug("client", "req", fmt.Sprintf("% X", b))
+			if logger.IsDebug() {
+				logger.Debug("client", "req", fmt.Sprintf("% X", b))
+			}
 			_, _ = c.l2c.Write(confirmation)
 		}
 	}
