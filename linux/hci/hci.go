@@ -513,6 +513,7 @@ func (h *HCI) handleACL(b []byte) error {
 
 	if c, ok := h.conns[handle]; ok {
 		c.chInPkt <- b
+		fmt.Println("c.chInPkt <- b, len:", len(c.chInPkt))
 	} else {
 		_ = logger.Warn("invalid connection handle on ACL packet", "handle:", handle)
 	}
