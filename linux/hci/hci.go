@@ -53,7 +53,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 
 		muClose:   sync.Mutex{},
 		done:      make(chan bool),
-		sktRxChan: make(chan []byte, 16), //todo pick a real number
+		sktRxChan: make(chan []byte, 10000), //todo pick a real number
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
