@@ -88,8 +88,8 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		sigRxMTU: ble.MaxMTU,
 		sigTxMTU: ble.DefaultMTU,
 
-		chInPkt: make(chan packet, 16),
-		chInPDU: make(chan pdu, 16),
+		chInPkt: make(chan packet, 10000),
+		chInPDU: make(chan pdu, 10000),
 
 		txBuffer: NewClient(h.pool),
 
@@ -404,7 +404,7 @@ func (c *Conn) recombine() error {
 	case cidLEAtt:
 		fmt.Println("start c.chInPDU <- p")
 		c.chInPDU <- p
-		fmt.Println("finish c.chInPDU <- p")
+		fmt.Println("finish c.chInPDU <- p, len:", len(c.chInPDU))
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:
