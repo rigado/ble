@@ -148,6 +148,29 @@ func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 	return err
 }
 
+func (c *Conn) ConnectionParametersUpdate(p cmd.LEConnectionUpdate) error {
+	// probably should send the request...
+	return c.hci.Send(&cmd.LEConnectionUpdate{
+		ConnectionHandle:   c.param.ConnectionHandle(),
+		ConnIntervalMin:    p.ConnIntervalMin,
+		ConnIntervalMax:    p.ConnIntervalMax,
+		ConnLatency:        p.ConnLatency,
+		SupervisionTimeout: p.SupervisionTimeout,
+		MinimumCELength:    0, // Informational, and spec doesn't specify the use.
+		MaximumCELength:    0, // Informational, and spec doesn't specify the use.
+	}, nil)
+}
+
+func (c *Conn) Conn(ch chan ble.EncryptionChangedInfo) error {
+	c.encChanged = ch
+	err := c.smp.StartEncryption()
+	if err != nil {
+		c.encChanged = nil
+	}
+
+	return err
+}
+
 // Read copies re-assembled L2CAP PDUs into sdu.
 func (c *Conn) Read(sdu []byte) (n int, err error) {
 	p, ok := <-c.chInPDU

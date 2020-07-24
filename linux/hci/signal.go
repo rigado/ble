@@ -219,13 +219,14 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 		return
 	}
 
+	p := c.hci.params.connParams
 	// LE Connection Update (0x08|0x0013) [Vol 2, Part E, 7.8.18]
 	c.hci.Send(&cmd.LEConnectionUpdate{
 		ConnectionHandle:   c.param.ConnectionHandle(),
-		ConnIntervalMin:    req.IntervalMin,
-		ConnIntervalMax:    req.IntervalMax,
-		ConnLatency:        req.SlaveLatency,
-		SupervisionTimeout: req.TimeoutMultiplier,
+		ConnIntervalMin:    p.ConnIntervalMin,
+		ConnIntervalMax:    p.ConnIntervalMax,
+		ConnLatency:        p.ConnLatency,
+		SupervisionTimeout: p.SupervisionTimeout,
 		MinimumCELength:    0, // Informational, and spec doesn't specify the use.
 		MaximumCELength:    0, // Informational, and spec doesn't specify the use.
 	}, nil)

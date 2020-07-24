@@ -10,6 +10,7 @@ import (
 
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/att"
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 const (
@@ -464,4 +465,8 @@ func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
 
 func (p *Client) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 	return p.conn.StartEncryption(ch)
+}
+
+func (p *Client) ConnectionParametersUpdate(params cmd.LEConnectionUpdate) error {
+	return p.conn.ConnectionParametersUpdate(params)
 }

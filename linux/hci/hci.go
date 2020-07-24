@@ -444,13 +444,18 @@ func (h *HCI) sktReadLoop() {
 		fmt.Println("sktRxLoop done")
 		close(h.sktRxChan)
 	}()
-
+	/*
+		dump := false
+		start, _ := hex.DecodeString("0200201b00170004001b2d0000000000ca0b0000000000000000000000000000")
+	*/
 	b := make([]byte, 4096)
 
 	for {
-		fmt.Println("beginSktRead:", time.Now().UnixNano())
+
+		//fmt.Println("beginSktRead:", time.Now().UnixNano())
 		n, err := h.skt.Read(b)
 		fmt.Println("endSktRead:", time.Now().UnixNano(), n, hex.EncodeToString(b[:n]))
+
 		switch {
 		case n == 0 && err == nil:
 			// read timeout
@@ -471,6 +476,14 @@ func (h *HCI) sktReadLoop() {
 		case err != nil:
 			h.err = fmt.Errorf("skt read error: %v", err)
 			return
+
+		/*	// short circuit stuff after the magic pkt
+			case dump:
+				continue
+			case !dump && bytes.Equal(start, b[:n]):
+				dump = true
+				continue
+		*/
 
 		default:
 			// ok
@@ -756,7 +769,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	h.muConns.Lock()
 	pa := e.PeerAddress()
 	addr := pa[:]
-	logger.Debug("hci", "connection complete", fmt.Sprintf("%04X: addr: %s, lecc evt: %s", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
+	logger.Debug("hci", "connection complete", fmt.Sprintf("%04X: addr: %v, intvl: %v, latency %v, timeout %v, lecc evt: %v", e.ConnectionHandle(), hex.EncodeToString(addr), e.ConnInterval(), e.ConnLatency(), e.SupervisionTimeout(), hex.EncodeToString(b)))
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -796,7 +809,19 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleLEConnectionParameterRequest(b []byte) error {
-	logger.Warn("got le conn params request", hex.EncodeToString(b))
+	e := evt.LERemoteConnectionParameterRequest(b)
+	ch := e.ConnectionHandle()
+
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[ch]
+	if !found {
+		return nil
+		//return fmt.Errorf("disconnecting an invalid handle %04X", ch)
+	}
+	logger.Info(fmt.Sprintf("le connection params request: handle %v, intvl %v/%v, lat %v, to %v", e.ConnectionHandle(), e.IntervalMin(), e.IntervalMax(), e.Latency(), e.Timeout()))
+	c.handleConnectionParameterUpdateRequest(b)
+
 	return nil
 }
 

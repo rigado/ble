@@ -1,6 +1,10 @@
 package ble
 
-import "time"
+import (
+	"time"
+
+	"github.com/rigado/ble/linux/hci/cmd"
+)
 
 // A Client is a GATT client.
 type Client interface {
@@ -79,4 +83,6 @@ type Client interface {
 	Pair(AuthData, time.Duration) error
 
 	StartEncryption(c chan EncryptionChangedInfo) error
+
+	ConnectionParametersUpdate(params cmd.LEConnectionUpdate) error
 }

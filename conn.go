@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 type EncryptionChangedInfo struct {
@@ -46,4 +48,6 @@ type Conn interface {
 	Pair(AuthData, time.Duration) error
 
 	StartEncryption(change chan EncryptionChangedInfo) error
+
+	ConnectionParametersUpdate(params cmd.LEConnectionUpdate) error
 }
