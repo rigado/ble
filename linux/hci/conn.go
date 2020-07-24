@@ -425,9 +425,9 @@ func (c *Conn) recombine() error {
 	// TODO: support dynamic or assigned channels for LE-Frames.
 	switch p.cid() {
 	case cidLEAtt:
-		fmt.Println("start c.chInPDU <- p")
+		//fmt.Println("start c.chInPDU <- p")
 		c.chInPDU <- p
-		fmt.Println("finish c.chInPDU <- p, len:", len(c.chInPDU))
+		//fmt.Println("finish c.chInPDU <- p, len:", len(c.chInPDU))
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:

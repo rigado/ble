@@ -587,9 +587,9 @@ func (c *Client) Loop() {
 	defer close(nc)
 	go func() {
 		for bb := range nc {
-			fmt.Println("start async notif handling")
+			//fmt.Println("start async notif handling")
 			c.handler.HandleNotification(bb)
-			fmt.Println("finish async notif handling")
+			//fmt.Println("finish async notif handling")
 		}
 	}()
 
@@ -619,9 +619,9 @@ func (c *Client) Loop() {
 			//ok
 		}
 
-		fmt.Printf("start l2c read\n")
+		//fmt.Printf("start l2c read\n")
 		n, err := c.l2c.Read(c.rxBuf)
-		fmt.Printf("finish l2c read, got %d\n", n)
+		//fmt.Printf("finish l2c read, got %d\n", n)
 
 		if err != nil {
 			logger.Info("client", "read error", err.Error())
@@ -684,7 +684,7 @@ func (c *Client) Loop() {
 			logger.Debug("exited client async loop: conn closed")
 			return
 		case nc <- b:
-			fmt.Println("sent notif to async worker")
+			//fmt.Println("sent notif to async worker")
 			// ok, sent to the async handler loop
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.

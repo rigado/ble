@@ -454,7 +454,7 @@ func (h *HCI) sktReadLoop() {
 
 		//fmt.Println("beginSktRead:", time.Now().UnixNano())
 		n, err := h.skt.Read(b)
-		fmt.Println("endSktRead:", time.Now().UnixNano(), n, hex.EncodeToString(b[:n]))
+		//fmt.Println("endSktRead:", time.Now().UnixNano(), n, hex.EncodeToString(b[:n]))
 
 		switch {
 		case n == 0 && err == nil:
@@ -528,7 +528,7 @@ func (h *HCI) handleACL(b []byte) error {
 
 	if c, ok := h.conns[handle]; ok {
 		c.chInPkt <- b
-		fmt.Println("c.chInPkt <- b, len:", len(c.chInPkt))
+		//fmt.Println("c.chInPkt <- b, len:", len(c.chInPkt))
 	} else {
 		_ = logger.Warn("invalid connection handle on ACL packet", "handle:", handle)
 	}
