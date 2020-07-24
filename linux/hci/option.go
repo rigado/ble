@@ -25,6 +25,7 @@ func (h *HCI) SetListenerTimeout(d time.Duration) error {
 // SetConnParams overrides default connection parameters.
 func (h *HCI) SetConnParams(param cmd.LECreateConnection) error {
 	h.params.connParams = param
+	fmt.Printf("set conn params to %+v\n", h.params.connParams)
 	return nil
 }
 

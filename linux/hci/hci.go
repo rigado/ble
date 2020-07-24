@@ -450,8 +450,7 @@ func (h *HCI) sktReadLoop() {
 	for {
 		fmt.Println("beginSktRead:", time.Now().UnixNano())
 		n, err := h.skt.Read(b)
-		fmt.Println("endSktRead:", time.Now().UnixNano())
-
+		fmt.Println("endSktRead:", time.Now().UnixNano(), n, hex.EncodeToString(b[:n]))
 		switch {
 		case n == 0 && err == nil:
 			// read timeout
