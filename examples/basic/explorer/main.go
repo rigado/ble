@@ -173,7 +173,7 @@ func explore(cln ble.Client, p *ble.Profile) error {
 
 				if (c.Property & ble.CharNotify) != 0 {
 					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
+					h := func(id uint, req []byte) { fmt.Printf("Notified: id %v, %q [ % X ]\n", id, string(req), req) }
 					if err := cln.Subscribe(c, false, h); err != nil {
 						log.Fatalf("subscribe failed: %s", err)
 					}
@@ -185,7 +185,7 @@ func explore(cln ble.Client, p *ble.Profile) error {
 				}
 				if (c.Property & ble.CharIndicate) != 0 {
 					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
+					h := func(id uint, req []byte) { fmt.Printf("Indicated: id %v, %q [ % X ]\n", id, string(req), req) }
 					if err := cln.Subscribe(c, true, h); err != nil {
 						log.Fatalf("subscribe failed: %s", err)
 					}

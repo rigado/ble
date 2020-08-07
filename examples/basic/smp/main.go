@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux"
 	bonds "github.com/rigado/ble/linux/hci/bond"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -48,7 +48,6 @@ func main() {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
-
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
@@ -119,7 +118,8 @@ func main() {
 		log.Println("starting encryption for", hex.EncodeToString(aBytes))
 		if exists := bm.Exists(hex.EncodeToString(aBytes)); exists == true {
 			log.Println("found pair info; starting encryption")
-			if err := cln.StartEncryption(); err != nil {
+			m := make(chan ble.EncryptionChangedInfo)
+			if err := cln.StartEncryption(m); err != nil {
 				log.Println("failed to start encryption:", err)
 			}
 		}
@@ -177,7 +177,7 @@ func explore(cln ble.Client, p *ble.Profile) error {
 
 				if (c.Property & ble.CharNotify) != 0 {
 					fmt.Printf("\n-- Subscribe to notification for %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Notified: %q [ % X ]\n", string(req), req) }
+					h := func(id uint, req []byte) { fmt.Printf("Notified: id %v, %q [ % X ]\n", id, string(req), req) }
 					if err := cln.Subscribe(c, false, h); err != nil {
 						log.Fatalf("subscribe failed: %s", err)
 					}
@@ -189,7 +189,7 @@ func explore(cln ble.Client, p *ble.Profile) error {
 				}
 				if (c.Property & ble.CharIndicate) != 0 {
 					fmt.Printf("\n-- Subscribe to indication of %s --\n", *sub)
-					h := func(req []byte) { fmt.Printf("Indicated: %q [ % X ]\n", string(req), req) }
+					h := func(id uint, req []byte) { fmt.Printf("Indicated: id %v, %q [ % X ]\n", id, string(req), req) }
 					if err := cln.Subscribe(c, true, h); err != nil {
 						log.Fatalf("subscribe failed: %s", err)
 					}
