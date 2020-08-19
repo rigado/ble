@@ -17,7 +17,7 @@ var dispatcher = map[byte]smpDispatcher{
 	pairingKeypress:         smpDispatcher{"pairing keypress", nil},
 }
 
-//Core spec v5.0, Vol 3, Part H, 3.5.5, Table 3.7
+//Core spec v5.2, Vol 3, Part H, 3.5.5, Table 3.7
 var pairingFailedReason = []string{
 	"reserved",
 	"passkey entry failed",
@@ -27,10 +27,17 @@ var pairingFailedReason = []string{
 	"pairing not support",
 	"encryption key size",
 	"command not supported",
+	"unspecified reason",
+	"repeated attempts",
+	"invalid parameters",
+	"dhkey check failed",
+	"numeric comparaison failed",
+	"BR/EDR pairing in progress",
+	"Cross-transport Key Derivation/Generation not allowed",
 }
 
 type smpDispatcher struct {
-	desc    string
+	desc string
 	//todo: only errors are returned from these functions
 	//so the []byte return should be removed
 	handler func(t *transport, p pdu) ([]byte, error)
