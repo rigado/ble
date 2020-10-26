@@ -246,7 +246,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 func (h *HCI) cancelDial(passthrough error) (ble.Client, error) {
 	err := h.Send(&h.params.connCancel, nil)
 	if err == nil {
-		// The pending connection was canceled successfully. pass the og error
+		// The pending connection was canceled successfully
 		return nil, errors.Wrap(passthrough, "connection cancelled")
 	}
 
@@ -259,12 +259,12 @@ func (h *HCI) cancelDial(passthrough error) (ble.Client, error) {
 			return gatt.NewClient(c, h.cache, h.done)
 		case <-time.After(50 * time.Millisecond):
 			logger.Debug("hci", "connection req timed out after a connection was made")
-			return nil, errors.Wrap(err, "cancel connection failed")
+			return nil, errors.Wrap(passthrough, "cancel connection failed - connection req timed out after a connection was made")
 		}
 	}
 
 	// some other issue
-	return nil, errors.Wrap(err, "cancel connection failed")
+	return nil, errors.Wrapf(passthrough, "cancel connection failed - %s", err.Error())
 }
 
 // Advertise starts advertising.
