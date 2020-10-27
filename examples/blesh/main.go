@@ -9,11 +9,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/examples/lib"
 	"github.com/rigado/ble/examples/lib/dev"
 	"github.com/rigado/ble/linux"
-	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -374,7 +374,7 @@ func cmdSub(c *cli.Context) error {
 		return err
 	}
 	// NotificationHandler
-	h := func(req []byte) { fmt.Printf("notified: %x | %q\n", req, req) }
+	h := func(id uint, req []byte) { fmt.Printf("notified: %x | %q\n", id, req) }
 	if u := curr.profile.Find(ble.NewCharacteristic(curr.uuid)); u != nil {
 		err := curr.client.Subscribe(u.(*ble.Characteristic), c.Bool("ind"), h)
 		return errors.Wrap(err, "can't subscribe to characteristic")

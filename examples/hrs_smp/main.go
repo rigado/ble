@@ -5,14 +5,15 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/rigado/ble"
-	"github.com/rigado/ble/linux"
-	bonds "github.com/rigado/ble/linux/hci/bond"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux"
+	bonds "github.com/rigado/ble/linux/hci/bond"
 )
 
 var (
@@ -119,16 +120,17 @@ func main() {
 		log.Println("starting encryption for", hex.EncodeToString(aBytes))
 		if exists := bm.Exists(hex.EncodeToString(aBytes)); exists == true {
 			log.Println("found pair info; starting encryption")
-			if err := cln.StartEncryption(); err != nil {
+			m := make(chan ble.EncryptionChangedInfo)
+			if err := cln.StartEncryption(m); err != nil {
 				log.Println("failed to start encryption:", err)
 			}
 		}
 	}
 
 	//perform server and characteristic discovery
-	hrCharUuid, _ := ble.Parse("2a37")
-	hrServiceUuid, _ := ble.Parse("180d")
-	services, err := cln.DiscoverServices([]ble.UUID{hrServiceUuid})
+	hrCharUUID, _ := ble.Parse("2a37")
+	hrServiceUUID, _ := ble.Parse("180d")
+	services, err := cln.DiscoverServices([]ble.UUID{hrServiceUUID})
 	if err != nil {
 		log.Println("failed to discover heart rate service:", err)
 		_ = cln.CancelConnection()
@@ -145,7 +147,7 @@ func main() {
 
 	var svc *ble.Service
 	for _, s := range services {
-		if hrServiceUuid.Equal(s.UUID) {
+		if hrServiceUUID.Equal(s.UUID) {
 			svc = s
 			break
 		}
@@ -158,7 +160,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	chars, err := cln.DiscoverCharacteristics([]ble.UUID{hrCharUuid}, svc)
+	chars, err := cln.DiscoverCharacteristics([]ble.UUID{hrCharUUID}, svc)
 	if err != nil {
 		log.Println("failed to discover heart rate characteristic:", err)
 		_ = cln.CancelConnection()
@@ -175,7 +177,7 @@ func main() {
 
 	var hrc *ble.Characteristic
 	for _, c := range chars {
-		if hrCharUuid.Equal(c.UUID){
+		if hrCharUUID.Equal(c.UUID) {
 			hrc = c
 			break
 		}
@@ -195,7 +197,7 @@ func main() {
 	first := true
 	for tries := 0; tries < 3; tries++ {
 		fmt.Println("attempt to subscribe")
-		err = cln.Subscribe(hrc, false, func(req []byte) {
+		err = cln.Subscribe(hrc, false, func(id uint, req []byte) {
 			if first {
 				first = false
 				end := time.Now()
@@ -241,4 +243,3 @@ func main() {
 
 	<-done
 }
-
