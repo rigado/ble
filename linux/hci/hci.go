@@ -20,6 +20,7 @@ type Command interface {
 	OpCode() int
 	Len() int
 	Marshal([]byte) error
+	String() string
 }
 
 // CommandRP ...
@@ -379,9 +380,8 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	select {
 	case <-time.After(3 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
-		fmt.Println("no response to command")
-		fmt.Println("pending commands:")
-		fmt.Printf("cmd: %x pkt: %s\n", c.OpCode(), hex.EncodeToString(b[:4+c.Len()]))
+		fmt.Println("no response to command:")
+		fmt.Printf("cmd: 0x%x (%v) pkt: %s\n", c.OpCode(), c.String(), hex.EncodeToString(b[:4+c.Len()]))
 		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
@@ -823,7 +823,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
-		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprint("%04X", ch))
+		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprintf("%04X", ch))
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
