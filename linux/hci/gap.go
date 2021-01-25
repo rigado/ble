@@ -229,9 +229,9 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 
 	select {
 	case <-ctx.Done():
-		return h.cancelDial()
+		return h.cancelDial(ctx.Err())
 	case <-tmo:
-		return h.cancelDial()
+		return h.cancelDial(fmt.Errorf("dialer timeout (%s)", h.dialerTmo))
 	case <-h.done:
 		return nil, h.err
 	case c, ok := <-h.chMasterConn:
@@ -243,25 +243,28 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 }
 
 // cancelDial cancels the Dialing
-func (h *HCI) cancelDial() (ble.Client, error) {
+func (h *HCI) cancelDial(passthrough error) (ble.Client, error) {
 	err := h.Send(&h.params.connCancel, nil)
 	if err == nil {
-		// The pending connection was canceled successfully.
-		return nil, fmt.Errorf("connection canceled")
+		// The pending connection was canceled successfully
+		return nil, errors.Wrap(passthrough, "connection cancelled")
 	}
+
 	// The connection has been established, the cancel command
 	// failed with ErrDisallowed.
 	if err == ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
-			logger.Debug("hci", "got connection complete obj after disallowed")
+			logger.Debug("hci", "got connection complete after disallowed")
 			return gatt.NewClient(c, h.cache, h.done)
 		case <-time.After(50 * time.Millisecond):
-			logger.Debug("hci", "connection req timed out even though a connection was made...")
-			return nil, errors.Wrap(err, "cancel connection failed")
+			logger.Debug("hci", "connection req timed out after a connection was made")
+			return nil, errors.Wrap(passthrough, "cancel connection failed - connection req timed out after a connection was made")
 		}
 	}
-	return nil, errors.Wrap(err, "cancel connection failed")
+
+	// some other issue
+	return nil, errors.Wrapf(passthrough, "cancel connection failed - %s", err.Error())
 }
 
 // Advertise starts advertising.
