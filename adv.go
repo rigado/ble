@@ -22,6 +22,7 @@ type Advertisement interface {
 	Timestamp() int64
 
 	ToMap() (map[string]interface{}, error)
+	Data() []byte
 }
 
 var AdvertisementMapKeys = struct {
