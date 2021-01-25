@@ -93,7 +93,11 @@ func (m *manager) Handle(in []byte) error {
 	}
 
 	if m.t.pairing.state == Finished {
-		close(m.result)
+		select {
+		case <-m.result:
+		default:
+			close(m.result)
+		}
 	}
 
 	return nil

@@ -403,7 +403,10 @@ func (c *Conn) recombine() error {
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:
-		_ = c.smp.Handle(p)
+		if err := c.smp.Handle(p); err != nil {
+			logger.Error("smp.Handle: ", err.Error())
+		}
+
 	default:
 		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
 	}
@@ -417,7 +420,7 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		err = fmt.Errorf(errCmd[cmdErr])
 		e := c.smp.DeleteBondInfo()
 		if e != nil {
-			_ = logger.Error("failed to delete bond info", e)
+			logger.Error("failed to delete bond info", e.Error())
 		}
 	}
 
@@ -427,10 +430,10 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		case c.encChanged <- info:
 			return
 		default:
-			_ = logger.Error("failed to send encryption changed status to channel:", info)
+			logger.Error("failed to send encryption changed status to channel:", fmt.Sprint(info))
 		}
 	} else {
-		logger.Info("encryption changed result - status:", status, "; err:", err)
+		logger.Info(fmt.Sprintf("encryption changed - status: %v, err %v", status, err))
 	}
 }
 

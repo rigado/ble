@@ -3,8 +3,8 @@ package parser
 import (
 	"fmt"
 
-	"github.com/rigado/ble"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 )
 
 // https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile
@@ -206,13 +206,12 @@ func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 }
 
 func Parse(pdu []byte) (map[string]interface{}, error) {
-	if pdu == nil {
-		return nil, fmt.Errorf("invalid pdu: %v", pdu)
+	if len(pdu) == 0 {
+		return nil, fmt.Errorf("nil/empty pdu")
 	}
 
 	m := make(map[string]interface{})
 	for i := 0; (i + 1) < len(pdu); {
-
 		//length @ offset 0
 		//type @ offset 1
 		//data @ 1 - (length-1)
@@ -221,25 +220,22 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 
 		//length should be more than 1 since there is a type byte
 		if length < 1 {
-			return nil, fmt.Errorf("invalid record length %d", length)
+			return m, fmt.Errorf("invalid record length %v, idx %v", length, i)
 		}
 
 		//do we have all the bytes for the payload?
 		if (i + length) >= len(pdu) {
-			return nil, fmt.Errorf("buffer overflow: want %v, have %v", (i + length), len(pdu))
+			return m, fmt.Errorf("buffer overflow: want %v, have %v, idx %v", (i + length), len(pdu), i)
 		}
 
 		start := i + 2
 		end := start + length - 1
 		bytes := pdu[start:end]
-
-		//fmt.Printf("type %v, len %v, cur %v, start %v, end %v, bytes %v\n", typ, length, i, start, end, bytes)
-
 		dec, ok := pduDecodeMap[typ]
 		if ok {
 			//have min length?
 			if dec.minSz > len(bytes) {
-				return nil, fmt.Errorf("adv type %v: min length %v, have %v", typ, dec.minSz, len(bytes))
+				return m, fmt.Errorf("adv type %v: min length %v, have %v, idx %v", typ, dec.minSz, len(bytes), i)
 			}
 
 			//expecting array?
@@ -248,7 +244,7 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 
 				//is this fatal?
 				if err != nil {
-					return nil, errors.Wrap(err, fmt.Sprintf("adv type %v", typ))
+					return m, errors.Wrapf(err, "adv type %v, idx %v", typ, i)
 				}
 
 				v, ok := m[dec.key].([]ble.UUID)

@@ -26,35 +26,37 @@ type Advertisement interface {
 }
 
 var AdvertisementMapKeys = struct {
-	MAC         string
-	RSSI        string
-	Name        string
-	MFG         string
-	Services    string
-	ServiceData string
-	Connectable string
-	Solicited   string
-	EventType   string
-	Flags       string
-	TxPower     string
-	AddressType string
-	Controller  string
-	Timestamp   string
+	MAC                string
+	RSSI               string
+	Name               string
+	MFG                string
+	Services           string
+	ServiceData        string
+	Connectable        string
+	Solicited          string
+	EventType          string
+	Flags              string
+	TxPower            string
+	AddressType        string
+	Controller         string
+	Timestamp          string
+	AdvertisementError string
 }{
-	MAC:         "mac",
-	RSSI:        "rssi",
-	Name:        "name",
-	MFG:         "mfg",
-	Services:    "services",
-	ServiceData: "serviceData",
-	Connectable: "connectable",
-	Solicited:   "solicited",
-	EventType:   "eventType",
-	Flags:       "flags",
-	TxPower:     "txPower",
-	AddressType: "addressType",
-	Controller:  "controllerMac",
-	Timestamp:   "timestamp",
+	MAC:                "mac",
+	RSSI:               "rssi",
+	Name:               "name",
+	MFG:                "mfg",
+	Services:           "services",
+	ServiceData:        "serviceData",
+	Connectable:        "connectable",
+	Solicited:          "solicited",
+	EventType:          "eventType",
+	Flags:              "flags",
+	TxPower:            "txPower",
+	AddressType:        "addressType",
+	Controller:         "controllerMac",
+	Timestamp:          "timestamp",
+	AdvertisementError: "advertisementError",
 }
 
 // ServiceData ...

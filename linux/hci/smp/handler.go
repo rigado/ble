@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/rigado/ble/linux/hci"
 )
 
@@ -147,7 +148,7 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	stk, err := smpS1(k, rRand, lRand)
 	t.pairing.shortTermKey = stk
 
-	if t.pairing.request.AuthReq & 0x01 == 0x00 {
+	if t.pairing.request.AuthReq&authReqBondMask == authReqNoBond {
 		t.pairing.state = Finished
 	}
 
@@ -199,7 +200,6 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 	//at this point, the pairing is complete
 	t.pairing.state = Finished
 
-
 	//todo: separate this out
 	return nil, t.encrypter.Encrypt()
 }
@@ -207,7 +207,9 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 func smpOnPairingFailed(t *transport, in pdu) ([]byte, error) {
 	reason := "unknown"
 	if len(in) > 0 {
-		reason = pairingFailedReason[in[0]]
+		if r, ok := pairingFailedReason[in[0]]; ok {
+			reason = r
+		}
 	}
 	return nil, fmt.Errorf("pairing failed: %s", reason)
 }
@@ -217,17 +219,20 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 		return nil, fmt.Errorf("%v, invalid length %v", hex.EncodeToString(in), len(in))
 	}
 
-	ra := hex.EncodeToString(t.pairing.remoteAddr)
-	bi, err := t.bondManager.Find(ra)
-	fmt.Println(err)
-	if err == nil {
-		t.pairing.bond = bi
-		return nil, t.encrypter.Encrypt()
-	}
-
 	//todo: clean this up
 	rx := hci.SmpConfig{}
 	rx.AuthReq = in[0]
+
+	if (rx.AuthReq & authReqBondMask) == authReqBond {
+		ra := hex.EncodeToString(t.pairing.remoteAddr)
+		bi, err := t.bondManager.Find(ra)
+		if err == nil {
+			t.pairing.bond = bi
+			return nil, t.encrypter.Encrypt()
+		}
+		fmt.Println("smpOnSecurityRequest bond manager error:", err)
+		// will re-bond below
+	}
 
 	//match the incoming request parameters
 	t.pairing.request.AuthReq = rx.AuthReq
@@ -250,13 +255,11 @@ func smpOnMasterIdentification(t *transport, in pdu) ([]byte, error) {
 	ltk := t.pairing.bond.LongTermKey()
 	t.pairing.bond = hci.NewBondInfo(ltk, ediv, randVal, true)
 
-	err := t.saveBondInfo()
-	if err != nil {
+	if err := t.saveBondInfo(); err != nil {
 		return nil, err
 	}
 
 	t.pairing.state = Finished
-
 	return nil, nil
 }
 
@@ -293,19 +296,19 @@ func continuePassKeyPairing(t *transport) {
 //Core spec v5.0 Vol 3, Part H, 2.3.5.1
 //Tables 2.6, 2.7, and 2.8
 var ioCapsTableSC = [][]int{
-	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
-	{ JustWorks, NumericComp, Passkey, JustWorks, NumericComp },
-	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
-	{ JustWorks, JustWorks, JustWorks, JustWorks, JustWorks },
-	{ Passkey, NumericComp, Passkey, JustWorks, NumericComp },
+	{JustWorks, JustWorks, Passkey, JustWorks, Passkey},
+	{JustWorks, NumericComp, Passkey, JustWorks, NumericComp},
+	{Passkey, Passkey, Passkey, JustWorks, Passkey},
+	{JustWorks, JustWorks, JustWorks, JustWorks, JustWorks},
+	{Passkey, NumericComp, Passkey, JustWorks, NumericComp},
 }
 
 var ioCapsTableLegacy = [][]int{
-	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
-	{ JustWorks, JustWorks, Passkey, JustWorks, Passkey },
-	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
-	{ JustWorks, JustWorks, JustWorks, JustWorks, JustWorks },
-	{ Passkey, Passkey, Passkey, JustWorks, Passkey },
+	{JustWorks, JustWorks, Passkey, JustWorks, Passkey},
+	{JustWorks, JustWorks, Passkey, JustWorks, Passkey},
+	{Passkey, Passkey, Passkey, JustWorks, Passkey},
+	{JustWorks, JustWorks, JustWorks, JustWorks, JustWorks},
+	{Passkey, Passkey, Passkey, JustWorks, Passkey},
 }
 
 func determinePairingType(t *transport) int {
@@ -313,7 +316,6 @@ func determinePairingType(t *transport) int {
 
 	req := t.pairing.request
 	rsp := t.pairing.response
-
 
 	if req.OobFlag == 0x01 && rsp.OobFlag == 0x01 && t.pairing.legacy {
 		return Oob
@@ -323,8 +325,8 @@ func determinePairingType(t *transport) int {
 		return Oob
 	}
 
-	if req.AuthReq & mitmMask == 0x00 &&
-		rsp.AuthReq & mitmMask == 0x00 {
+	if req.AuthReq&mitmMask == 0x00 &&
+		rsp.AuthReq&mitmMask == 0x00 {
 		return JustWorks
 	}
 

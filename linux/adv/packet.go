@@ -68,8 +68,16 @@ func NewRawPacket(bytes ...[]byte) (*Packet, error) {
 
 	//decode the bytes
 	m, err := parser.Parse(b)
-	if err != nil {
-		return nil, errors.Wrap(err, "pdu decode")
+	err = errors.Wrapf(err, "pdu decode")
+	switch {
+	case err == nil:
+		// ok
+	case len(m) > 0:
+		// some of the adv was ok, append the error
+		m[ble.AdvertisementMapKeys.AdvertisementError] = err.Error()
+	default:
+		// nothing was ok parsed, exit
+		return nil, err
 	}
 
 	p := &Packet{b: b, m: m}
