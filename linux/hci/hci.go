@@ -790,12 +790,12 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleLEConnectionParameterRequest(b []byte) error {
-	logger.Error("got a conn params request")
+	logger.Warn("ignoring LEConnectionParameterRequest")
 	return nil
 }
 
 func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
-	logger.Error("got a conn params update")
+	logger.Warn("ignoring LEConnectionUpdateComplete")
 	return nil
 }
 
