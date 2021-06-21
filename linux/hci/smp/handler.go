@@ -1,6 +1,7 @@
 package smp
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -163,6 +164,13 @@ func smpOnPairingPublicKey(t *transport, in pdu) ([]byte, error) {
 
 	if len(in) != 64 {
 		return nil, fmt.Errorf("invalid length")
+	}
+
+	//validate the remote public key does not match our public key
+	//CVE-2020-26558
+	k := MarshalPublicKeyXY(t.pairing.scECDHKeys.public)
+	if bytes.Equal(k, in) {
+		return nil, fmt.Errorf("remote public key cannot match local public key")
 	}
 
 	pubk, ok := UnmarshalPublicKey(in)
