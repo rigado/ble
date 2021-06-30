@@ -91,9 +91,9 @@ func (h *HCI) SetTransportH4Socket(addr string, timeout time.Duration) error {
 }
 
 // SetTransportH4Uart sets h4 uart path
-func (h *HCI) SetTransportH4Uart(path string) error {
+func (h *HCI) SetTransportH4Uart(path string, baud int) error {
 	h.transport = transport{
-		h4uart: &transportH4Uart{path},
+		h4uart: &transportH4Uart{path, baud},
 	}
 	return nil
 }

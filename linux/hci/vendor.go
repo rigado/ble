@@ -40,10 +40,6 @@ func (c *CustomCommand) String() string {
 }
 
 func (h *HCI) SendVendorSpecificCommand(op uint16, length uint8, v interface{}) error {
-	if op > 1<<ogfBitShift {
-		return fmt.Errorf("invalid op %v; op value max is 0x3ff (1023)", op)
-	}
-
 	if length > maxHciPayload {
 		return fmt.Errorf("invalid length %v; max hci payload length is %v", length, maxHciPayload)
 	}

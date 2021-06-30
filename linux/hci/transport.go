@@ -20,6 +20,7 @@ type transportH4Socket struct {
 
 type transportH4Uart struct {
 	path string
+	baud int
 }
 
 type transport struct {
@@ -39,6 +40,9 @@ func getTransport(t transport) (io.ReadWriteCloser, error) {
 	case t.h4uart != nil:
 		so := h4.DefaultSerialOptions()
 		so.PortName = t.h4uart.path
+		if t.h4uart.baud != -1 {
+			so.BaudRate = uint(t.h4uart.baud)
+		}
 		return h4.NewSerial(so)
 
 	default:

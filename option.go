@@ -21,7 +21,7 @@ type DeviceOption interface {
 
 	SetTransportHCISocket(id int) error
 	SetTransportH4Socket(addr string, timeout time.Duration) error
-	SetTransportH4Uart(path string) error
+	SetTransportH4Uart(path string, baud int) error
 	SetGattCacheFile(filename string)
 }
 
@@ -130,9 +130,9 @@ func OptTransportH4Socket(addr string, timeout time.Duration) Option {
 }
 
 // OptTransportH4Uart set h4 uart transport
-func OptTransportH4Uart(path string) Option {
+func OptTransportH4Uart(path string, baud int) Option {
 	return func(opt DeviceOption) error {
-		opt.SetTransportH4Uart(path)
+		opt.SetTransportH4Uart(path, baud)
 		return nil
 	}
 }
