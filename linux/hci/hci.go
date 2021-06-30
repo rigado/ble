@@ -55,6 +55,8 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		muClose:   sync.Mutex{},
 		done:      make(chan bool),
 		sktRxChan: make(chan []byte, 16), //todo pick a real number
+
+		vendorChan: make(chan []byte),
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -129,6 +131,8 @@ type HCI struct {
 	sktRxChan chan []byte
 
 	cache ble.GattCache
+
+	vendorChan chan []byte
 }
 
 // Init ...
@@ -301,6 +305,7 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 	if err != nil {
 		return err
 	}
+
 	if len(b) > 0 && b[0] != 0x00 {
 		return ErrCommand(b[0])
 	}
@@ -329,11 +334,26 @@ func (h *HCI) send(c Command) ([]byte, error) {
 
 	p := &pkt{c, make(chan []byte)}
 
+	oc := c.OpCode()
+
+	//check to see if this is a vendor command
+	if oc>>ogfBitShift == ogfVendorSpecificDebug {
+		//this is a vendor command, set the opcode to vendor specific event
+		//since that is how the response is delivered
+		oc = ogfVendorSpecificDebug
+	}
+
 	//verify opcode is free before asking for the command buffer
 	//this ensures that the command buffer is only taken if
 	//the command can be sent
-	if h.checkOpCodeFree(c.OpCode()) != nil {
+	if h.checkOpCodeFree(oc) != nil {
 		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
+	}
+
+	//try to marshal the data
+	m := make([]byte, c.Len())
+	if err := c.Marshal(m); err != nil {
+		return nil, fmt.Errorf("hci: failed to marshal cmd: %v", err)
 	}
 
 	// get buffer w/timeout
@@ -351,15 +371,13 @@ func (h *HCI) send(c Command) ([]byte, error) {
 
 	//HCI header
 	b[0] = pktTypeCommand
-	b[1] = byte(c.OpCode())
+	b[1] = byte(c.OpCode()) //use real opcode here since there is a small swap for vendor packets
 	b[2] = byte(c.OpCode() >> 8)
 	b[3] = byte(c.Len())
-	if err := c.Marshal(b[4:]); err != nil {
-		h.close(fmt.Errorf("hci: failed to marshal cmd"))
-	}
+	copy(b[4:], m)
 
 	h.muSent.Lock()
-	h.sent[c.OpCode()] = p
+	h.sent[oc] = p //use oc here due to swap to 0xff for vendor events
 	h.muSent.Unlock()
 
 	if !h.isOpen() {
@@ -395,7 +413,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	// command status messages with no matching send, which can attempt to
 	// access stale packets in sent and fail or lock up.
 	h.muSent.Lock()
-	delete(h.sent, c.OpCode())
+	delete(h.sent, oc) //use oc here since it could be different from the real opcode
 	h.muSent.Unlock()
 
 	return ret, err
@@ -535,7 +553,8 @@ func (h *HCI) handleEvt(b []byte) error {
 		h.err = f(b[2:])
 		return nil
 	}
-	if code == 0xff { // Ignore vendor events
+	if code == evt.VendorEventCode {
+		h.err = h.handleVendorEvent(b[2:])
 		return nil
 	}
 	return fmt.Errorf("unsupported event packet: % X", b)
@@ -920,6 +939,27 @@ func (h *HCI) setAllowedCommands(n int) {
 			//timeout
 			break
 		}
+	}
+}
+
+func (h *HCI) handleVendorEvent(b []byte) error {
+	//find the opcode
+	h.muSent.Lock()
+	p, found := h.sent[ogfVendorSpecificDebug]
+	h.muSent.Unlock()
+
+	if !found {
+		return fmt.Errorf("received vendor event but no vendor command was sent: %02x", b)
+	}
+
+	//todo: send data back to caller via channel
+
+	select {
+	case <-h.done:
+		//hci closed
+		return fmt.Errorf("hci closed")
+	case p.done <- []byte{0x00}:
+		return nil
 	}
 }
 

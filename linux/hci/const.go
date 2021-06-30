@@ -29,10 +29,17 @@ const (
 const (
 	roleMaster = 0x00
 	roleSlave  = 0x01
+
+	maxHciPayload = 252
 )
 
 const (
 	chCmdBufChanSize    = 16 // TODO: decide correct size (comment migrated)
 	chCmdBufElementSize = 64
 	chCmdBufTimeout     = time.Second * 5
+)
+
+const (
+	ogfBitShift            = 10
+	ogfVendorSpecificDebug = 0x3f
 )

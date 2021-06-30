@@ -227,3 +227,11 @@ type AuthenticatedPayloadTimeoutExpired []byte
 func (r AuthenticatedPayloadTimeoutExpired) ConnectionHandle() uint16 {
 	return binary.LittleEndian.Uint16(r[0:])
 }
+
+const VendorEventCode = 0xff
+
+type VendorEvent []byte
+
+func (v VendorEvent) Data() []byte {
+	return v
+}
