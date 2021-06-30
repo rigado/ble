@@ -15,16 +15,15 @@ import (
 )
 
 var (
-	name    = flag.String("name", "Thingy", "name of remote peripheral")
-	addr    = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
-	h4skt   = flag.String("h4s", "", "h4 socket server address")
-	h4uart  = flag.String("h4u", "", "h4 uart")
-	hciSkt  = flag.Int("device", -1, "hci index")
-	sub     = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
-	sd      = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
-	bond    = flag.Bool("bond", false, "attempt to bond on connection")
-	dump    = flag.Bool("dump", false, "dump stack?")
-	qcaAddr = flag.String("qcaaddr", "", "set mac address for qca bt radio")
+	name   = flag.String("name", "Thingy", "name of remote peripheral")
+	addr   = flag.String("addr", "", "address of remote peripheral (MAC on Linux, UUID on OS X)")
+	h4skt  = flag.String("h4s", "", "h4 socket server address")
+	h4uart = flag.String("h4u", "", "h4 uart")
+	hciSkt = flag.Int("device", -1, "hci index")
+	sub    = flag.Duration("sub", 0, "subscribe to notification and indication for a specified period")
+	sd     = flag.Duration("sd", 20*time.Second, "scanning duration, 0 for indefinitely")
+	bond   = flag.Bool("bond", false, "attempt to bond on connection")
+	dump   = flag.Bool("dump", false, "dump stack?")
 )
 
 func main() {
@@ -52,13 +51,6 @@ func main() {
 		log.Fatalf("can't new device : %s", err)
 	}
 	ble.SetDefaultDevice(d)
-
-	if len(*qcaAddr) != 0 {
-		err := d.SendCustomControllerCommand(nil, 0xfc0b, 0x09, []byte{0x01, 0x02, 0x06, 0x56, 0x34, 0x12, 0x93, 0x54, 0x94})
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
