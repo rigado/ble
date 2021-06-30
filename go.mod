@@ -17,5 +17,5 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
 	golang.org/x/crypto v0.0.0-20200115085410-6d4e4cb37c7d // indirect
-	golang.org/x/sys v0.0.0-20191126131656-8a8471f7e56d
+	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
 )

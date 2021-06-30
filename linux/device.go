@@ -212,3 +212,7 @@ func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 func (d *Device) Address() ble.Addr {
 	return d.HCI.Addr()
 }
+
+func (d *Device) SendVendorSpecificCommand(opcode uint16, length uint8, v interface{}) error {
+	return d.HCI.SendVendorSpecificCommand(opcode, length, v)
+}

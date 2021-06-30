@@ -45,4 +45,8 @@ type Device interface {
 
 	// Address ...
 	Address() Addr
+
+	// Custom controller command
+	// When sending a struct with an array or a slice, a fixed sized array must be used rather than a slice
+	SendVendorSpecificCommand(opcode uint16, length uint8, v interface{}) error
 }
