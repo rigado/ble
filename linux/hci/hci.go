@@ -449,8 +449,8 @@ func (h *HCI) sktProcessLoop() {
 			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
 				_ = logger.Error("hci", "skt: ", err)
 			} else {
-				h.err = fmt.Errorf("skt handle error: %v", err)
-				return
+				logger.Warn("skt handle error: %v", err)
+				// return
 			}
 		}
 	}
