@@ -4,4 +4,4 @@ import (
 	"github.com/rigado/ble"
 )
 
-var logger = ble.Logger
+var logger = ble.GetLogger()

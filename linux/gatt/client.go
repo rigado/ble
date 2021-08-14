@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -29,6 +28,8 @@ type Client struct {
 
 	conn  ble.Conn
 	cache ble.GattCache
+
+	ble.Logger
 }
 
 type sub struct {
@@ -40,13 +41,15 @@ type sub struct {
 }
 
 // NewClient returns a GATT Client.
-func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool) (*Client, error) {
+func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool, l ble.Logger) (*Client, error) {
+	cl := l.ChildLogger(map[string]interface{}{"client": hex.EncodeToString(conn.RemoteAddr().Bytes())})
 	p := &Client{
-		subs:  make(map[uint16]*sub),
-		conn:  conn,
-		cache: cache,
+		subs:   make(map[uint16]*sub),
+		conn:   conn,
+		cache:  cache,
+		Logger: cl,
 	}
-	p.ac = att.NewClient(conn, p, done)
+	p.ac = att.NewClient(conn, p, done, cl)
 
 	go p.ac.Loop()
 
@@ -440,7 +443,7 @@ func (p *Client) HandleNotification(req []byte) {
 	sub, ok := p.subs[vh]
 	if !ok {
 		// FIXME: disconnects and propagate an error to the user.
-		log.Printf("got an unregistered notification")
+		p.Warnf("got an unregistered notification")
 		return
 	}
 
@@ -453,7 +456,7 @@ func (p *Client) HandleNotification(req []byte) {
 	case sub.nHandler != nil:
 		sub.nHandler(sub.id, nd)
 	default:
-		log.Printf("no handler, dropping data vh 0x%x, indication %v, id %v, %v", vh, indication, sub.id, hex.EncodeToString(nd))
+		p.Warnf("no handler, dropping data vh 0x%x, indication %v, id %v, %x", vh, indication, sub.id, nd)
 	}
 	sub.id++
 }

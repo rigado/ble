@@ -27,13 +27,12 @@ type Client struct {
 	done       chan bool
 	connClosed chan struct{}
 
-	reqHandler map[int]func([]byte) error
-
 	server *Server
+	ble.Logger
 }
 
 // NewClient returns an Attribute Protocol Client.
-func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
+func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool, l ble.Logger) *Client {
 	c := &Client{
 		l2c:        l2c,
 		rspc:       make(chan []byte),
@@ -44,8 +43,9 @@ func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 		handler:    h,
 		done:       done,
 		connClosed: make(chan struct{}),
+		Logger:     l,
 	}
-	c.chTxBuf <- make([]byte, l2c.TxMTU(), l2c.TxMTU())
+	c.chTxBuf <- make([]byte, l2c.TxMTU())
 
 	go func() {
 		<-l2c.Disconnected()
@@ -57,9 +57,9 @@ func NewClient(l2c ble.Conn, h NotificationHandler, done chan bool) *Client {
 
 func (c *Client) WithServer(db *DB) *Client {
 	var err error
-	c.server, err = NewServer(db, c.l2c)
+	c.server, err = NewServer(db, c.l2c, c.Logger)
 	if err != nil {
-		logger.Info("failed to create server for client")
+		c.Errorf("client: failed to create server")
 	}
 
 	return c
@@ -109,7 +109,7 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 		c.l2c.SetTxMTU(txMTU)
 		// Put a re-allocated txBuf back to the channel.
 		// The txBuf has been captured in deferred function.
-		txBuf = make([]byte, txMTU, txMTU)
+		txBuf = make([]byte, txMTU)
 	}
 
 	return txMTU, nil
@@ -506,7 +506,7 @@ func (c *Client) sendCmd(b []byte) error {
 }
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
-	logger.Debug("client", "req", fmt.Sprintf("% X", b))
+	c.Debugf("client: req % X", b)
 	if _, err := c.l2c.Write(b); err != nil {
 		return nil, errors.Wrap(err, "send ATT request failed")
 	}
@@ -521,7 +521,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			// returns an ErrReqNotSupp response, and continue to wait
 			// the response to our request.
 			errRsp := newErrorResponse(rsp[0], 0x0000, ble.ErrReqNotSupp)
-			logger.Debug("client", "req", fmt.Sprintf("% X", b))
+			c.Debugf("client: rsp % X", b)
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
 				return nil, errors.Wrap(err, "unexpected ATT response received")
@@ -554,14 +554,14 @@ func (c *Client) asyncReqLoop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			logger.Debug("[BLE ATT]: exited client async loop: done")
+			c.Debug("[BLE ATT]: exited client async loop: done")
 			return
 		case <-c.connClosed:
-			logger.Debug("[BLE ATT]: exited client async loop: conn closed")
+			c.Debug("[BLE ATT]: exited client async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				logger.Debug("[BLE ATT] exited client async loop: l2c nil")
+				c.Debug("[BLE ATT] exited client async loop: l2c nil")
 				return
 			}
 			//ok
@@ -574,7 +574,7 @@ func (c *Client) asyncReqLoop() {
 		}
 		err := c.sendResp(rsp)
 		if err != nil {
-			logger.Info("client", "failed to send async att response for", fmt.Sprintf("%x", in[0]))
+			c.Errorf("client: failed to send async att response for: %X", in[0])
 		}
 	}
 }
@@ -608,14 +608,14 @@ func (c *Client) Loop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			logger.Debug("exited client loop: done")
+			c.Debug("exited client loop: done")
 			return
 		case <-c.connClosed:
-			logger.Debug("exited client async loop: conn closed")
+			c.Debug("exited client async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				logger.Debug("exited client loop: l2c nil")
+				c.Debug("exited client loop: l2c nil")
 				return
 			}
 			//ok
@@ -624,7 +624,7 @@ func (c *Client) Loop() {
 		n, err := c.l2c.Read(c.rxBuf)
 
 		if err != nil {
-			logger.Info("client", "read error", err.Error())
+			c.Errorf("client: read %v", err)
 			// We don't expect any error from the bearer (L2CAP ACL-U)
 			// Pass it along to the pending request, if any, and escape.
 			c.chErr <- err
@@ -633,34 +633,34 @@ func (c *Client) Loop() {
 
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
-		logger.Debug("client", "data in", fmt.Sprintf("% X", b))
+		c.Debugf("client: data rx % X", b)
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
 		if b[0]&0x01 == 0x00 {
 			select {
 			case <-c.done:
-				logger.Info("exited client loop: closed after async req rx")
+				c.Info("exited client loop: closed after async req rx")
 				return
 			case <-c.connClosed:
-				logger.Debug("exited client async loop: conn closed")
+				c.Debug("exited client async loop: conn closed")
 				return
 			case c.inc <- b:
 				continue
 			default:
-				logger.Info("client", "failed to enqueue request for", fmt.Sprintf("%x", b[0]))
+				c.Errorf("client: failed to enqueue request for", fmt.Sprintf("%x", b[0]))
 				continue
 			}
 		}
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
-			logger.Debug("client", "rsp", fmt.Sprintf("% X", c.rxBuf[:n]))
+			c.Debugf("client: rsp % X", c.rxBuf[:n])
 			select {
 			case <-c.done:
-				logger.Info("exited client loop: closed after rsp rx")
+				c.Info("exited client loop: closed after rsp rx")
 				return
 			case <-c.connClosed:
-				logger.Debug("exited client async loop: conn closed")
+				c.Debug("exited client async loop: conn closed")
 				return
 			case c.rspc <- b:
 				continue
@@ -668,24 +668,24 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		logger.Debug("client", "notfi", fmt.Sprintf("% X", b))
+		c.Debugf("client: notif % X", b)
 		select {
 		case <-c.done:
-			logger.Info("exited client loop: closed after rx")
+			c.Info("exited client loop: closed after rx")
 			return
 		case <-c.connClosed:
-			logger.Debug("exited client async loop: conn closed")
+			c.Debug("exited client async loop: conn closed")
 			return
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
 			// ok
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.
-			_ = logger.Error("client", "req", "can't enqueue incoming notification.")
+			c.Error("client: req - can't enqueue incoming notification.")
 		}
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
-			logger.Debug("client", "req", fmt.Sprintf("% X", b))
+			c.Debugf("client: req % X", b)
 			_, _ = c.l2c.Write(confirmation)
 		}
 	}

@@ -67,14 +67,14 @@ type Conn struct {
 
 	smp        SmpManager
 	encChanged chan ble.EncryptionChangedInfo
+	ble.Logger
 }
 
 type Encrypter interface {
 	Encrypt() error
 }
 
-func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
-
+func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
 	c := &Conn{
 		hci:   h,
 		ctx:   context.Background(),
@@ -94,10 +94,11 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 		txBuffer: NewClient(h.pool),
 
 		chDone: make(chan struct{}),
+		Logger: h.Logger.ChildLogger(map[string]interface{}{"l2cap": mac}),
 	}
 
 	if c.hci.smpEnabled {
-		c.smp = c.hci.smp.Create(defaultSmpConfig)
+		c.smp = c.hci.smp.Create(defaultSmpConfig, c.Logger)
 		c.initPairingContext()
 		c.smp.SetWritePDUFunc(c.writePDU)
 		c.smp.SetEncryptFunc(c.encrypt)
@@ -111,9 +112,9 @@ func newConn(h *HCI, param evt.LEConnectionComplete) *Conn {
 					c.hci.dispatchError(err)
 
 					//attempt to cleanup
-					logger.Error("conn", "error in recombine, cleaning up connection handle")
+					c.Errorf("recombineLoop: %v, cleaning up connection handle", err)
 					if err := c.hci.cleanupConnectionHandle(c.param.ConnectionHandle()); err != nil {
-						fmt.Printf("recombine cleanup: %v\n", err)
+						c.Errorf("recombineLoop: cleanup %v", err)
 					}
 				}
 				close(c.chInPDU)
@@ -237,7 +238,7 @@ func (c *Conn) encrypt(bi BondInfo) error {
 	legacy, stk := c.smp.LegacyPairingInfo()
 	//if a short term key is present, use it as the long term key
 	if legacy && len(stk) > 0 {
-		fmt.Println("encrypting with short term key")
+		c.Infof("encrypt: using short term key")
 		return c.stkEncrypt(stk)
 	}
 
@@ -369,7 +370,7 @@ func (c *Conn) recombine() error {
 	}
 
 	p := pdu(pkt.data())
-	logger.Debug("recombine", "pdu in:", fmt.Sprintf("% X", pkt.data()))
+	c.Debugf("recombine: pdu in - % X", pkt.data())
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
 	// according to CID.
@@ -403,12 +404,14 @@ func (c *Conn) recombine() error {
 	case cidLESignal:
 		_ = c.handleSignal(p)
 	case CidSMP:
-		if err := c.smp.Handle(p); err != nil {
-			logger.Error("smp.Handle: ", err.Error())
+		if c.smp == nil {
+			c.Errorf("recombine: smp nil")
+		} else if err := c.smp.Handle(p); err != nil {
+			c.Errorf("recombine: smp.Handle - %v", err)
 		}
 
 	default:
-		logger.Info("recombine()", "unrecognized CID", fmt.Sprintf("%04X, [%X]", p.cid(), p))
+		c.Errorf("recombine: unrecognized CID %04X, [%X]", p.cid(), p)
 	}
 	return nil
 }
@@ -418,9 +421,8 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 	if status != 0x00 {
 		cmdErr := ErrCommand(status)
 		err = fmt.Errorf(errCmd[cmdErr])
-		e := c.smp.DeleteBondInfo()
-		if e != nil {
-			logger.Error("failed to delete bond info", e.Error())
+		if de := c.smp.DeleteBondInfo(); de != nil {
+			c.Errorf("encryptionChanged: failed to delete bond info: %v", err)
 		}
 	}
 
@@ -430,10 +432,10 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		case c.encChanged <- info:
 			return
 		default:
-			logger.Error("failed to send encryption changed status to channel:", fmt.Sprint(info))
+			c.Errorf("encryptionChanged: failed to send encryption changed status to channel: %v", info)
 		}
 	} else {
-		logger.Info(fmt.Sprintf("encryption changed - status: %v, err %v", status, err))
+		c.Infof("encryptionChanged: status %v, err %v", status, err)
 	}
 }
 
@@ -454,7 +456,7 @@ func (c *Conn) Close() error {
 			Reason:           0x13,
 		}, nil)
 
-		logger.Debug("conn", "connection close called")
+		c.Debugf("conn connection close called")
 		_ = c.hci.cleanupConnectionHandle(c.param.ConnectionHandle())
 		return err
 	}

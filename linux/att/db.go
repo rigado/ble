@@ -2,7 +2,6 @@ package att
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/rigado/ble"
 )
@@ -11,6 +10,7 @@ import (
 type DB struct {
 	attrs []*attr
 	base  uint16 // handle for first attr in attrs
+	ble.Logger
 }
 
 const (
@@ -62,7 +62,7 @@ func (r *DB) subrange(start, end uint16) []*attr {
 }
 
 // NewDB ...
-func NewDB(ss []*ble.Service, base uint16) *DB {
+func NewDB(ss []*ble.Service, base uint16, l ble.Logger) *DB {
 	h := base
 	var attrs []*attr
 	var aa []*attr
@@ -73,8 +73,10 @@ func NewDB(ss []*ble.Service, base uint16) *DB {
 		}
 		attrs = append(attrs, aa...)
 	}
-	DumpAttributes(attrs)
-	return &DB{attrs: attrs, base: base}
+
+	d := &DB{attrs: attrs, base: base, Logger: l}
+	d.DumpAttributes(attrs)
+	return d
 }
 
 func genSvcAttr(s *ble.Service, h uint16) (uint16, []*attr) {
@@ -143,15 +145,15 @@ func genDescAttr(d *ble.Descriptor, h uint16) *attr {
 }
 
 // DumpAttributes ...
-func DumpAttributes(aa []*attr) {
-	logger.Debug("server", "db", "Generating attribute table:")
-	logger.Debug("server", "db", "handle   endh   type")
+func (d *DB) DumpAttributes(aa []*attr) {
+	d.Debug("server: db - Generating attribute table:")
+	d.Debug("server: db - handle endh type")
 	for _, a := range aa {
 		if a.v != nil {
-			logger.Debug("server", "db", fmt.Sprintf("0x%04X 0x%04X 0x%s [% X]", a.h, a.endh, a.typ, a.v))
+			d.Debugf("server: db - 0x%04X 0x%04X 0x%s [% X]", a.h, a.endh, a.typ, a.v)
 			continue
 		}
-		logger.Debug("server", "db", fmt.Sprintf("0x%04X 0x%04X 0x%s", a.h, a.endh, a.typ))
+		d.Debugf("server: db - 0x%04X 0x%04X 0x%s", a.h, a.endh, a.typ)
 	}
 }
 

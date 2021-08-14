@@ -8,9 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/rigado/ble"
 	"github.com/pkg/errors"
 	"github.com/raff/goble/xpc"
+	"github.com/rigado/ble"
 
 	"sync"
 )
@@ -401,7 +401,7 @@ func (d *Device) HandleXpcEvent(event xpc.Dict, err error) {
 	}
 	m := msg(event)
 	args := msg(msg(event).args())
-	logger.Info("recv", "id", m.id(), "args", fmt.Sprintf("%v", m.args()))
+	logger.Infof("recv: id %v, args %v", m.id(), m.args())
 
 	switch m.id() {
 	case // Device event
@@ -569,7 +569,7 @@ func (d *Device) sendReq(x xpc.XPC, id int, args xpc.Dict) (msg, error) {
 }
 
 func (d *Device) sendCmd(x xpc.XPC, id int, args xpc.Dict) error {
-	logger.Info("send", "id", id, "args", fmt.Sprintf("%v", args))
+	logger.Infof("send: id %v, args %v", id, args)
 	x.Send(xpc.Dict{"kCBMsgId": id, "kCBMsgArgs": args}, false)
 	return nil
 }

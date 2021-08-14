@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/rigado/ble/sliceops"
 )
 
@@ -47,8 +48,7 @@ func smpF5(w, n1, n2, a1, a2 []byte) ([]byte, []byte, error) {
 
 	t, err := aesCMAC(salt, w)
 	if err != nil {
-		fmt.Println("failed to generate f5 key:", err)
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "generateF5Key")
 	}
 
 	m := length
@@ -61,8 +61,7 @@ func smpF5(w, n1, n2, a1, a2 []byte) ([]byte, []byte, error) {
 
 	macKey, err := aesCMAC(t, m)
 	if err != nil {
-		fmt.Println("failed to generate macKey:", err)
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "generateMacKey")
 	}
 
 	//ltk generation bit
@@ -70,8 +69,7 @@ func smpF5(w, n1, n2, a1, a2 []byte) ([]byte, []byte, error) {
 
 	ltk, err := aesCMAC(t, m)
 	if err != nil {
-		fmt.Print("failed to generate ltk:", err)
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "generateLTK")
 	}
 
 	return macKey, ltk, nil

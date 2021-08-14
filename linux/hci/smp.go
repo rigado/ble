@@ -1,8 +1,9 @@
 package hci
 
 import (
-	"github.com/rigado/ble"
 	"time"
+
+	"github.com/rigado/ble"
 )
 
 type smpDispatcher struct {
@@ -27,7 +28,7 @@ const (
 )
 
 type SmpManagerFactory interface {
-	Create(SmpConfig) SmpManager
+	Create(SmpConfig, ble.Logger) SmpManager
 	SetBondManager(BondManager)
 }
 
