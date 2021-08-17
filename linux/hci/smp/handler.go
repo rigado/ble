@@ -45,7 +45,11 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	t.pairing.legacy = isLegacy(rx.AuthReq)
 	t.pairing.pairingType = determinePairingType(t)
 
-	t.Debugf("smpOnPairingResponse: detected pairing type %v", pairingTypeStrings[t.pairing.pairingType])
+	pts, ok := pairingTypeStrings[t.pairing.pairingType]
+	if !ok {
+		return nil, fmt.Errorf("invalid pairing type %v", t.pairing.pairingType)
+	}
+	t.Debugf("smpOnPairingResponse: detected pairing type '%v'", pts)
 
 	if t.pairing.pairingType == Oob &&
 		len(t.pairing.authData.OOBData) == 0 {

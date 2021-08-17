@@ -20,11 +20,11 @@ const (
 	Oob
 )
 
-var pairingTypeStrings = []string{
-	"Just Works",
-	"Numeric Comparison",
-	"Passkey Entry",
-	"OOB Data",
+var pairingTypeStrings = map[int]string{
+	JustWorks:   "Just Works",
+	NumericComp: "Numeric Comparison",
+	Passkey:     "Passkey Entry",
+	Oob:         "OOB Data",
 }
 
 type pairingContext struct {
