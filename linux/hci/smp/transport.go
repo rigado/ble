@@ -6,9 +6,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci"
 	"github.com/rigado/ble/sliceops"
 )
@@ -31,10 +31,11 @@ type transport struct {
 	nopFunc func() error //workaround stuff
 
 	result chan error
+	ble.Logger
 }
 
-func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error) *transport {
-	return &transport{ctx, writePDU, bm, e, nopFunc, make(chan error)}
+func NewSmpTransport(ctx *pairingContext, bm hci.BondManager, e hci.Encrypter, writePDU func([]byte) (int, error), nopFunc func() error, l ble.Logger) *transport {
+	return &transport{ctx, writePDU, bm, e, nopFunc, make(chan error), l}
 }
 
 func (t *transport) SetContext(ctx *pairingContext) {
@@ -96,7 +97,7 @@ func (t *transport) sendPublicKey() error {
 	if t.pairing.scECDHKeys == nil {
 		keys, err := GenerateKeys()
 		if err != nil {
-			fmt.Println("error generating secure keys:", err)
+			t.Errorf("sendPublicKey: generateKeys - %v", err)
 		}
 		t.pairing.scECDHKeys = keys
 	}
@@ -139,7 +140,6 @@ func (t *transport) sendDHKeyCheck() error {
 		return fmt.Errorf("no pairing context")
 	}
 
-	log.Printf("send dhkey check")
 	p := t.pairing
 
 	//Ea = f6 (MacKey, Na, Nb, rb, IOcapA, A, B)

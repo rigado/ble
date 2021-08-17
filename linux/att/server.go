@@ -36,10 +36,12 @@ type Server struct {
 	// Store a write handler for defer execute once receiving ExecuteWriteRequest
 	prepareWriteRequestAttr *attr
 	prepareWriteRequestData bytes.Buffer
+
+	ble.Logger
 }
 
 // NewServer returns an ATT (Attribute Protocol) server.
-func NewServer(db *DB, l2c ble.Conn) (*Server, error) {
+func NewServer(db *DB, l2c ble.Conn, l ble.Logger) (*Server, error) {
 	mtu := l2c.RxMTU()
 	if mtu < ble.DefaultMTU || mtu > ble.MaxMTU {
 		return nil, fmt.Errorf("invalid MTU")
@@ -57,16 +59,17 @@ func NewServer(db *DB, l2c ble.Conn) (*Server, error) {
 		db: db,
 
 		rxMTU:     mtu,
-		txBuf:     make([]byte, ble.DefaultMTU, ble.DefaultMTU),
+		txBuf:     make([]byte, ble.DefaultMTU),
 		chNotBuf:  make(chan []byte, 1),
 		chIndBuf:  make(chan []byte, 1),
 		chConfirm: make(chan bool),
 
 		dummyRspWriter: ble.NewResponseWriter(nil),
+		Logger:         l,
 	}
 	s.conn.svr = s
-	s.chNotBuf <- make([]byte, ble.DefaultMTU, ble.DefaultMTU)
-	s.chIndBuf <- make([]byte, ble.DefaultMTU, ble.DefaultMTU)
+	s.chNotBuf <- make([]byte, ble.DefaultMTU)
+	s.chIndBuf <- make([]byte, ble.DefaultMTU)
 	return s, nil
 }
 
@@ -143,7 +146,7 @@ func (s *Server) Loop() {
 				select {
 				case s.chConfirm <- true:
 				default:
-					logger.Error("server", "received a spurious confirmation", nil)
+					s.Errorf("server: received a spurious confirmation")
 				}
 				continue
 			}
@@ -162,7 +165,7 @@ func (s *Server) Loop() {
 	}
 	for h, ccc := range s.conn.cccs {
 		if ccc != 0 {
-			logger.Info("cleanup", ble.ContextKeyCCC, fmt.Sprintf("0x%02X", ccc))
+			s.Infof("server: cleanup %v - 0x%02X", ble.ContextKeyCCC, ccc)
 		}
 		if ccc&cccIndicate != 0 {
 			s.conn.in[h].Close()
@@ -182,7 +185,7 @@ func (s *Server) handleRequest(b []byte) []byte {
 	if len(b) == 0 {
 		return nil
 	}
-	logger.Debug("server", "req", fmt.Sprintf("% X", b))
+	s.Debugf("server: req - % X", b)
 
 	switch reqType := b[0]; reqType {
 	case ExchangeMTURequestCode:
@@ -213,7 +216,7 @@ func (s *Server) handleRequest(b []byte) []byte {
 	default:
 		resp = newErrorResponse(reqType, 0x0000, ble.ErrReqNotSupp)
 	}
-	logger.Debug("server", "rsp", fmt.Sprintf("% X", resp))
+	s.Debugf("server: rsp - % X", resp)
 	return resp
 }
 
@@ -234,11 +237,11 @@ func (s *Server) handleExchangeMTURequest(r ExchangeMTURequest) []byte {
 		// Apply the txMTU after this response has been sent and before
 		// any other attribute protocol PDU is sent.
 		defer func() {
-			s.txBuf = make([]byte, txMTU, txMTU)
+			s.txBuf = make([]byte, txMTU)
 			<-s.chNotBuf
-			s.chNotBuf <- make([]byte, txMTU, txMTU)
+			s.chNotBuf <- make([]byte, txMTU)
 			<-s.chIndBuf
-			s.chIndBuf <- make([]byte, txMTU, txMTU)
+			s.chIndBuf <- make([]byte, txMTU)
 		}()
 	}
 
@@ -543,7 +546,8 @@ func (s *Server) handleWriteRequest(r WriteRequest) []byte {
 }
 
 func (s *Server) handlePrepareWriteRequest(r PrepareWriteRequest) []byte {
-	logger.Debug("handlePrepareWriteRequest ->", "r.AttributeHandle", r.AttributeHandle())
+	s.Debugf("prepareWriteRequest:attributeHandle %v", r.AttributeHandle())
+
 	// Validate the request.
 	switch {
 	case len(r) < 3:
@@ -648,8 +652,7 @@ func handleATT(a *attr, s *Server, req []byte, rsp ble.ResponseWriter) ble.ATTEr
 			return ble.ErrWriteNotPerm
 		}
 		data = PrepareWriteRequest(req).PartAttributeValue()
-		logger.Debug("handleATT", "PartAttributeValue",
-			fmt.Sprintf("data: %x, offset: %d, %p\n", data, int(PrepareWriteRequest(req).ValueOffset()), s.prepareWriteRequestAttr))
+		s.Debugf("ATT: PartAttributeValue data %x, offset %v, %p", data, PrepareWriteRequest(req).ValueOffset(), s.prepareWriteRequestAttr)
 
 		if s.prepareWriteRequestAttr == nil {
 			s.prepareWriteRequestAttr = a

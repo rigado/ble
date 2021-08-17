@@ -34,7 +34,7 @@ func NewDeviceWithNameAndHandler(name string, handler ble.NotifyHandler, opts ..
 		return nil, errors.Wrap(err, "can't init hci")
 	}
 
-	srv, err := gatt.NewServerWithNameAndHandler(name, handler)
+	srv, err := gatt.NewServerWithNameAndHandler(name, handler, dev.Logger)
 	if err != nil {
 		dev.Close()
 		return nil, errors.Wrap(err, "can't create server")
@@ -58,13 +58,13 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 			// An EOF error indicates that the HCI socket was closed during
 			// the read.  Don't report this as an error.
 			if err != io.EOF {
-				fmt.Printf("can't accept: %s\n", err)
+				dev.Errorf("socket accept: %v", err)
 			}
 			return
 		}
 
 		if l2c == nil {
-			fmt.Printf("l2c nil\n")
+			dev.Errorf("socket accept: l2c nil")
 			return
 		}
 
@@ -73,13 +73,14 @@ func loop(dev *hci.HCI, s *gatt.Server, mtu int) {
 		l2c.SetRxMTU(mtu)
 
 		s.Lock()
-		as, err := att.NewServer(s.DB(), l2c)
+		as, err := att.NewServer(s.DB(), l2c, dev.Logger)
 		s.Unlock()
 		if err != nil {
-			fmt.Printf("can't create ATT server: %s\n", err)
+			dev.Errorf("att.NewServer: %v", err)
 			continue
 		}
-		fmt.Println("starting server loop")
+
+		dev.Infof("starting att server loop")
 		go as.Loop()
 	}
 }

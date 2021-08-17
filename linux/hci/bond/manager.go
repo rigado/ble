@@ -5,16 +5,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/rigado/ble/linux/hci"
 	"io/ioutil"
 	"os"
 	"sync"
+
+	"github.com/rigado/ble"
+	"github.com/rigado/ble/linux/hci"
 )
 
 type manager struct {
 	filePath string
 	lock     sync.RWMutex
-	bonds    map[string]bondData
+	ble.Logger
 }
 
 type bondData struct {
@@ -34,6 +36,7 @@ func NewBondManager(bondFilePath string) hci.BondManager {
 	}
 	return &manager{
 		filePath: bondFilePath,
+		Logger:   ble.GetLogger(),
 	}
 }
 
@@ -48,7 +51,7 @@ func (m *manager) Exists(addr string) bool {
 
 	bonds, err := m.loadBonds()
 	if err != nil {
-		fmt.Print(err)
+		m.Error(err)
 		return false
 	}
 
@@ -85,9 +88,9 @@ func (m *manager) Find(addr string) (hci.BondInfo, error) {
 		delete(bonds, addr)
 		err := m.storeBonds(bonds)
 		if err != nil {
-			fmt.Printf("bondData manager err: %s\n", err)
+			m.Errorf("bondManager: store %s", err)
 		}
-		return nil, fmt.Errorf("found invalid bondData information: %s\n", bondErr)
+		return nil, fmt.Errorf("found invalid bondData information: %v", bondErr)
 	}
 
 	return bi, nil
@@ -114,7 +117,7 @@ func (m *manager) Save(addr string, bond hci.BondInfo) error {
 
 	//check to see if this address already exists
 	if _, ok := bonds[addr]; ok {
-		fmt.Printf("replacing existing bondData for %s\n", addr)
+		m.Infof("bondManager: replacing existing bond for %s", addr)
 	}
 
 	bonds[addr] = bd

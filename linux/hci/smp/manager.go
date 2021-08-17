@@ -30,14 +30,15 @@ type manager struct {
 	bondManager hci.BondManager
 	encrypt     func(info hci.BondInfo) error
 	result      chan error
+	ble.Logger
 }
 
 //todo: need to have on instance per connection which requires a mutex in the bond manager
 //todo: remove bond manager from input parameters?
-func NewSmpManager(config hci.SmpConfig, bm hci.BondManager) *manager {
-	p := &pairingContext{request: config, state: Init}
-	m := &manager{config: config, pairing: p, bondManager: bm, result: make(chan error)}
-	t := NewSmpTransport(p, bm, m, nil, nil)
+func NewSmpManager(config hci.SmpConfig, bm hci.BondManager, l ble.Logger) *manager {
+	p := &pairingContext{request: config, state: Init, Logger: l}
+	m := &manager{config: config, pairing: p, bondManager: bm, result: make(chan error), Logger: l}
+	t := NewSmpTransport(p, bm, m, nil, nil, l)
 	m.t = t
 	return m
 }
@@ -79,7 +80,7 @@ func (m *manager) Handle(in []byte) error {
 	data := payload[1:]
 	v, ok := dispatcher[code]
 	if !ok || v.handler == nil {
-		fmt.Println("smp:", "unhandled smp code %v", code)
+		m.Errorf("smp: unhandled smp code %v", code)
 
 		// C.5.1 Pairing Not Supported
 		return m.t.send([]byte{pairingFailed, 0x05})
@@ -150,7 +151,7 @@ func (m *manager) StartEncryption() error {
 func (m *manager) BondInfoFor(addr string) hci.BondInfo {
 	bi, err := m.bondManager.Find(addr)
 	if err != nil {
-		fmt.Print(err)
+		m.Errorf("bondInfoFor: %v", err)
 		return nil
 	}
 

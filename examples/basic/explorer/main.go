@@ -5,13 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"runtime"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux"
+	bonds "github.com/rigado/ble/linux/hci/bond"
+	"github.com/rigado/ble/linux/hci/h4"
 )
 
 var (
@@ -41,12 +43,20 @@ func main() {
 	case len(*h4skt) > 0:
 		opt = ble.OptTransportH4Socket(*h4skt, 2*time.Second)
 	case len(*h4uart) > 0:
-		opt = ble.OptTransportH4Uart(*h4uart)
+		opt = ble.OptTransportH4Uart(*h4uart, int(h4.DefaultSerialOptions().BaudRate))
 	default:
 		log.Fatalf("no valid device to init")
 	}
 
-	d, err := linux.NewDeviceWithNameAndHandler("", nil, opt)
+	//To create a pair with a device, the pair manager needs a file
+	//to store and load pair information
+	bondFilePath := filepath.Join("bonds.json")
+	bm := bonds.NewBondManager(bondFilePath)
+
+	//Enable security by putting the pair manager in the enable security option
+	optSecurity := ble.OptEnableSecurity(bm)
+
+	d, err := linux.NewDeviceWithNameAndHandler("", nil, opt, optSecurity)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
@@ -55,14 +65,14 @@ func main() {
 	// Default to search device with name of Gopher (or specified by user).
 	filter := func(a ble.Advertisement) bool {
 		fmt.Println(a.Addr(), a.LocalName())
-		return strings.ToUpper(a.LocalName()) == strings.ToUpper(*name)
+		return strings.EqualFold(a.LocalName(), *name)
 	}
 
 	// If addr is specified, search for addr instead.
 	if len(*addr) != 0 {
 		filter = func(a ble.Advertisement) bool {
 			fmt.Println(a.Addr())
-			return strings.ToUpper(a.Addr().String()) == strings.ToUpper(*addr)
+			return strings.EqualFold(a.Addr().String(), *addr)
 		}
 	}
 
@@ -88,6 +98,27 @@ func main() {
 	log.Println("connected!")
 	<-time.After(2000 * time.Millisecond)
 
+	if *bond {
+		//pairing can be manually triggered by issuing the pair command
+		//however, the typical process is
+		/* 1. connect
+		   2. attempt to read or write to a characteristic which requires security
+		   3. peripheral responds with insufficient authentication
+		   4. central triggers bonding
+		*/
+		log.Println("pairing with", cln.Addr().String())
+
+		err = cln.Pair(ble.AuthData{}, time.Second*30)
+		if err != nil {
+			log.Println(err)
+			_ = cln.CancelConnection()
+			<-done
+			os.Exit(1)
+		} else {
+			log.Println("pairing successful!")
+		}
+	}
+
 	rxMtu := ble.MaxMTU
 	txMtu, err := cln.ExchangeMTU(rxMtu)
 	if err != nil {
@@ -107,8 +138,6 @@ func main() {
 	// Start the exploration.
 	explore(cln, p)
 
-	dumpStack()
-
 	// Disconnect the connection. (On OS X, this might take a while.)
 	fmt.Printf("Disconnecting [ %s ]... (this might take up to few seconds on OS X)\n", cln.Addr())
 	cln.CancelConnection()
@@ -116,18 +145,6 @@ func main() {
 	<-done
 
 	time.Sleep(125 * time.Millisecond)
-
-	dumpStack()
-}
-
-func dumpStack() {
-	if !*dump {
-		return
-	}
-	// dump call stack
-	buf := make([]byte, 1<<16)
-	runtime.Stack(buf, true)
-	fmt.Printf("%s", buf)
 }
 
 func explore(cln ble.Client, p *ble.Profile) error {
@@ -219,16 +236,4 @@ func propString(p ble.Property) string {
 		}
 	}
 	return s
-}
-
-func chkErr(err error) {
-	switch errors.Cause(err) {
-	case nil:
-	case context.DeadlineExceeded:
-		fmt.Printf("done\n")
-	case context.Canceled:
-		fmt.Printf("canceled\n")
-	default:
-		log.Fatalf(err.Error())
-	}
 }

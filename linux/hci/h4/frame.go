@@ -56,16 +56,12 @@ func (f *frame) Assemble(b []byte) {
 		f.b = append(f.b, bb...)
 	}
 
-	// fmt.Printf("in  %0x\n", b)
-	// fmt.Printf("buf %0x\n", b)
-
 	rf, err := f.frame()
 	if err != nil {
 		return
 	}
 	out := make([]byte, len(rf))
 	copy(out, rf)
-	// fmt.Printf("out: %0x\n", out)
 	f.out <- out
 
 	// shift

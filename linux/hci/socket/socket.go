@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 	"golang.org/x/sys/unix"
 )
 
@@ -60,6 +61,7 @@ type Socket struct {
 	wmu  sync.Mutex
 	done chan int
 	cmu  sync.Mutex
+	ble.Logger
 }
 
 // NewSocket returns a HCI User Channel of specified device id.
@@ -133,7 +135,7 @@ func open(fd, id int) (*Socket, error) {
 		unix.Read(fd, b)
 	}
 
-	return &Socket{fd: fd, done: make(chan int)}, nil
+	return &Socket{fd: fd, done: make(chan int), Logger: ble.GetLogger()}, nil
 }
 
 func (s *Socket) Read(p []byte) (int, error) {
@@ -145,14 +147,14 @@ func (s *Socket) Read(p []byte) (int, error) {
 	n := 0
 	s.rmu.Lock()
 	defer s.rmu.Unlock()
-	// dont need to add unixPollErrors, they are always returned
+	// don't need to add unixPollErrors, they are always returned
 	pfds := []unix.PollFd{{Fd: int32(s.fd), Events: unixPollDataIn}}
 	unix.Poll(pfds, readTimeout)
 	evts := pfds[0].Revents
 
 	switch {
 	case evts&unixPollErrors != 0:
-		fmt.Printf("hci socket error: poll events 0x%04x\n", evts)
+		s.Errorf("socketRead: unixPoll events 0x%04x", evts)
 		return 0, io.EOF
 
 	case evts&unixPollDataIn != 0:
@@ -168,7 +170,7 @@ func (s *Socket) Read(p []byte) (int, error) {
 	if !s.isOpen() {
 		return 0, io.EOF
 	}
-	return n, errors.Wrap(err, "can't read hci socket")
+	return n, errors.Wrap(err, "readSocket")
 }
 
 func (s *Socket) Write(p []byte) (int, error) {
@@ -179,7 +181,7 @@ func (s *Socket) Write(p []byte) (int, error) {
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 	n, err := unix.Write(s.fd, p)
-	return n, errors.Wrap(err, "can't write hci socket")
+	return n, errors.Wrap(err, "writeSocket")
 }
 
 func (s *Socket) Close() error {
@@ -192,12 +194,12 @@ func (s *Socket) Close() error {
 
 	default:
 		close(s.done)
-		fmt.Println("closing hci socket!")
+		s.Debugf("closing socket")
 		s.rmu.Lock()
 		err := unix.Close(s.fd)
 		s.rmu.Unlock()
 
-		return errors.Wrap(err, "can't close hci socket")
+		return errors.Wrap(err, "closeSocket")
 	}
 }
 

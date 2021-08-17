@@ -45,7 +45,11 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	t.pairing.legacy = isLegacy(rx.AuthReq)
 	t.pairing.pairingType = determinePairingType(t)
 
-	fmt.Println("detected pairing type: ", pairingTypeStrings[t.pairing.pairingType])
+	pts, ok := pairingTypeStrings[t.pairing.pairingType]
+	if !ok {
+		return nil, fmt.Errorf("invalid pairing type %v", t.pairing.pairingType)
+	}
+	t.Debugf("smpOnPairingResponse: detected pairing type '%v'", pts)
 
 	if t.pairing.pairingType == Oob &&
 		len(t.pairing.authData.OOBData) == 0 {
@@ -111,7 +115,7 @@ func onSecureRandom(t *transport) ([]byte, error) {
 	} else {
 		err := t.pairing.checkConfirm()
 		if err != nil {
-			fmt.Println(err)
+			t.Errorf("smpOnSecureRandom: checkConfirm - %v", err)
 			return nil, err
 		}
 	}
@@ -121,14 +125,14 @@ func onSecureRandom(t *transport) ([]byte, error) {
 	// move on to auth stage 2 (2.3.5.6.5) calc mackey, ltk
 	err := t.pairing.calcMacLtk()
 	if err != nil {
-		fmt.Println(err)
+		t.Errorf("smpOnSecureRandom: calcMacLtk - %v", err)
 		return nil, err
 	}
 
 	//send dhkey check
 	err = t.sendDHKeyCheck()
 	if err != nil {
-		fmt.Println(err)
+		t.Errorf("smpOnSecureRandom: sendDHKeyCheck - %v", err)
 		return nil, err
 	}
 
@@ -147,6 +151,9 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	//calculate STK
 	k := getLegacyParingTK(t.pairing.authData.Passkey)
 	stk, err := smpS1(k, rRand, lRand)
+	if err != nil {
+		return nil, err
+	}
 	t.pairing.shortTermKey = stk
 
 	if t.pairing.request.AuthReq&authReqBondMask == authReqNoBond {
@@ -199,7 +206,7 @@ func smpOnDHKeyCheck(t *transport, in pdu) ([]byte, error) {
 		return nil, err
 	}
 
-	fmt.Println("dhkey check pass!")
+	t.Debugf("dhKeyCheck: OK")
 	err = t.saveBondInfo()
 	if err != nil {
 		return nil, err
@@ -238,7 +245,7 @@ func smpOnSecurityRequest(t *transport, in pdu) ([]byte, error) {
 			t.pairing.bond = bi
 			return nil, t.encrypter.Encrypt()
 		}
-		fmt.Println("smpOnSecurityRequest bond manager error:", err)
+		t.Errorf("smpOnSecurityRequest: bond manager %v", err)
 		// will re-bond below
 	}
 
@@ -345,9 +352,8 @@ func determinePairingType(t *transport) int {
 
 	if rsp.IoCap >= hci.IoCapsReservedStart ||
 		req.IoCap >= hci.IoCapsReservedStart {
-		fmt.Printf("invalid io capabilities specified: req: %x rsp: %x\n",
-			req.IoCap, rsp.IoCap)
-		fmt.Println("using just works")
+		t.Warnf("determinePairingType: invalid io capabilities specified: req: %x rsp: %x", req.IoCap, rsp.IoCap)
+		t.Warnf("determinePairingType: using just works")
 		//todo: is this a valid assumption or should this return an error instead?
 		return JustWorks
 	}

@@ -10,15 +10,16 @@ import (
 
 // NewServerWithName creates a new Server with the specified name
 func NewServerWithName(name string) (*Server, error) {
-	return NewServerWithNameAndHandler(name, nil)
+	return NewServerWithNameAndHandler(name, nil, ble.GetLogger())
 }
 
 // NewServerWithNameAndHandler allow to specify a custom NotifyHandler
-func NewServerWithNameAndHandler(name string, notifyHandler ble.NotifyHandler) (*Server, error) {
+func NewServerWithNameAndHandler(name string, notifyHandler ble.NotifyHandler, l ble.Logger) (*Server, error) {
 	return &Server{
-		name: name,
-		svcs: defaultServicesWithHandler(name, notifyHandler),
-		db:   att.NewDB(defaultServices(name), uint16(1)),
+		name:   name,
+		svcs:   defaultServicesWithHandler(name, notifyHandler),
+		db:     att.NewDB(defaultServices(name), uint16(1), l),
+		Logger: l,
 	}, nil
 }
 
@@ -34,6 +35,7 @@ type Server struct {
 
 	svcs []*ble.Service
 	db   *att.DB
+	ble.Logger
 }
 
 // AddService ...
@@ -41,7 +43,7 @@ func (s *Server) AddService(svc *ble.Service) error {
 	s.Lock()
 	defer s.Unlock()
 	s.svcs = append(s.svcs, svc)
-	s.db = att.NewDB(s.svcs, uint16(1)) // ble attrs start at 1
+	s.db = att.NewDB(s.svcs, uint16(1), s.Logger) // ble attrs start at 1
 	return nil
 }
 
@@ -50,7 +52,7 @@ func (s *Server) RemoveAllServices() error {
 	s.Lock()
 	defer s.Unlock()
 	s.svcs = defaultServices(s.name)
-	s.db = att.NewDB(s.svcs, uint16(1)) // ble attrs start at 1
+	s.db = att.NewDB(s.svcs, uint16(1), s.Logger) // ble attrs start at 1
 	return nil
 }
 
@@ -59,7 +61,7 @@ func (s *Server) SetServices(svcs []*ble.Service) error {
 	s.Lock()
 	defer s.Unlock()
 	s.svcs = append(defaultServices(s.name), svcs...)
-	s.db = att.NewDB(s.svcs, uint16(1)) // ble attrs start at 1
+	s.db = att.NewDB(s.svcs, uint16(1), s.Logger) // ble attrs start at 1
 	return nil
 }
 
@@ -71,6 +73,7 @@ func (s *Server) DB() *att.DB {
 func defaultServices(name string) []*ble.Service {
 	return defaultServicesWithHandler(name, nil)
 }
+
 func defaultServicesWithHandler(name string, handler ble.NotifyHandler) []*ble.Service {
 	// https://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.ble.appearance.xml
 	var gapCharAppearanceGenericComputer = []byte{0x00, 0x80}

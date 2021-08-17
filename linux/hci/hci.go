@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 	"github.com/rigado/ble/linux/hci/evt"
+	"github.com/rigado/ble/sliceops"
 )
 
 // Command ...
@@ -57,6 +57,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		sktRxChan: make(chan []byte, 16), //todo pick a real number
 
 		vendorChan: make(chan []byte),
+		Logger:     ble.GetLogger(),
 	}
 	h.params.init()
 	if err := h.Option(opts...); err != nil {
@@ -133,6 +134,8 @@ type HCI struct {
 	cache ble.GattCache
 
 	vendorChan chan []byte
+
+	ble.Logger
 }
 
 // Init ...
@@ -203,7 +206,7 @@ func (h *HCI) cleanup() {
 	h.muConns.Unlock()
 
 	// kill all open connections w/o disconnect
-	logger.Debug("hci", fmt.Sprintf("cleanup(): found %v connection handles", len(hh)))
+	h.Debugf("hci: cleanup() found %v connection handles", len(hh))
 	for _, ch := range hh {
 		h.cleanupConnectionHandle(ch)
 	}
@@ -255,7 +258,7 @@ func (h *HCI) isOpen() bool {
 }
 
 func (h *HCI) init() error {
-	logger.Info("hci reset")
+	h.Debug("hci reset")
 	h.Send(&cmd.Reset{}, nil)
 
 	ReadBDADDRRP := cmd.ReadBDADDRRP{}
@@ -397,8 +400,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	select {
 	case <-time.After(3 * time.Second):
 		err = fmt.Errorf("hci: no response to command, hci connection failed")
-		fmt.Println("no response to command:")
-		fmt.Printf("cmd: 0x%x (%v) pkt: %s\n", c.OpCode(), c.String(), hex.EncodeToString(b[:4+c.Len()]))
+		h.Errorf("%v - cmd 0x%x (%v) pkt: %x", err, c.OpCode(), c.String(), b[:4+c.Len()])
 		h.dispatchError(err)
 		ret = nil
 	case <-h.done:
@@ -430,13 +432,13 @@ func (h *HCI) sktProcessLoop() {
 
 		select {
 		case <-h.done:
-			fmt.Println("close requested")
+			h.Debugf("sktProcessLoop: close requested")
 			h.err = io.EOF
 			return
 
 		case p, ok = <-h.sktRxChan:
 			if !ok {
-				fmt.Println("socket rx closed")
+				h.Debugf("sktProcessLoop: rx channel closed")
 				h.err = io.EOF
 				return
 			}
@@ -444,21 +446,14 @@ func (h *HCI) sktProcessLoop() {
 		}
 
 		if err := h.handlePkt(p); err != nil {
-			// Some bluetooth devices may append vendor specific packets at the last,
-			// in this case, simply ignore them.
-			if strings.HasPrefix(err.Error(), "unsupported vendor packet:") {
-				_ = logger.Error("hci", "skt: ", err)
-			} else {
-				h.err = fmt.Errorf("skt handle error: %v", err)
-				return
-			}
+			h.Warnf("sktProcessLoop: handlePacket - %v", err)
 		}
 	}
 }
 
 func (h *HCI) sktReadLoop() {
 	defer func() {
-		fmt.Println("sktRxLoop done")
+		h.Debugf("sktReadLoop: done, closing sktRxChan")
 		close(h.sktRxChan)
 	}()
 
@@ -531,7 +526,7 @@ func (h *HCI) handleACL(b []byte) error {
 	if c, ok := h.conns[handle]; ok {
 		c.chInPkt <- b
 	} else {
-		_ = logger.Warn("invalid connection handle on ACL packet", "handle:", handle)
+		h.Warnf("handleACL: invalid connection handle %v", handle)
 	}
 
 	return nil
@@ -760,16 +755,16 @@ func (h *HCI) handleCommandStatus(b []byte) error {
 func (h *HCI) handleLEConnectionComplete(b []byte) error {
 	e := evt.LEConnectionComplete(b)
 
-	status := e.Status()
-	if status != 0 {
-		logger.Warn("hci", "connection failed:", fmt.Sprintf("% X", b))
+	if status := e.Status(); status != 0 {
+		h.Warnf("connectionComplete: connection failed with status %X", status)
 		return nil
 	}
-	c := newConn(h, e)
-	h.muConns.Lock()
+
 	pa := e.PeerAddress()
-	addr := pa[:]
-	logger.Debug("hci", "connection complete", fmt.Sprintf("%04X: addr: %s, lecc evt: %s", e.ConnectionHandle(), hex.EncodeToString(addr), hex.EncodeToString(b)))
+	addr := hex.EncodeToString(sliceops.SwapBuf(pa[:]))
+	c := newConn(h, e, addr)
+	h.muConns.Lock()
+	h.Debugf("connectionComplete: handle %04x, addr %v, lecc evt %X", e.ConnectionHandle(), addr, b)
 	h.conns[e.ConnectionHandle()] = c
 	h.muConns.Unlock()
 
@@ -809,29 +804,28 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 }
 
 func (h *HCI) handleLEConnectionParameterRequest(b []byte) error {
-	logger.Warn("ignoring LEConnectionParameterRequest")
+	h.Warn("LEConnectionParameterRequest: ignored")
 	return nil
 }
 
 func (h *HCI) handleLEConnectionUpdateComplete(b []byte) error {
-	logger.Warn("ignoring LEConnectionUpdateComplete")
+	h.Warn("LEConnectionUpdateComplete: ignored")
 	return nil
 }
 
 func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
-	logger.Debug("hci", "cleanupConnHan: looking for", fmt.Sprintf("%04X", ch))
+	h.Debugf("cleanupConnectionHandle %04X: getting device", ch)
 	c, found := h.conns[ch]
 	if !found {
 		return nil
-		//return fmt.Errorf("disconnecting an invalid handle %04X", ch)
 	}
 
-	logger.Debug("hci", "", fmt.Sprintf("cleanupConnHan %04X: found device with address %s\n", ch, c.RemoteAddr().String()))
-
+	h.Debugf("cleanupConnectionHandle %04X: found device with address %v", ch, c.RemoteAddr().String())
 	delete(h.conns, ch)
-	logger.Debug("hci", "cleanupConnHan close c.chInPkt", fmt.Sprintf("%04X", ch))
+
+	h.Debugf("cleanupConnectionHandle %04X: close c.chInPkt", ch)
 	close(c.chInPkt)
 
 	if !h.isOpen() && c.param.Role() == roleSlave {
@@ -846,7 +840,7 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.params.RUnlock()
 	} else {
 		// remote peripheral disconnected
-		logger.Debug("hci", "cleanupConnHan close c.chDone", fmt.Sprintf("%04X", ch))
+		h.Debugf("cleanupConnectionHandle %04X: close c.chDone", ch)
 		close(c.chDone)
 	}
 	// When a connection disconnects, all the sent packets and weren't acked yet
@@ -862,10 +856,9 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 }
 
 func (h *HCI) handleDisconnectionComplete(b []byte) error {
-	logger.Debug("hci", "disconnect complete:", fmt.Sprintf("% X", b))
 	e := evt.DisconnectionComplete(b)
 	ch := e.ConnectionHandle()
-	logger.Debug("hci", "disconnect complete for handle", fmt.Sprintf("%04x", ch))
+	h.Debugf("disconnectComplete: handle %04X, reason %02X", ch, e.Reason())
 	if ErrCommand(e.Reason()) == ErrLocalHost {
 		//if the local host triggered the disconnect, the connection handle was already
 		//cleaned up. otherwise, the connection handle will be cleaned up because this
@@ -873,7 +866,7 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 		return nil
 	}
 
-	logger.Debug("hci", "cleaning up connection handle due to disconnect complete")
+	h.Debugf("disconnectComplete: cleaning up connection handle %04X", ch)
 	return h.cleanupConnectionHandle(ch)
 }
 
@@ -883,7 +876,7 @@ func (h *HCI) handleEncryptionChange(b []byte) error {
 	defer h.muConns.Unlock()
 	c, found := h.conns[e.ConnectionHandle()]
 	if !found {
-		logger.Error("encryption changed event for unknown connection handle:", fmt.Sprint(e.ConnectionHandle()))
+		h.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
 	}
 
 	//pass to connection to handle status
@@ -894,7 +887,7 @@ func (h *HCI) handleEncryptionChange(b []byte) error {
 
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
-	logger.Debug("hci", "number of comp packets:", fmt.Sprintf("% X", b))
+	h.Debugf("numberOfCompletedPackets: % X", b)
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles()); i++ {
@@ -914,15 +907,13 @@ func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 func (h *HCI) handleLELongTermKeyRequest(b []byte) error {
 	//todo: probably need to support this
 	e := evt.LELongTermKeyRequest(b)
-	panic(nil)
-	return h.Send(&cmd.LELongTermKeyRequestNegativeReply{
-		ConnectionHandle: e.ConnectionHandle(),
-	}, nil)
+	h.Logger.Errorf("LELongTermKeyRequest: not supported - pkt %X", e)
+	return fmt.Errorf("not supported")
 }
 
 func (h *HCI) setAllowedCommands(n int) {
 	if n > chCmdBufChanSize {
-		fmt.Printf("hci.setAllowedCommands: warning, defaulting %d -> %d\n", n, chCmdBufChanSize)
+		h.Warnf("setAllowedCommands: defaulting %d -> %d", n, chCmdBufChanSize)
 		n = chCmdBufChanSize
 	}
 
@@ -966,10 +957,10 @@ func (h *HCI) handleVendorEvent(b []byte) error {
 func (h *HCI) dispatchError(e error) {
 	switch {
 	case h.errorHandler == nil:
-		fmt.Println(e)
+		h.Logger.Error(e)
 	case !h.isOpen():
 		//don't dispatch
-		fmt.Println("hci closing:", e)
+		h.Debug(e)
 	default:
 		h.errorHandler(e)
 	}
@@ -980,7 +971,9 @@ func (h *HCI) NOP() error {
 	return nil
 
 	// ReadBDADDRRP := cmd.ReadBDADDRRP{}
-	// err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP)
-	// fmt.Println("NOP: err ", err)
-	// return err
+	// if err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP); err != nil {
+	// 	h.Errorf("NOP: %v", err)
+	// 	return err
+	// }
+	// return nil
 }

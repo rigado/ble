@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/rigado/ble/linux/hci/cmd"
@@ -101,12 +100,12 @@ func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 		return 0, err
 	}
-	logger.Debug("sig", "send", fmt.Sprintf("[%X]", buf.Bytes()))
+	c.Debugf("signal: send [%X]", buf.Bytes())
 	return c.writePDU(buf.Bytes())
 }
 
 func (c *Conn) handleSignal(p pdu) error {
-	logger.Debug("sig", "recv", fmt.Sprintf("[%X]", p))
+	c.Debugf("signal: recv [%X]", p)
 	// When multiple commands are included in an L2CAP packet and the packet
 	// exceeds the signaling MTU (MTUsig) of the receiver, a single Command Reject
 	// packet shall be sent in response. The identifier shall match the first Request
@@ -121,7 +120,7 @@ func (c *Conn) handleSignal(p pdu) error {
 				Data:   []byte{uint8(c.sigRxMTU), uint8(c.sigRxMTU >> 8)}, // Actual MTUsig.
 			})
 		if err != nil {
-			_ = logger.Error("send repsonse", fmt.Sprintf("%v", err))
+			c.Errorf("signal: sendRepsonse %v", err)
 		}
 		return nil
 	}

@@ -20,11 +20,11 @@ const (
 	Oob
 )
 
-var pairingTypeStrings = []string{
-	"Just Works",
-	"Numeric Comparison",
-	"Passkey Entry",
-	"OOB Data",
+var pairingTypeStrings = map[int]string{
+	JustWorks:   "Just Works",
+	NumericComp: "Numeric Comparison",
+	Passkey:     "Passkey Entry",
+	Oob:         "OOB Data",
 }
 
 type pairingContext struct {
@@ -55,6 +55,8 @@ type pairingContext struct {
 	state       PairingState
 	authData    ble.AuthData
 	bond        hci.BondInfo
+
+	ble.Logger
 }
 
 func (p *pairingContext) checkConfirm() error {
@@ -98,7 +100,7 @@ func (p *pairingContext) checkPasskeyConfirm() error {
 		return err
 	}
 
-	//fmt.Printf("i: %d, z: %x, c: %v, cc: %v, ra: %v, rb: %v\n", iteration, z,
+	//p.Debugf("i: %d, z: %x, c: %v, cc: %v, ra: %v, rb: %v", iteration, z,
 	//	hex.EncodeToString(p.remoteConfirm),
 	//	hex.EncodeToString(calcConf),
 	//	hex.EncodeToString(p.localRandom),
@@ -127,10 +129,10 @@ func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 
 	calcConf, err := smpF4(kax, kbx, nai, z)
 	if err != nil {
-		fmt.Println(err)
+		p.Errorf("generatePasskeyConfirm: %v", err)
 	}
 
-	//fmt.Printf("passkey confirm %d: z: %x, conf: %v\n", iteration, z, hex.EncodeToString(calcConf))
+	//p.Debugf("passkey confirm %d: z: %x, conf: %v", iteration, z, hex.EncodeToString(calcConf))
 
 	return calcConf, nai
 }

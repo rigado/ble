@@ -217,7 +217,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	ab = sliceops.SwapBuf(ab)
 	copy(h.params.connParams.PeerAddress[:], ab)
 
-	logger.Info(fmt.Sprintf("dialing addr %v, type %v", a.String(), h.params.connParams.PeerAddressType))
+	h.Infof("dial: addr %v, type %v", a.String(), h.params.connParams.PeerAddressType)
 
 	if err = h.Send(&h.params.connParams, nil); err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (h *HCI) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 		if !ok {
 			return nil, fmt.Errorf("chMasterConn closed")
 		}
-		return gatt.NewClient(c, h.cache, h.done)
+		return gatt.NewClient(c, h.cache, h.done, h.Logger)
 	}
 }
 
@@ -255,10 +255,10 @@ func (h *HCI) cancelDial(passthrough error) (ble.Client, error) {
 	if err == ErrDisallowed {
 		select {
 		case c := <-h.chMasterConn:
-			logger.Debug("hci", "got connection complete after disallowed")
-			return gatt.NewClient(c, h.cache, h.done)
+			h.Debug("cancelDial: got connection complete after disallowed")
+			return gatt.NewClient(c, h.cache, h.done, h.Logger)
 		case <-time.After(50 * time.Millisecond):
-			logger.Debug("hci", "connection req timed out after a connection was made")
+			h.Debug("cancelDial: connection req timed out after a connection was made")
 			return nil, errors.Wrap(passthrough, "cancel connection failed - connection req timed out after a connection was made")
 		}
 	}
