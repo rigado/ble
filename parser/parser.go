@@ -72,103 +72,103 @@ type pduRecord struct {
 }
 
 var pduDecodeMap = map[byte]pduRecord{
-	types.uuid16inc: pduRecord{
+	types.uuid16inc: {
 		2,
 		2,
 		0,
 		keys.services,
 	},
-	types.uuid16comp: pduRecord{
+	types.uuid16comp: {
 		2,
 		2,
 		0,
 		keys.services,
 	},
-	types.uuid32inc: pduRecord{
+	types.uuid32inc: {
 		4,
 		4,
 		0,
 		keys.services,
 	},
-	types.uuid32comp: pduRecord{
+	types.uuid32comp: {
 		4,
 		4,
 		0,
 		keys.services,
 	},
-	types.uuid128inc: pduRecord{
+	types.uuid128inc: {
 		16,
 		16,
 		0,
 		keys.services,
 	},
-	types.uuid128comp: pduRecord{
+	types.uuid128comp: {
 		16,
 		16,
 		0,
 		keys.services,
 	},
-	types.sol16: pduRecord{
+	types.sol16: {
 		2,
 		2,
 		0,
 		keys.solicited,
 	},
-	types.sol32: pduRecord{
+	types.sol32: {
 		4,
 		4,
 		0,
 		keys.solicited,
 	},
-	types.sol128: pduRecord{
+	types.sol128: {
 		16,
 		16,
 		0,
 		keys.solicited,
 	},
-	types.svc16: pduRecord{
+	types.svc16: {
 		0,
 		2,
 		2,
 		keys.serviceData,
 	},
-	types.svc32: pduRecord{
+	types.svc32: {
 		0,
 		4,
 		4,
 		keys.serviceData,
 	},
-	types.svc128: pduRecord{
+	types.svc128: {
 		0,
 		16,
 		16,
 		keys.serviceData,
 	},
-	types.namecomp: pduRecord{
+	types.namecomp: {
 		0,
 		1,
 		0,
 		keys.localName,
 	},
-	types.nameshort: pduRecord{
+	types.nameshort: {
 		0,
 		1,
 		0,
 		keys.localName,
 	},
-	types.txpwr: pduRecord{
+	types.txpwr: {
 		0,
 		1,
 		0,
 		keys.txpwr,
 	},
-	types.mfgdata: pduRecord{
+	types.mfgdata: {
 		0,
 		1,
 		0,
 		keys.mfgdata,
 	},
-	types.flags: pduRecord{
+	types.flags: {
 		0,
 		1,
 		0,
@@ -183,7 +183,7 @@ func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 	}
 
 	//bytes empty/nil?
-	if bytes == nil || len(bytes) == 0 {
+	if len(bytes) == 0 {
 		return nil, fmt.Errorf("nil/empty bytes")
 	}
 
@@ -232,7 +232,7 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 		end := start + length - 1
 		bytes := pdu[start:end]
 		dec, ok := pduDecodeMap[typ]
-		if ok {
+		if ok && len(bytes) != 0 {
 			//have min length?
 			if dec.minSz > len(bytes) {
 				return m, fmt.Errorf("adv type %v: min length %v, have %v, idx %v", typ, dec.minSz, len(bytes), i)
