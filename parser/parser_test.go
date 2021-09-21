@@ -33,18 +33,11 @@ func testArrayBad(typ byte, t *testing.T) error {
 		t.Fatalf("unsupported type %v", typ)
 	}
 
-	//len == 0
-	p := testPdu{}
-	b := []byte{}
-	p.add(typ, b)
-
-	_, err := Parse(p.bytes())
-	if err == nil {
-		return fmt.Errorf("len==0, no decode error")
-	}
-
 	//len % arraySz != 0
-	p = testPdu{}
+	var err error
+	var b []byte
+
+	p := testPdu{}
 	b1 := []byte{}
 	b2 := []byte{}
 	for i := 0; i < dec.arrayElementSz; i++ {
@@ -67,9 +60,11 @@ func testArrayBad(typ byte, t *testing.T) error {
 	b = []byte{}
 	for i := 0; i < (dec.arrayElementSz - 1); i++ { //-1 for error
 		bi := byte(i)
-		b1 = append(b1, bi)
+		b = append(b, bi)
 	}
 	p.add(typ, b)
+
+	t.Logf("type %v, bytes %x", typ, b)
 
 	_, err = Parse(p.bytes())
 	if err == nil {
@@ -81,7 +76,7 @@ func testArrayBad(typ byte, t *testing.T) error {
 	b = []byte{}
 	for i := 0; i < (dec.minSz - 1); i++ { //-1 for error
 		bi := byte(i)
-		b1 = append(b1, bi)
+		b = append(b1, bi)
 	}
 	p.add(typ, b)
 
@@ -256,28 +251,24 @@ func testNonArrayBad(typ byte, t *testing.T) error {
 		t.Fatalf("unsupported type %v", typ)
 	}
 
-	//len == 0
-	p := testPdu{}
-	b := []byte{}
-	p.add(typ, b)
+	var err error
+	var p testPdu
+	var b []byte
 
-	_, err := Parse(p.bytes())
-	if err == nil {
-		return fmt.Errorf("len==0, no decode error")
-	}
+	// len < minSz (skip if resulting in len == 0)
+	if dec.minSz > 1 {
+		p = testPdu{}
+		b = []byte{}
+		for i := 0; i < (dec.minSz - 1); i++ { //-1 for error
+			bi := byte(i)
+			b = append(b, bi)
+		}
+		p.add(typ, b)
 
-	// len < minSz (may also cover len == 0)
-	p = testPdu{}
-	b = []byte{}
-	for i := 0; i < (dec.minSz - 1); i++ { //-1 for error
-		bi := byte(i)
-		b = append(b, bi)
-	}
-	p.add(typ, b)
-
-	_, err = Parse(p.bytes())
-	if err == nil {
-		return fmt.Errorf("len<minSz, no decode error")
+		_, err = Parse(p.bytes())
+		if err == nil {
+			return fmt.Errorf("len<minSz, no decode error")
+		}
 	}
 
 	//corrupt encoding (bad length)
@@ -503,22 +494,118 @@ func TestServiceData(t *testing.T) {
 	}
 }
 
-// func TestFieldCombo(t *testing.T) {
-// 	p := testPdu{}
-// 	p.add(types.flags, []byte{99})
-// 	p.add(types.uuid16comp, []byte{1, 2, 34, 56})
-// 	p.add(types.uuid16inc, []byte{3, 4})
-// 	p.add(types.uuid32comp, []byte{5, 6, 7, 8})
-// 	p.add(types.uuid32inc, []byte{9, 10, 11, 12, 1, 2, 3, 4})
-// 	p.add(types.uuid128comp, []byte{1, 2, 3, 4, 5, 6, 7, 8, 11, 22, 33, 44, 55, 66, 77, 88})
-// 	p.add(types.uuid128inc, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15})
-// 	p.add(types.mfgdata, []byte{99, 88, 77, 66, 55, 44})
-// 	p.add(types.svc16, []byte{0x11, 0x22, 33, 44, 55, 66, 77})
-// 	p.add(types.svc32, []byte{0x11, 0x22, 0x33, 0x44, 55, 66, 77, 88, 99, 10, 11})
-// 	p.add(types.svc128, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0xff})
+func Test_FieldCombo(t *testing.T) {
+	u128 := []byte{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3}
+	md := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 
-// 	m, err := Parse(p.bytes())
-// 	t.Fatal(m, err)
+	p := testPdu{}
+	p.add(types.flags, []byte{0x12})
+	p.add(types.uuid16comp, []byte{1, 2, 3, 4})
+	p.add(types.uuid128comp, u128)
+	p.add(types.mfgdata, md)
+	p.add(types.svc16, []byte{1, 2, 3, 4, 5, 6, 7})
 
-// 	// v, ok := m[keys.uuid128comp].([]interface{})
-// }
+	m, err := Parse(p.bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var v, exp interface{}
+	t.Log(m)
+
+	// check flags
+	exp = []byte{0x12}
+	v = m[keys.flags]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check services
+	exp = []ble.UUID{
+		ble.UUID16(0x0201),
+		ble.UUID16(0x0403),
+		ble.UUID(u128),
+	}
+
+	v = m[keys.services]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check mfg
+	exp = md
+	v = m[keys.mfgdata]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check svc data
+	exp = map[string]interface{}{
+		"0201": []interface{}{[]byte{3, 4, 5, 6, 7}},
+	}
+	v = m[keys.serviceData]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+}
+
+func Test_ParseErrors(t *testing.T) {
+	// missing a byte on uuid128
+	u128bad := []byte{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3}
+	md := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+
+	p := testPdu{}
+	p.add(types.uuid128comp, u128bad)
+	p.add(types.mfgdata, md)
+
+	_, err := Parse(p.bytes())
+	if err == nil {
+		t.Fatal("expect error on bad input length")
+	}
+
+	// empty uuid128 field, check mfg ok
+	p = testPdu{}
+	p.add(types.uuid128comp, []byte{})
+	p.add(types.mfgdata, md)
+
+	m, err := Parse(p.bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var v, exp interface{}
+	t.Log(m)
+
+	// check mfg
+	exp = md
+	v = m[keys.mfgdata]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	if v, ok := m[keys.services]; ok {
+		t.Fatalf("service field present on empty input, got %v", v)
+	}
+
+	// empty name on end
+	p = testPdu{}
+	p.add(types.mfgdata, md)
+	p.add(types.namecomp, []byte{})
+
+	m, err = Parse(p.bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check mfg
+	exp = md
+	v = m[keys.mfgdata]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	if v, ok := m[keys.localName]; ok {
+		t.Fatalf("name field present on empty input, got %v", v)
+	}
+
+}
