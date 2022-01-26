@@ -923,12 +923,14 @@ func (h *HCI) setAllowedCommands(n int) {
 		case <-h.done:
 			//closed
 			return
+
 		case h.chCmdBufs <- make([]byte, chCmdBufElementSize):
 			//ok
+
 		case <-time.After(chCmdBufTimeout):
 			h.dispatchError(fmt.Errorf("chCmdBufs put timeout"))
 			//timeout
-			break
+			return
 		}
 	}
 }
@@ -940,7 +942,8 @@ func (h *HCI) handleVendorEvent(b []byte) error {
 	h.muSent.Unlock()
 
 	if !found {
-		return fmt.Errorf("received vendor event but no vendor command was sent: %02x", b)
+		h.Errorf("received vendor event but no vendor command was sent: %02x", b)
+		return nil
 	}
 
 	//todo: send data back to caller via channel
