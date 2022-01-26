@@ -17,8 +17,8 @@ type Pool struct {
 
 // NewPool ...
 func NewPool(sz int, cnt int) (*Pool, error) {
-	if cnt == 0 {
-		return nil, fmt.Errorf("invalid buffer size")
+	if cnt <= 0 {
+		return nil, fmt.Errorf("invalid buffer size %v", cnt)
 	}
 	ch := make(chan *bytes.Buffer, cnt)
 	for len(ch) < cnt {
