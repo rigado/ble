@@ -486,7 +486,15 @@ func (h *HCI) sktReadLoop() {
 			// ok
 			p := make([]byte, n)
 			copy(p, b)
-			h.sktRxChan <- p
+			select {
+			case h.sktRxChan <- p:
+				//ok
+			//check h.done here; sktProcessLoop could exit before the
+			//above channel put is read leading to a leaked goroutine
+			case <-h.done:
+				//exit
+				return
+			}
 		}
 	}
 }
