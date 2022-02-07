@@ -622,13 +622,26 @@ func (c *Client) Loop() {
 		}
 
 		n, err := c.l2c.Read(c.rxBuf)
-
-		if err != nil {
-			c.Errorf("client: read %v", err)
-			// We don't expect any error from the bearer (L2CAP ACL-U)
-			// Pass it along to the pending request, if any, and escape.
-			c.chErr <- err
+		// keep trying?
+		select {
+		case <-c.done:
+			c.Debug("exited client loop: done")
 			return
+		case <-c.connClosed:
+			c.Debug("exited client async loop: conn closed")
+			return
+		default:
+			if c.l2c == nil {
+				c.Debug("exited client loop: l2c nil")
+				return
+			} else if err != nil {
+				c.Errorf("client: read %v", err)
+				// We don't expect any error from the bearer (L2CAP ACL-U)
+				// Pass it along to the pending request, if any, and escape.
+				c.chErr <- err
+				return
+			}
+			//ok
 		}
 
 		b := make([]byte, n)

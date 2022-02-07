@@ -833,9 +833,6 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 	h.Debugf("cleanupConnectionHandle %04X: found device with address %v", ch, c.RemoteAddr().String())
 	delete(h.conns, ch)
 
-	h.Debugf("cleanupConnectionHandle %04X: close c.chInPkt", ch)
-	close(c.chInPkt)
-
 	if !h.isOpen() && c.param.Role() == roleSlave {
 		// Re-enable advertising, if it was advertising. Refer to the
 		// handleLEConnectionComplete() for details.
@@ -851,6 +848,10 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		h.Debugf("cleanupConnectionHandle %04X: close c.chDone", ch)
 		close(c.chDone)
 	}
+
+	h.Debugf("cleanupConnectionHandle %04X: close c.chInPkt", ch)
+	close(c.chInPkt)
+
 	// When a connection disconnects, all the sent packets and weren't acked yet
 	// will be recycled. [Vol2, Part E 4.3]
 	//
