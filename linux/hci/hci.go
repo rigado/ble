@@ -849,6 +849,8 @@ func (h *HCI) cleanupConnectionHandle(ch uint16) error {
 		close(c.chDone)
 	}
 
+	//Clean up this channel after we close chDone. Otherwise, closing this channel before
+	//causes a spurious error in the att client packet handling loop
 	h.Debugf("cleanupConnectionHandle %04X: close c.chInPkt", ch)
 	close(c.chInPkt)
 
