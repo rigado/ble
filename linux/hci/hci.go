@@ -155,7 +155,7 @@ func (h *HCI) Init() error {
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),
-	// evt.EncryptionKeyRefreshCompleteCode:         todo),
+	h.subh[evt.EncryptionKeyRefreshCompleteCode] = h.handleEncryptionKeyRefreshComplete,
 	// evt.AuthenticatedPayloadTimeoutExpiredCode:   todo),
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 
@@ -883,16 +883,27 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 
 func (h *HCI) handleEncryptionChange(b []byte) error {
 	e := evt.EncryptionChange(b)
-	h.muConns.Lock()
-	defer h.muConns.Unlock()
-	c, found := h.conns[e.ConnectionHandle()]
-	if !found {
-		h.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
+
+	c := h.findConnection(e.ConnectionHandle())
+	if c == nil {
+		return fmt.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
 	}
 
 	//pass to connection to handle status
 	c.handleEncryptionChanged(e.Status(), e.EncryptionEnabled())
 
+	return nil
+}
+
+func (h *HCI) handleEncryptionKeyRefreshComplete(b []byte) error {
+	e := evt.EncryptionKeyRefreshComplete(b)
+
+	c := h.findConnection(e.ConnectionHandle())
+	if c == nil {
+		return fmt.Errorf("encryptionKeyRefresh: unknown connection handle %04X", e.ConnectionHandle())
+	}
+
+	c.handleEncryptionKeyRefreshComplete(e.Status())
 	return nil
 }
 
@@ -980,14 +991,13 @@ func (h *HCI) dispatchError(e error) {
 	}
 }
 
-// workaround, remove
-func (h *HCI) NOP() error {
-	return nil
+func (h *HCI) findConnection(handle uint16) *Conn {
+	h.muConns.Lock()
+	defer h.muConns.Unlock()
+	c, found := h.conns[handle]
+	if !found {
+		return nil
+	}
 
-	// ReadBDADDRRP := cmd.ReadBDADDRRP{}
-	// if err := h.Send(&cmd.ReadBDADDR{}, &ReadBDADDRRP); err != nil {
-	// 	h.Errorf("NOP: %v", err)
-	// 	return err
-	// }
-	// return nil
+	return c
 }
