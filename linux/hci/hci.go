@@ -155,7 +155,7 @@ func (h *HCI) Init() error {
 	// evt.ReadRemoteVersionInformationCompleteCode: todo),
 	// evt.HardwareErrorCode:                        todo),
 	// evt.DataBufferOverflowCode:                   todo),
-	h.subh[evt.EncryptionKeyRefreshCompleteCode] = h.handleEncryptionKeyRefreshComplete,
+	h.subh[evt.EncryptionKeyRefreshCompleteCode] = h.handleEncryptionKeyRefreshComplete
 	// evt.AuthenticatedPayloadTimeoutExpiredCode:   todo),
 	// evt.LEReadRemoteUsedFeaturesCompleteSubCode:   todo),
 
