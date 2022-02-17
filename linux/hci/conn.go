@@ -433,10 +433,9 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		}
 	}
 
-	encEnabled := enabled == 0x01
-	c.encryptionEnabled = encEnabled
+	c.encryptionEnabled = enabled == 0x01
 
-	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: encEnabled}
+	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: c.encryptionEnabled}
 	if c.encChanged != nil {
 		select {
 		case c.encChanged <- info:
