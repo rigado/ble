@@ -65,6 +65,10 @@ type Conn struct {
 	// leFrame is set to be true when the LE Credit based flow control is used.
 	leFrame bool
 
+	// encryptionEnabled is set to true when an encryption change event arrives
+	// with a success status
+	encryptionEnabled bool
+
 	smp        SmpManager
 	encChanged chan ble.EncryptionChangedInfo
 	ble.Logger
@@ -140,6 +144,9 @@ func (c *Conn) Pair(authData ble.AuthData, to time.Duration) error {
 }
 
 func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
+	if c.encryptionEnabled {
+		return ble.ErrEncryptionAlreadyEnabled
+	}
 	c.encChanged = ch
 	err := c.smp.StartEncryption()
 	if err != nil {
@@ -426,16 +433,43 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 		}
 	}
 
-	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: enabled == 0x01}
+	c.encryptionEnabled = enabled == 0x01
+
+	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: c.encryptionEnabled}
 	if c.encChanged != nil {
 		select {
 		case c.encChanged <- info:
 			return
 		default:
-			c.Errorf("encryptionChanged: failed to send encryption changed status to channel: %v", info)
+			c.Errorf("encryptionChanged: failed to send encryption update to channel: %v", info)
 		}
 	} else {
-		c.Infof("encryptionChanged: status %v, err %v", status, err)
+		c.Infof("encryptionChanged: status %v", status)
+	}
+}
+
+func (c *Conn) handleEncryptionKeyRefreshComplete(status uint8) {
+	var err error
+	if status != 0x00 {
+		cmdErr := ErrCommand(status)
+		err = fmt.Errorf(errCmd[cmdErr])
+		if de := c.smp.DeleteBondInfo(); de != nil {
+			c.Errorf("encryptionChanged: failed to delete bond info: %v", err)
+		}
+	}
+
+	c.encryptionEnabled = true
+
+	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: true}
+	if c.encChanged != nil {
+		select {
+		case c.encChanged <- info:
+			return
+		default:
+			c.Errorf("encryptionKeyRefreshComplete: failed to send encryption update to channel: %v", info)
+		}
+	} else {
+		c.Infof("encryptionKeyRefreshComplete: status %v", status)
 	}
 }
 

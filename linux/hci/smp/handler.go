@@ -49,7 +49,7 @@ func smpOnPairingResponse(t *transport, in pdu) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid pairing type %v", t.pairing.pairingType)
 	}
-	t.Debugf("smpOnPairingResponse: detected pairing type '%v'", pts)
+	t.Infof("smpOnPairingResponse: detected pairing type '%v'", pts)
 
 	if t.pairing.pairingType == Oob &&
 		len(t.pairing.authData.OOBData) == 0 {
@@ -149,7 +149,13 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	rRand := t.pairing.remoteRandom
 
 	//calculate STK
-	k := getLegacyParingTK(t.pairing.authData.Passkey)
+	var k []byte
+	if t.pairing.pairingType == Passkey {
+		k = getLegacyParingTK(t.pairing.authData.Passkey)
+	} else {
+		k = getLegacyParingTK(0)
+	}
+
 	stk, err := smpS1(k, rRand, lRand)
 	if err != nil {
 		return nil, err
