@@ -230,7 +230,8 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 
 		start := i + 2
 		end := start + length - 1
-		bytes := pdu[start:end]
+		bytes := make([]byte, len(pdu[start:end]))
+		copy(bytes, pdu[start:end])
 		dec, ok := pduDecodeMap[typ]
 		if ok && len(bytes) != 0 {
 			//have min length?
@@ -277,7 +278,8 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 				m[dec.key] = msd
 			} else {
 				//we already checked for min length so just copy
-				m[dec.key] = bytes
+				writeOrAppendBytes(m, dec.key, bytes)
+
 			}
 		}
 
@@ -285,4 +287,19 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 	}
 
 	return m, nil
+}
+
+func writeOrAppendBytes(m map[string]interface{}, key string, data []byte) {
+	if _, ok := m[key]; !ok {
+		m[key] = data
+	} else {
+		if d, ok := m[key].([]byte); ok {
+			d = append(d, data...)
+			m[key] = d
+		} else {
+			//just overwrite it if the data type is wrong
+			m[key] = data
+		}
+
+	}
 }
