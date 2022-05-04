@@ -23,6 +23,7 @@ type Advertisement interface {
 
 	ToMap() (map[string]interface{}, error)
 	Data() []byte
+	SrData() []byte
 }
 
 var AdvertisementMapKeys = struct {
