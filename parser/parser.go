@@ -278,8 +278,12 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 				m[dec.key] = msd
 			} else {
 				//we already checked for min length so just copy
+				if dec.key == keys.mfgdata {
+					//mfg data contains the company id again in the scan response
+					//strip that out
+					bytes = bytes[2:]
+				}
 				writeOrAppendBytes(m, dec.key, bytes)
-
 			}
 		}
 
