@@ -560,7 +560,7 @@ func Test_SpiltFields(t *testing.T) {
 	p.add(types.mfgdata, md)
 	p.add(types.svc16, []byte{1, 2, 3, 4, 5, 6, 7})
 
-	md2 := []byte{10, 11, 12, 13, 14, 15}
+	md2 := []byte{0xc5, 0, 10, 11, 12, 13, 14, 15}
 	sr := testPdu{}
 	sr.add(types.mfgdata, md2)
 
@@ -595,7 +595,7 @@ func Test_SpiltFields(t *testing.T) {
 	}
 
 	// check mfg
-	exp = append(md, md2...)
+	exp = append(md, md2[2:]...)
 	v = m[keys.mfgdata]
 	if !reflect.DeepEqual(v, exp) {
 		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)

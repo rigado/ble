@@ -278,11 +278,6 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 				m[dec.key] = msd
 			} else {
 				//we already checked for min length so just copy
-				if dec.key == keys.mfgdata {
-					//mfg data contains the company id again in the scan response
-					//strip that out
-					bytes = bytes[2:]
-				}
 				writeOrAppendBytes(m, dec.key, bytes)
 			}
 		}
@@ -298,6 +293,11 @@ func writeOrAppendBytes(m map[string]interface{}, key string, data []byte) {
 		m[key] = data
 	} else {
 		if d, ok := m[key].([]byte); ok {
+			if key == keys.mfgdata {
+				//mfg data contains the company id again in the scan response
+				//strip that out
+				data = data[2:]
+			}
 			d = append(d, data...)
 			m[key] = d
 		} else {
