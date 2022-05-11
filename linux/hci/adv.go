@@ -165,6 +165,13 @@ func (a *Advertisement) Data() []byte {
 	return v
 }
 
+// SrData returns the scan response data of the packet.
+// This is linux specific
+func (a *Advertisement) SrData() []byte {
+	v, _ := a.srDataWErr()
+	return v
+}
+
 // ScanResponse returns the scan response of the packet, if it presents.
 // This is linux specific.
 func (a *Advertisement) ScanResponse() []byte {

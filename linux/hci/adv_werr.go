@@ -103,6 +103,14 @@ func (a *Advertisement) dataWErr() ([]byte, error) {
 	return a.e.DataWErr(a.i)
 }
 
+func (a *Advertisement) srDataWErr() ([]byte, error) {
+	//no scan response data available
+	if a.sr == nil {
+		return nil, nil
+	}
+	return a.e.DataWErr(a.sr.i)
+}
+
 func (a *Advertisement) scanResponseWErr() ([]byte, error) {
 	if a.sr == nil {
 		return nil, nil

@@ -549,6 +549,68 @@ func Test_FieldCombo(t *testing.T) {
 	}
 }
 
+func Test_SpiltFields(t *testing.T) {
+	u128 := []byte{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3}
+	md := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+
+	p := testPdu{}
+	p.add(types.flags, []byte{0x12})
+	p.add(types.uuid16comp, []byte{1, 2, 3, 4})
+	p.add(types.uuid128comp, u128)
+	p.add(types.mfgdata, md)
+	p.add(types.svc16, []byte{1, 2, 3, 4, 5, 6, 7})
+
+	md2 := []byte{0xc5, 0, 10, 11, 12, 13, 14, 15}
+	sr := testPdu{}
+	sr.add(types.mfgdata, md2)
+
+	//mimic behavior of call to new packet
+	allBytes := append(p.bytes(), sr.bytes()...)
+
+	m, err := Parse(allBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var v, exp interface{}
+	t.Log(m)
+
+	// check flags
+	exp = []byte{0x12}
+	v = m[keys.flags]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check services
+	exp = []ble.UUID{
+		ble.UUID16(0x0201),
+		ble.UUID16(0x0403),
+		ble.UUID(u128),
+	}
+
+	v = m[keys.services]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check mfg
+	exp = append(md, md2[2:]...)
+	v = m[keys.mfgdata]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+
+	// check svc data
+	exp = map[string]interface{}{
+		"0201": []interface{}{[]byte{3, 4, 5, 6, 7}},
+	}
+	v = m[keys.serviceData]
+	if !reflect.DeepEqual(v, exp) {
+		t.Fatalf("have %v (%T), want %v (%T)", v, v, exp, exp)
+	}
+}
+
 func Test_ParseErrors(t *testing.T) {
 	// missing a byte on uuid128
 	u128bad := []byte{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3}
