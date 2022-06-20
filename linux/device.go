@@ -183,7 +183,10 @@ func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) erro
 		return err
 	}
 	<-ctx.Done()
-	d.HCI.StopScanning()
+	if err := d.HCI.StopScanning(); err != nil {
+		return err
+	}
+
 	return ctx.Err()
 }
 
