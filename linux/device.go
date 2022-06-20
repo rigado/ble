@@ -190,6 +190,25 @@ func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) erro
 	return ctx.Err()
 }
 
+func (d *Device) NonblockingScan(allowDup bool, h ble.AdvHandler) error {
+	if err := d.HCI.SetAdvHandler(h); err != nil {
+		return err
+	}
+
+	if err := d.HCI.Scan(allowDup); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Device) StopScan() error {
+	if err := d.HCI.StopScanning(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Dial ...
 func (d *Device) Dial(ctx context.Context, a ble.Addr) (ble.Client, error) {
 	// d.HCI.Dial is a blocking call, although most of time it should return immediately.

@@ -40,6 +40,12 @@ type Device interface {
 	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false, async handling
 	Scan(ctx context.Context, allowDup bool, h AdvHandler) error
 
+	// NonblockingScan starts scanning without blocking the caller
+	NonblockingScan(allowDup bool, h AdvHandler) error
+
+	// StopScan stops scanning. Used in conjunction with nonblocking scan
+	StopScan() error
+
 	// Dial ...
 	Dial(ctx context.Context, a Addr) (Client, error)
 
