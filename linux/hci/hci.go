@@ -400,6 +400,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	h.sent[oc] = p //use oc here due to swap to 0xff for vendor events
 	h.muSent.Unlock()
 
+	h.Debugf("tx op: %v - %v", c.OpCode(), hex.EncodeToString(b))
 	if !h.isOpen() {
 		return nil, fmt.Errorf("hci closed")
 	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
@@ -522,6 +523,7 @@ func (h *HCI) close(err error) error {
 
 func (h *HCI) handlePkt(b []byte) error {
 	// Strip the 1-byte HCI header and pass down the rest of the packet.
+	h.Debugf("hci rx: %v", hex.EncodeToString(b))
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeACLData:
