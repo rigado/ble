@@ -523,10 +523,10 @@ func (h *HCI) close(err error) error {
 
 func (h *HCI) handlePkt(b []byte) error {
 	// Strip the 1-byte HCI header and pass down the rest of the packet.
-	h.Debugf("hci rx: %v", hex.EncodeToString(b))
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeACLData:
+		h.Debugf("hci rx acl: %v", hex.EncodeToString(b))
 		return h.handleACL(b)
 	case pktTypeEvent:
 		return h.handleEvt(b)
