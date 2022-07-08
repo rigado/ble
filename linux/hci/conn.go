@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -352,6 +353,7 @@ func (c *Conn) writePDU(pdu []byte) (int, error) {
 		default:
 		}
 
+		c.Debugf("tx: %v", hex.EncodeToString(pkt.Bytes()))
 		if _, err := c.hci.skt.Write(pkt.Bytes()); err != nil {
 			return sent, err
 		}
@@ -377,7 +379,7 @@ func (c *Conn) recombine() error {
 	}
 
 	p := pdu(pkt.data())
-	c.Debugf("recombine: pdu in - % X", pkt.data())
+	c.Debugf("recombine: pdu in - %v", hex.EncodeToString(pkt.data()))
 	// Currently, check for LE-U only. For channels that we don't recognizes,
 	// re-combine them anyway, and discard them later when we dispatch the PDU
 	// according to CID.

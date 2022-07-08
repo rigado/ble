@@ -2,7 +2,9 @@ package att
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
+
 	"fmt"
 	"io"
 	"time"
@@ -60,7 +62,7 @@ func (c *Client) WithServer(db *DB) *Client {
 	var err error
 	c.server, err = NewServer(db, c.l2c, c.Logger)
 	if err != nil {
-		c.Errorf("client: failed to create server")
+		c.Errorf("failed to create server")
 	}
 
 	return c
@@ -511,7 +513,7 @@ func (c *Client) sendCmd(b []byte) error {
 }
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
-	c.Debugf("client: req % X", b)
+	c.Debugf("req: %v", hex.EncodeToString(b))
 	if _, err := c.l2c.Write(b); err != nil {
 		return nil, fmt.Errorf("send ATT request failed: %w", err)
 	}
@@ -526,7 +528,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			// returns an ErrReqNotSupp response, and continue to wait
 			// the response to our request.
 			errRsp := newErrorResponse(rsp[0], 0x0000, ble.ErrReqNotSupp)
-			c.Debugf("client: rsp % X", b)
+			c.Debugf("rsp: % X", b)
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
 				return nil, fmt.Errorf("unexpected ATT response received: %w", err)
@@ -559,14 +561,14 @@ func (c *Client) asyncReqLoop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			c.Debug("[BLE ATT]: exited client async loop: done")
+			c.Debug("exited async loop: done")
 			return
 		case <-c.connClosed:
-			c.Debug("[BLE ATT]: exited client async loop: conn closed")
+			c.Debug("exited async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				c.Debug("[BLE ATT] exited client async loop: l2c nil")
+				c.Debug("exited async loop: l2c nil")
 				return
 			}
 			//ok
@@ -579,7 +581,7 @@ func (c *Client) asyncReqLoop() {
 		}
 		err := c.sendResp(rsp)
 		if err != nil {
-			c.Errorf("client: failed to send async att response for: %X", in[0])
+			c.Errorf("failed to send async att response for: %X", in[0])
 		}
 	}
 }
@@ -613,14 +615,14 @@ func (c *Client) Loop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			c.Debug("exited client loop: done")
+			c.Debug("exited async loop: done")
 			return
 		case <-c.connClosed:
-			c.Debug("exited client async loop: conn closed")
+			c.Debug("exited async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				c.Debug("exited client loop: l2c nil")
+				c.Debug("exited async loop: l2c nil")
 				return
 			}
 			//ok
@@ -630,14 +632,14 @@ func (c *Client) Loop() {
 		// keep trying?
 		select {
 		case <-c.done:
-			c.Debug("exited client loop: done")
+			c.Debug("exited async loop: done")
 			return
 		case <-c.connClosed:
-			c.Debug("exited client async loop: conn closed")
+			c.Debug("exited async loop: conn closed")
 			return
 		default:
 			if c.l2c == nil {
-				c.Debug("exited client loop: l2c nil")
+				c.Debug("exited async loop: l2c nil")
 				return
 			} else if err != nil {
 				if errors.Is(err, io.ErrClosedPipe) {
@@ -657,28 +659,28 @@ func (c *Client) Loop() {
 
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
-		c.Debugf("client: data rx % X", b)
+		c.Debugf("rx: %v", hex.EncodeToString(b))
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
 		if b[0]&0x01 == 0x00 {
 			select {
 			case <-c.done:
-				c.Info("exited client loop: closed after async req rx")
+				c.Info("exited async loop: closed after async req rx")
 				return
 			case <-c.connClosed:
-				c.Debug("exited client async loop: conn closed")
+				c.Debug("exited async loop: conn closed")
 				return
 			case c.inc <- b:
 				continue
 			default:
-				c.Errorf("client: failed to enqueue request for", fmt.Sprintf("%x", b[0]))
+				c.Errorf("failed to enqueue request for %x", b[0])
 				continue
 			}
 		}
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
-			c.Debugf("client: rsp % X", c.rxBuf[:n])
+			c.Debugf("a rx: %v", hex.EncodeToString(c.rxBuf[:n]))
 			select {
 			case <-c.done:
 				c.Info("exited client loop: closed after rsp rx")
@@ -692,24 +694,24 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		c.Debugf("client: notif % X", b)
+		c.Debugf("notif: %v", hex.EncodeToString(b))
 		select {
 		case <-c.done:
-			c.Info("exited client loop: closed after rx")
+			c.Info("exited async loop: closed after rx")
 			return
 		case <-c.connClosed:
-			c.Debug("exited client async loop: conn closed")
+			c.Debug("exited async loop: conn closed")
 			return
 		case ch <- asyncWork{handle: c.handler.HandleNotification, data: b}:
 			// ok
 		default:
 			// If this really happens, especially on a slow machine, enlarge the channel buffer.
-			c.Error("client: req - can't enqueue incoming notification.")
+			c.Error("can't enqueue incoming notification.")
 		}
 
 		// Always write aknowledgement for an indication, even it was an invalid request.
 		if b[0] == HandleValueIndicationCode {
-			c.Debugf("client: req % X", b)
+			c.Debugf("write confirmation for indication")
 			_, _ = c.l2c.Write(confirmation)
 		}
 	}

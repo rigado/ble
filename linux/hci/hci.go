@@ -931,7 +931,7 @@ func (h *HCI) handleEncryptionKeyRefreshComplete(b []byte) error {
 
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
-	h.Debugf("numberOfCompletedPackets: % X", b)
+	h.Debugf("numberOfCompletedPackets: %v", hex.EncodeToString(b))
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles()); i++ {
