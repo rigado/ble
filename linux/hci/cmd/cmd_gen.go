@@ -1560,3 +1560,34 @@ type LERemoteConnectionParameterRequestNegativeReplyRP struct {
 func (c *LERemoteConnectionParameterRequestNegativeReplyRP) Unmarshal(b []byte) error {
 	return unmarshal(c, b)
 }
+
+// LEWriteSuggestedDefaultDataLength implements LE Write Suggested Default Data Length (0x08|0x0024) [Vol 2, Part E, 7.8.35]
+type LEWriteSuggestedDefaultDataLength struct {
+	SuggestedMaxTxOctets uint16
+	SuggestedMaxTxTime   uint16
+}
+
+func (c *LEWriteSuggestedDefaultDataLength) String() string {
+	return "LE Write Suggested Default Data Length (0x08|0x0024)"
+}
+
+// OpCode returns the opcode of the command.
+func (c *LEWriteSuggestedDefaultDataLength) OpCode() int { return 0x08<<10 | 0x0024 }
+
+// Len returns the length of the command.
+func (c *LEWriteSuggestedDefaultDataLength) Len() int { return 4 }
+
+// Marshal serializes the command parameters into binary form.
+func (c *LEWriteSuggestedDefaultDataLength) Marshal(b []byte) error {
+	return marshal(c, b)
+}
+
+// LEWriteSuggestedDefaultDataLengthRP returns the return parameter of LE Write Suggested Default Data Length
+type LEWriteSuggestedDefaultDataLengthRP struct {
+	Status uint8
+}
+
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (c *LEWriteSuggestedDefaultDataLengthRP) Unmarshal(b []byte) error {
+	return unmarshal(c, b)
+}
