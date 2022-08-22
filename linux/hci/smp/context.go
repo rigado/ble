@@ -28,35 +28,38 @@ var pairingTypeStrings = map[int]string{
 }
 
 type pairingContext struct {
-	request        hci.SmpConfig
-	response       hci.SmpConfig
-	remoteAddr     []byte
-	remoteAddrType byte
-	remoteRandom   []byte
-	remoteConfirm  []byte
+	authData     ble.AuthData
+	localConfirm []byte
 
-	localAddr     []byte
-	localAddrType byte
-	localRandom   []byte
-	localConfirm  []byte
+	remoteAddr    []byte
+	remoteRandom  []byte
+	remoteConfirm []byte
 
-	scECDHKeys         *ECDHKeys
-	scMacKey           []byte
-	scRemotePubKey     crypto.PublicKey
-	scDHKey            []byte
+	localAddr          []byte
+	localRandom        []byte
 	scRemoteDHKeyCheck []byte
 
-	legacy       bool
 	shortTermKey []byte
+
+	scMacKey []byte
+	scDHKey  []byte
+	bond     hci.BondInfo
+
+	ble.Logger
+	scRemotePubKey crypto.PublicKey
+
+	scECDHKeys *ECDHKeys
 
 	passKeyIteration int
 
 	pairingType int
 	state       PairingState
-	authData    ble.AuthData
-	bond        hci.BondInfo
+	request     hci.SmpConfig
+	response    hci.SmpConfig
 
-	ble.Logger
+	legacy         bool
+	localAddrType  byte
+	remoteAddrType byte
 }
 
 func (p *pairingContext) checkConfirm() error {
@@ -114,7 +117,7 @@ func (p *pairingContext) checkPasskeyConfirm() error {
 	return nil
 }
 
-//todo: key should be set at the beginning
+// todo: key should be set at the beginning
 func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 	kbx := MarshalPublicKeyX(p.scRemotePubKey)
 	kax := MarshalPublicKeyX(p.scECDHKeys.public)
