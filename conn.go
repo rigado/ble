@@ -28,6 +28,9 @@ type Conn interface {
 	// RemoteAddr returns remote device's address.
 	RemoteAddr() Addr
 
+	// ReadRSSI returns the remote device's RSSI.
+	ReadRSSI() (int8, error)
+
 	// RxMTU returns the ATT_MTU which the local device is capable of accepting.
 	RxMTU() int
 

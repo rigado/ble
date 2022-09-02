@@ -115,6 +115,10 @@ func (c *Client) ExchangeMTU(clientRxMTU int) (serverRxMTU int, err error) {
 	return txMTU, nil
 }
 
+func (c *Client) ReadRSSI() (int8, error) {
+	return c.l2c.ReadRSSI()
+}
+
 // FindInformation obtains the mapping of attribute handles with their associated types.
 // This allows a Client to discover the list of attributes and their types on a server.
 // [Vol 3, Part F, 3.4.3.1 & 3.4.3.2]

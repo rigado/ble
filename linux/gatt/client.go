@@ -325,11 +325,11 @@ func (p *Client) WriteDescriptor(d *ble.Descriptor, v []byte) error {
 }
 
 // ReadRSSI retrieves the current RSSI value of remote peripheral. [Vol 2, Part E, 7.5.4]
-func (p *Client) ReadRSSI() int {
+func (p *Client) ReadRSSI() (int8, error) {
 	p.Lock()
 	defer p.Unlock()
-	// TODO:
-	return 0
+
+	return p.ac.ReadRSSI()
 }
 
 // ExchangeMTU informs the server of the client’s maximum receive MTU size and
