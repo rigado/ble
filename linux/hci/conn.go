@@ -505,6 +505,22 @@ func (c *Conn) RemoteAddr() ble.Addr {
 	return ble.NewAddr(net.HardwareAddr([]byte{a[5], a[4], a[3], a[2], a[1], a[0]}).String())
 }
 
+func (c *Conn) ReadRSSI() (int8, error) {
+	read := &cmd.ReadRSSI{Handle: c.param.ConnectionHandle()}
+	readRsp := cmd.ReadRSSIRP{}
+
+	err := c.hci.Send(read, &readRsp)
+	if err != nil {
+		return 127, fmt.Errorf("failed to read rssi: %v", err)
+	}
+
+	if readRsp.Status != 0 {
+		return 127, fmt.Errorf("read rssi failed with status %x", readRsp.Status)
+	}
+
+	return readRsp.RSSI, nil
+}
+
 // RxMTU returns the MTU which the upper layer is capable of accepting.
 func (c *Conn) RxMTU() int { return c.rxMTU }
 
