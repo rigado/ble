@@ -319,9 +319,6 @@ func (h *HCI) Send(c Command, r CommandRP) error {
 }
 
 func (h *HCI) checkOpCodeFree(opCode int) error {
-	h.muSent.Lock()
-	defer h.muSent.Unlock()
-
 	_, ok := h.sent[opCode]
 	if ok {
 		return fmt.Errorf("command with opcode %v pending", opCode)
@@ -329,6 +326,25 @@ func (h *HCI) checkOpCodeFree(opCode int) error {
 
 	return nil
 }
+
+func (h *HCI) getTxBuf() ([]byte, error) {
+	// get buffer w/timeout
+	var b []byte
+	select {
+	case <-h.done:
+		return nil, fmt.Errorf("hci closed")
+	case b = <-h.chCmdBufs:
+		//ok
+	case <-time.After(chCmdBufTimeout):
+		err := fmt.Errorf("chCmdBufs get timeout")
+		h.dispatchError(err)
+		return nil, err
+	}
+
+	return b, nil
+}
+
+var ocl = &opCodeLocker{}
 
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
@@ -349,26 +365,24 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	//verify opcode is free before asking for the command buffer
 	//this ensures that the command buffer is only taken if
 	//the command can be sent
-	if h.checkOpCodeFree(oc) != nil {
-		return nil, fmt.Errorf("command with opcode %v pending", c.OpCode())
-	}
+	ocl.LockOpCode(oc)
+	defer func() {
+		err := ocl.UnlockOpCode(oc)
+		if err != nil {
+			h.Errorf("failed to unlock opcode: %v", err)
+		}
+	}()
 
 	//try to marshal the data
 	m := make([]byte, c.Len())
 	if err := c.Marshal(m); err != nil {
+		h.muSent.Unlock()
 		return nil, fmt.Errorf("hci: failed to marshal cmd: %v", err)
 	}
 
 	// get buffer w/timeout
-	var b []byte
-	select {
-	case <-h.done:
-		return nil, fmt.Errorf("hci closed")
-	case b = <-h.chCmdBufs:
-		//ok
-	case <-time.After(chCmdBufTimeout):
-		err := fmt.Errorf("chCmdBufs get timeout")
-		h.dispatchError(err)
+	b, err := h.getTxBuf()
+	if err != nil {
 		return nil, err
 	}
 
@@ -392,7 +406,6 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	}
 
 	var ret []byte
-	var err error
 
 	// emergency timeout to prevent calls from locking up if the HCI
 	// interface doesn't respond. Responses should normally be fast
@@ -553,11 +566,16 @@ func (h *HCI) handleEvt(b []byte) error {
 	}
 
 	if f := h.evth[code]; f != nil {
-		h.err = f(b[2:])
+		if err := f(b[2:]); err != nil {
+			h.err = err
+			h.Errorf("event handler for %v failed: %v", code, err)
+		}
 		return nil
 	}
 	if code == evt.VendorEventCode {
-		h.err = h.handleVendorEvent(b[2:])
+		err := h.handleVendorEvent(b[2:])
+		//vendor commands should be reported up the stack
+		h.dispatchError(err)
 		return nil
 	}
 	return fmt.Errorf("unsupported event packet: % X", b)
@@ -1000,4 +1018,45 @@ func (h *HCI) findConnection(handle uint16) *Conn {
 	}
 
 	return c
+}
+
+type opCodeLocker struct {
+	locks map[int]*sync.Mutex
+	sync.RWMutex
+}
+
+func (o *opCodeLocker) LockOpCode(oc int) {
+	o.Lock()
+
+	if o.locks == nil {
+		o.locks = map[int]*sync.Mutex{oc: {}}
+	}
+
+	var l *sync.Mutex
+	if lock, ok := o.locks[oc]; !ok {
+		o.locks[oc] = &sync.Mutex{}
+		l = o.locks[oc]
+	} else {
+		l = lock
+	}
+
+	o.Unlock()
+	l.Lock()
+}
+
+func (o *opCodeLocker) UnlockOpCode(oc int) error {
+	o.Lock()
+	defer o.Unlock()
+
+	if o.locks == nil {
+		return fmt.Errorf("unlock for oc %v failed because no locks exist", oc)
+	}
+
+	if l, ok := o.locks[oc]; ok {
+		l.Unlock()
+	} else {
+		return fmt.Errorf("unlock for oc %v failed because lock doesn't exist", oc)
+	}
+
+	return nil
 }
