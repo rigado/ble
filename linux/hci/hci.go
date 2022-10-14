@@ -902,15 +902,17 @@ func (h *HCI) handleDisconnectionComplete(b []byte) error {
 func (h *HCI) handleEncryptionChange(b []byte) error {
 	e := evt.EncryptionChange(b)
 
-	c := h.findConnection(e.ConnectionHandle())
-	if c == nil {
-		return fmt.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
-	}
+	return fmt.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
 
-	//pass to connection to handle status
-	c.handleEncryptionChanged(e.Status(), e.EncryptionEnabled())
-
-	return nil
+	//c := h.findConnection(e.ConnectionHandle())
+	//if c == nil {
+	//	return fmt.Errorf("encryptionChanged: unknown connection handle %04X", e.ConnectionHandle())
+	//}
+	//
+	////pass to connection to handle status
+	//c.handleEncryptionChanged(e.Status(), e.EncryptionEnabled())
+	//
+	//return nil
 }
 
 func (h *HCI) handleEncryptionKeyRefreshComplete(b []byte) error {
