@@ -567,7 +567,6 @@ func (h *HCI) handleEvt(b []byte) error {
 
 	if f := h.evth[code]; f != nil {
 		if err := f(b[2:]); err != nil {
-			h.err = err
 			h.Errorf("event handler for %v failed: %v", code, err)
 		}
 		return nil
