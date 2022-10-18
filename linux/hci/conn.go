@@ -129,6 +129,10 @@ func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
 	return c
 }
 
+func (c *Conn) Closed() <-chan struct{} {
+	return c.chDone
+}
+
 // Context returns the context that is used by this Conn.
 func (c *Conn) Context() context.Context {
 	return c.ctx

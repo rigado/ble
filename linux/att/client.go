@@ -634,6 +634,9 @@ func (c *Client) Loop() {
 		case <-c.connClosed:
 			c.Debug("exited client async loop: conn closed")
 			return
+		case <-c.l2c.Closed():
+			c.Debug("exited client async loop: conn closed")
+			return
 		default:
 			if c.l2c == nil {
 				c.Debug("exited client loop: l2c nil")

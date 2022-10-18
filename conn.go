@@ -46,6 +46,8 @@ type Conn interface {
 	// Disconnected returns a receiving channel, which is closed when the connection disconnects.
 	Disconnected() <-chan struct{}
 
+	Closed() <-chan struct{}
+
 	Pair(AuthData, time.Duration) error
 
 	StartEncryption(change chan EncryptionChangedInfo) error
