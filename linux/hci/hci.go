@@ -57,6 +57,7 @@ func NewHCI(smp SmpManagerFactory, opts ...ble.Option) (*HCI, error) {
 		sktRxChan: make(chan []byte, 16), //todo pick a real number
 
 		vendorChan: make(chan []byte),
+		ocl:        &opCodeLocker{},
 		Logger:     ble.GetLogger(),
 	}
 	h.params.init()
@@ -134,6 +135,8 @@ type HCI struct {
 	cache ble.GattCache
 
 	vendorChan chan []byte
+
+	ocl *opCodeLocker
 
 	ble.Logger
 }
@@ -344,8 +347,6 @@ func (h *HCI) getTxBuf() ([]byte, error) {
 	return b, nil
 }
 
-var ocl = &opCodeLocker{}
-
 func (h *HCI) send(c Command) ([]byte, error) {
 	if h.err != nil {
 		return nil, h.err
@@ -365,11 +366,13 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	//verify opcode is free before asking for the command buffer
 	//this ensures that the command buffer is only taken if
 	//the command can be sent
-	ocl.LockOpCode(oc)
+	h.ocl.LockOpCode(oc)
 	defer func() {
-		err := ocl.UnlockOpCode(oc)
+		err := h.ocl.UnlockOpCode(oc)
 		if err != nil {
-			h.Errorf("failed to unlock opcode: %v", err)
+			err := fmt.Errorf("failed to unlock opcode %v: %v", oc, err)
+			h.Errorf("%v", err)
+			h.dispatchError(err)
 		}
 	}()
 
