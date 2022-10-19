@@ -2,8 +2,9 @@ package adv
 
 import (
 	"encoding/binary"
+	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
 	"github.com/rigado/ble"
 	"github.com/rigado/ble/parser"
 )
@@ -68,7 +69,12 @@ func NewRawPacket(bytes ...[]byte) (*Packet, error) {
 
 	//decode the bytes
 	m, err := parser.Parse(b)
-	err = errors.Wrapf(err, "pdu decode")
+	if !errors.Is(err, parser.EmptyOrNilPdu) {
+		err = fmt.Errorf("pdu decode: %w", err)
+	} else {
+		err = nil
+	}
+
 	switch {
 	case err == nil:
 		// ok
