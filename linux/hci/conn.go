@@ -160,7 +160,7 @@ func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 func (c *Conn) Read(sdu []byte) (n int, err error) {
 	p, ok := <-c.chInPDU
 	if !ok {
-		return 0, errors.Wrap(io.ErrClosedPipe, "input channel closed")
+		return 0, fmt.Errorf("input channel closed: %w", io.ErrClosedPipe)
 	}
 	if len(p) == 0 {
 		return 0, errors.Wrap(io.ErrUnexpectedEOF, "received empty packet")
