@@ -2,10 +2,11 @@ package att
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rigado/ble"
 )
 
@@ -512,7 +513,7 @@ func (c *Client) sendCmd(b []byte) error {
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 	c.Debugf("client: req % X", b)
 	if _, err := c.l2c.Write(b); err != nil {
-		return nil, errors.Wrap(err, "send ATT request failed")
+		return nil, fmt.Errorf("send ATT request failed: %w", err)
 	}
 	for {
 		select {
@@ -528,12 +529,12 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			c.Debugf("client: rsp % X", b)
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
-				return nil, errors.Wrap(err, "unexpected ATT response received")
+				return nil, fmt.Errorf("unexpected ATT response received: %w", err)
 			}
 		case err := <-c.chErr:
-			return nil, errors.Wrap(err, "ATT request failed")
+			return nil, fmt.Errorf("ATT request failed: %w", err)
 		case <-time.After(2 * time.Second):
-			return nil, errors.Wrap(ErrSeqProtoTimeout, "ATT request timeout")
+			return nil, fmt.Errorf("ATT request timeout: %w", ErrSeqProtoTimeout)
 		}
 	}
 
@@ -547,7 +548,7 @@ func (c *Client) sendResp(rsp []byte) error {
 		return fmt.Errorf("ble conn was nil")
 	}
 	if _, err := c.l2c.Write(rsp); err != nil {
-		return errors.Wrap(err, "send ATT request failed")
+		return fmt.Errorf("send ATT request failed: %w", err)
 	}
 
 	return nil
@@ -639,10 +640,16 @@ func (c *Client) Loop() {
 				c.Debug("exited client loop: l2c nil")
 				return
 			} else if err != nil {
-				c.Errorf("client: read %v", err)
-				// We don't expect any error from the bearer (L2CAP ACL-U)
-				// Pass it along to the pending request, if any, and escape.
-				c.chErr <- err
+				if errors.Is(err, io.ErrClosedPipe) {
+					c.Debugf("input channel closed while reading due to disconnection or connection failure")
+					c.chErr <- fmt.Errorf("disconnected")
+				} else {
+					c.Errorf("client: read %v", err)
+
+					// We don't expect any error from the bearer (L2CAP ACL-U)
+					// Pass it along to the pending request, if any, and escape.
+					c.chErr <- err
+				}
 				return
 			}
 			//ok
