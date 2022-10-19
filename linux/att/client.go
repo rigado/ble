@@ -642,6 +642,7 @@ func (c *Client) Loop() {
 			} else if err != nil {
 				if strings.Contains(err.Error(), "input channel closed") {
 					c.Debugf("input channel closed while reading due to disconnection or connection failure")
+					c.chErr <- fmt.Errorf("disconnected")
 				} else {
 					c.Errorf("client: read %v", err)
 
