@@ -3,6 +3,7 @@ package att
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -634,18 +635,20 @@ func (c *Client) Loop() {
 		case <-c.connClosed:
 			c.Debug("exited client async loop: conn closed")
 			return
-		case <-c.l2c.Closed():
-			c.Debug("exited client async loop: conn closed")
-			return
 		default:
 			if c.l2c == nil {
 				c.Debug("exited client loop: l2c nil")
 				return
 			} else if err != nil {
-				c.Errorf("client: read %v", err)
-				// We don't expect any error from the bearer (L2CAP ACL-U)
-				// Pass it along to the pending request, if any, and escape.
-				c.chErr <- err
+				if strings.Contains(err.Error(), "input channel closed") {
+					c.Debugf("input channel closed while reading due to disconnection or connection failure")
+				} else {
+					c.Errorf("client: read %v", err)
+
+					// We don't expect any error from the bearer (L2CAP ACL-U)
+					// Pass it along to the pending request, if any, and escape.
+					c.chErr <- err
+				}
 				return
 			}
 			//ok
