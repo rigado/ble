@@ -2,7 +2,6 @@ package att
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 
 	"fmt"
@@ -513,7 +512,7 @@ func (c *Client) sendCmd(b []byte) error {
 }
 
 func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
-	c.Debugf("req: %v", hex.EncodeToString(b))
+	c.Debugf("req: %x", b)
 	if _, err := c.l2c.Write(b); err != nil {
 		return nil, fmt.Errorf("send ATT request failed: %w", err)
 	}
@@ -680,7 +679,7 @@ func (c *Client) Loop() {
 		}
 
 		if (b[0] != HandleValueNotificationCode) && (b[0] != HandleValueIndicationCode) {
-			c.Debugf("a rx: %v", hex.EncodeToString(c.rxBuf[:n]))
+			c.Debugf("a rx: %x", c.rxBuf[:n])
 			select {
 			case <-c.done:
 				c.Info("exited client loop: closed after rsp rx")
@@ -694,7 +693,7 @@ func (c *Client) Loop() {
 		}
 
 		// Deliver the full request to upper layer.
-		c.Debugf("notif: %v", hex.EncodeToString(b))
+		c.Debugf("notif: %x", b)
 		select {
 		case <-c.done:
 			c.Info("exited async loop: closed after rx")
