@@ -69,10 +69,12 @@ func NewRawPacket(bytes ...[]byte) (*Packet, error) {
 
 	//decode the bytes
 	m, err := parser.Parse(b)
-	if !errors.Is(err, parser.EmptyOrNilPdu) {
-		err = fmt.Errorf("pdu decode: %w", err)
-	} else {
-		err = nil
+	if err != nil {
+		if !errors.Is(err, parser.EmptyOrNilPdu) {
+			err = fmt.Errorf("pdu decode: %w", err)
+		} else {
+			err = nil
+		}
 	}
 
 	switch {
