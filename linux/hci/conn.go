@@ -70,6 +70,7 @@ type Conn struct {
 	encryptionEnabled bool
 
 	smp        SmpManager
+	encInfo    ble.EncryptionChangedInfo
 	encChanged chan ble.EncryptionChangedInfo
 	ble.Logger
 }
@@ -145,8 +146,23 @@ func (c *Conn) Pair(authData ble.AuthData, to time.Duration) error {
 
 func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 	if c.encryptionEnabled {
+		//we already have the encryption changed info, send it to the channel if possible
+		if ch != nil {
+			go func(conn *Conn, c chan ble.EncryptionChangedInfo) {
+				select {
+				case ch <- conn.encInfo:
+					//ok
+				default:
+					conn.Errorf("encryptionChanged: failed to send encryption update to channel: %v", conn.encInfo)
+				}
+			}(c, ch)
+			return nil
+		}
+
+		//if a nil channel is passed in, then return the already enabled error
 		return ble.ErrEncryptionAlreadyEnabled
 	}
+
 	c.encChanged = ch
 	err := c.smp.StartEncryption()
 	if err != nil {
@@ -436,13 +452,13 @@ func (c *Conn) handleEncryptionChanged(status uint8, enabled uint8) {
 
 	c.encryptionEnabled = enabled == 0x01
 
-	info := ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: c.encryptionEnabled}
+	c.encInfo = ble.EncryptionChangedInfo{Status: int(status), Err: err, Enabled: c.encryptionEnabled}
 	if c.encChanged != nil {
 		select {
-		case c.encChanged <- info:
+		case c.encChanged <- c.encInfo:
 			return
 		default:
-			c.Errorf("encryptionChanged: failed to send encryption update to channel: %v", info)
+			c.Errorf("encryptionChanged: failed to send encryption update to channel: %v", c.encInfo)
 		}
 	} else {
 		c.Infof("encryptionChanged: status %v", status)
