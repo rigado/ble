@@ -152,7 +152,7 @@ func (c *Conn) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 				select {
 				case ch <- conn.encInfo:
 					//ok
-				default:
+				case <-time.After(1 * time.Second):
 					conn.Errorf("encryptionChanged: failed to send encryption update to channel: %v", conn.encInfo)
 				}
 			}(c, ch)
