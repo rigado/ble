@@ -528,7 +528,7 @@ func (c *Client) sendReq(b []byte) (rsp []byte, err error) {
 			// returns an ErrReqNotSupp response, and continue to wait
 			// the response to our request.
 			errRsp := newErrorResponse(rsp[0], 0x0000, ble.ErrReqNotSupp)
-			c.Debugf("rsp: % X", b)
+			c.Debugf("rsp: %x", b)
 			_, err := c.l2c.Write(errRsp)
 			if err != nil {
 				return nil, fmt.Errorf("unexpected ATT response received: %w", err)
@@ -659,7 +659,7 @@ func (c *Client) Loop() {
 
 		b := make([]byte, n)
 		copy(b, c.rxBuf)
-		c.Debugf("rx: %v", hex.EncodeToString(b))
+		c.Debugf("rx: %x", b)
 
 		//all incoming requests are even numbered
 		//which means the last bit should be 0
