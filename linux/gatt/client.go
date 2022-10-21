@@ -457,7 +457,7 @@ func (p *Client) HandleNotification(req []byte) {
 		sub.nHandler(sub.id, nd)
 	default:
 		select {
-		case <-p.Disconnected():
+		case <-p.conn.Disconnected():
 			//ok
 		default:
 			p.Warnf("no handler, dropping data vh 0x%x, indication %v, id %v, %x", vh, indication, sub.id, nd)
