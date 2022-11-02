@@ -3,9 +3,11 @@ package parser
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
 	"github.com/rigado/ble"
 )
+
+var EmptyOrNilPdu = errors.New("nil/empty pdu")
 
 // https://www.bluetooth.org/en-us/specification/assigned-numbers/generic-access-profile
 var types = struct {
@@ -207,7 +209,7 @@ func getArray(size int, bytes []byte) ([]ble.UUID, error) {
 
 func Parse(pdu []byte) (map[string]interface{}, error) {
 	if len(pdu) == 0 {
-		return nil, fmt.Errorf("nil/empty pdu")
+		return nil, EmptyOrNilPdu
 	}
 
 	m := make(map[string]interface{})
@@ -225,7 +227,7 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 
 		//do we have all the bytes for the payload?
 		if (i + length) >= len(pdu) {
-			return m, fmt.Errorf("buffer overflow: want %v, have %v, idx %v", (i + length), len(pdu), i)
+			return m, fmt.Errorf("buffer overflow: want %v, have %v, idx %v", i+length, len(pdu), i)
 		}
 
 		start := i + 2
@@ -245,7 +247,7 @@ func Parse(pdu []byte) (map[string]interface{}, error) {
 
 				//is this fatal?
 				if err != nil {
-					return m, errors.Wrapf(err, "adv type %v, idx %v", typ, i)
+					return m, fmt.Errorf("adv type %v, idx %v: %w", typ, i, err)
 				}
 
 				v, ok := m[dec.key].([]ble.UUID)

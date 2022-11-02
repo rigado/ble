@@ -42,7 +42,7 @@ type sub struct {
 
 // NewClient returns a GATT Client.
 func NewClient(conn ble.Conn, cache ble.GattCache, done chan bool, l ble.Logger) (*Client, error) {
-	cl := l.ChildLogger(map[string]interface{}{"client": hex.EncodeToString(conn.RemoteAddr().Bytes())})
+	cl := l.ChildLogger(map[string]interface{}{"gatt": hex.EncodeToString(conn.RemoteAddr().Bytes())})
 	p := &Client{
 		subs:   make(map[uint16]*sub),
 		conn:   conn,
@@ -456,7 +456,12 @@ func (p *Client) HandleNotification(req []byte) {
 	case sub.nHandler != nil:
 		sub.nHandler(sub.id, nd)
 	default:
-		p.Warnf("no handler, dropping data vh 0x%x, indication %v, id %v, %x", vh, indication, sub.id, nd)
+		select {
+		case <-p.conn.Disconnected():
+			//ok
+		default:
+			p.Warnf("no handler, dropping data vh 0x%x, indication %v, id %v, %x", vh, indication, sub.id, nd)
+		}
 	}
 	sub.id++
 }

@@ -302,6 +302,9 @@ func (h *HCI) init() error {
 	WriteLEHostSupportRP := cmd.WriteLEHostSupportRP{}
 	h.Send(&cmd.WriteLEHostSupport{LESupportedHost: 1, SimultaneousLEHost: 0}, &WriteLEHostSupportRP)
 
+	WriteDefaultDataLengthRP := cmd.LEWriteSuggestedDefaultDataLengthRP{}
+	h.Send(&cmd.LEWriteSuggestedDefaultDataLength{SuggestedMaxTxOctets: 251, SuggestedMaxTxTime: 2120}, &WriteDefaultDataLengthRP)
+
 	return h.err
 }
 
@@ -400,6 +403,7 @@ func (h *HCI) send(c Command) ([]byte, error) {
 	h.sent[oc] = p //use oc here due to swap to 0xff for vendor events
 	h.muSent.Unlock()
 
+	h.Debugf("tx op: %v - %v", c.OpCode(), hex.EncodeToString(b))
 	if !h.isOpen() {
 		return nil, fmt.Errorf("hci closed")
 	} else if n, err := h.skt.Write(b[:4+c.Len()]); err != nil {
@@ -525,6 +529,7 @@ func (h *HCI) handlePkt(b []byte) error {
 	t, b := b[0], b[1:]
 	switch t {
 	case pktTypeACLData:
+		h.Debugf("hci rx acl: %v", hex.EncodeToString(b))
 		return h.handleACL(b)
 	case pktTypeEvent:
 		return h.handleEvt(b)
@@ -929,7 +934,7 @@ func (h *HCI) handleEncryptionKeyRefreshComplete(b []byte) error {
 
 func (h *HCI) handleNumberOfCompletedPackets(b []byte) error {
 	e := evt.NumberOfCompletedPackets(b)
-	h.Debugf("numberOfCompletedPackets: % X", b)
+	h.Debugf("numberOfCompletedPackets: %v", hex.EncodeToString(b))
 	h.muConns.Lock()
 	defer h.muConns.Unlock()
 	for i := 0; i < int(e.NumberOfHandles()); i++ {

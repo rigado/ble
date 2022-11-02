@@ -1241,6 +1241,29 @@
                         "Events": [
                                 "Command Complete"
                         ]
+                },
+                {
+                        "Name": "LE Write Suggested Default Data Length",
+                        "Spec": "Vol 2, Part E, 7.8.35",
+                        "OGF": "0x08",
+                        "OCF": "0x0024",
+                        "Len": 4,
+                        "Param": [
+                                {
+                                        "SuggestedMaxTxOctets": "uint16"
+                                },
+                                {
+                                        "SuggestedMaxTxTime": "uint16"
+                                }
+                        ],
+                        "Return": [
+                                {
+                                        "Status": "uint8"
+                                }
+                        ],
+                        "Events": [
+                                "Command Complete"
+                        ]
                 }
         ]
 }

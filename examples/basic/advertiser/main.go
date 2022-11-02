@@ -4,23 +4,26 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/rigado/ble/linux"
 	"log"
 	"time"
 
-	"github.com/rigado/ble"
-	"github.com/rigado/ble/examples/lib/dev"
 	"github.com/pkg/errors"
+	"github.com/rigado/ble"
 )
 
 var (
 	device = flag.String("device", "default", "implementation of ble")
 	du     = flag.Duration("du", 5*time.Second, "advertising duration, 0 for indefinitely")
+	name   = flag.String("name", "Cascade", "name of the peripheral device")
 )
 
 func main() {
 	flag.Parse()
 
-	d, err := dev.NewDevice("default")
+	opt := ble.OptTransportHCISocket(0)
+
+	d, err := linux.NewDeviceWithNameAndHandler("", nil, opt)
 	if err != nil {
 		log.Fatalf("can't new device : %s", err)
 	}
@@ -29,7 +32,7 @@ func main() {
 	// Advertise for specified durantion, or until interrupted by user.
 	fmt.Printf("Advertising for %s...\n", *du)
 	ctx := ble.WithSigHandler(context.WithTimeout(context.Background(), *du))
-	chkErr(ble.AdvertiseNameAndServices(ctx, "Gopher"))
+	chkErr(ble.AdvertiseNameAndServices(ctx, *name, ble.BatteryUUID, ble.DeviceInfoUUID))
 }
 
 func chkErr(err error) {
