@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/rigado/ble"
 	"github.com/rigado/ble/linux/hci/cmd"
 )
 
 // Signal ...
 type Signal interface {
 	Code() int
-	Marshal() ([]byte, error)
+	Marshal() []byte
 	Unmarshal([]byte) error
 }
 
@@ -24,11 +26,15 @@ func (s sigCmd) len() int     { return int(binary.LittleEndian.Uint16(s[2:4])) }
 func (s sigCmd) data() []byte { return s[4 : 4+s.len()] }
 
 // Signal ...
-func (c *Conn) Signal(req Signal, rsp Signal) error {
-	data, err := req.Marshal()
-	if err != nil {
-		return err
+func (c *Conn) Signal(req, rsp Signal) error {
+
+	c.sigID++
+	if c.sigID == 0 {
+		c.sigID = 1
 	}
+
+	data := req.Marshal()
+
 	buf := bytes.NewBuffer(make([]byte, 0))
 	if err := binary.Write(buf, binary.LittleEndian, uint16(4+len(data))); err != nil {
 		return err
@@ -37,6 +43,7 @@ func (c *Conn) Signal(req Signal, rsp Signal) error {
 		return err
 	}
 
+	// 4 byte hdr
 	if err := binary.Write(buf, binary.LittleEndian, uint8(req.Code())); err != nil {
 		return err
 	}
@@ -46,41 +53,59 @@ func (c *Conn) Signal(req Signal, rsp Signal) error {
 	if err := binary.Write(buf, binary.LittleEndian, uint16(len(data))); err != nil {
 		return err
 	}
+	// payload
 	if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 		return err
 	}
 
-	c.sigSent = make(chan []byte)
-	defer close(c.sigSent)
+	// attach a response channel
+	var rspc chan sigCmd
+	if rsp != nil {
+		rspc = make(chan sigCmd, 1)
+		c.sigRspChannelsMu.Lock()
+		c.sigRspChannels[c.sigID] = rspc
+		c.sigRspChannelsMu.Unlock()
+
+		// cleanup
+		defer func(sigId uint8) {
+			c.sigRspChannelsMu.Lock()
+			delete(c.sigRspChannels, sigId)
+			c.sigRspChannelsMu.Unlock()
+		}(c.sigID)
+	}
+
 	if _, err := c.writePDU(buf.Bytes()); err != nil {
 		return err
 	}
+
+	// if no response is expected, we are done
+	if rspc == nil {
+		return nil
+	}
+
+	// otherwise try and find a response
 	var s sigCmd
 	select {
-	case s = <-c.sigSent:
-	case <-time.After(time.Second):
+	case s = <-rspc:
+		// ok
+	case <-time.After(time.Second * 2):
 		// TODO: Find the proper timed out defined in spec, if any.
 		return errors.New("signaling request timed out")
 	}
 
-	if s.code() != req.Code() {
-		return errors.New("mismatched signaling response")
+	if s.code() != rsp.Code() {
+		return fmt.Errorf("unexpected signaling response, have %v, want %v", s.code(), req.Code())
 	}
 	if s.id() != c.sigID {
-		return errors.New("mismatched signaling id")
+		return fmt.Errorf("unexpected signaling id, have %v, want %v", s.id(), c.sigID)
 	}
-	c.sigID++
-	if rsp == nil {
-		return nil
-	}
+
 	return rsp.Unmarshal(s.data())
 }
 
 func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
-	data, err := r.Marshal()
-	if err != nil {
-		return 0, err
-	}
+	data := r.Marshal()
+
 	buf := bytes.NewBuffer(make([]byte, 0))
 	if err := binary.Write(buf, binary.LittleEndian, uint16(4+len(data))); err != nil {
 		return 0, err
@@ -100,12 +125,16 @@ func (c *Conn) sendResponse(code uint8, id uint8, r Signal) (int, error) {
 	if err := binary.Write(buf, binary.LittleEndian, data); err != nil {
 		return 0, err
 	}
-	c.Debugf("signal: send [%X]", buf.Bytes())
+	c.Debugf("signal: txrsp [%X]", buf.Bytes())
 	return c.writePDU(buf.Bytes())
 }
 
+func (c *Conn) handleIncomingCoc(p pdu) error {
+	return c.coc.recieve(p.cid(), p.payload())
+}
+
 func (c *Conn) handleSignal(p pdu) error {
-	c.Debugf("signal: recv [%X]", p)
+	c.Debugf("signal: rx [%X]", p)
 	// When multiple commands are included in an L2CAP packet and the packet
 	// exceeds the signaling MTU (MTUsig) of the receiver, a single Command Reject
 	// packet shall be sent in response. The identifier shall match the first Request
@@ -126,6 +155,7 @@ func (c *Conn) handleSignal(p pdu) error {
 	}
 
 	s := sigCmd(p.payload())
+	c.Debugf("rx signal code 0x%x, id 0x%x", s.code(), s.id())
 	for len(s) > 0 {
 		// Check if it's a supported request.
 		switch s.code() {
@@ -133,24 +163,31 @@ func (c *Conn) handleSignal(p pdu) error {
 			c.handleDisconnectRequest(s)
 		case SignalConnectionParameterUpdateRequest:
 			c.handleConnectionParameterUpdateRequest(s)
+		// case SignalLECreditBasedConnectionResponse:
+		// 	c.LECreditBasedConnectionResponse(s)
 		case SignalLECreditBasedConnectionRequest:
 			c.LECreditBasedConnectionRequest(s)
 		case SignalLEFlowControlCredit:
 			c.LEFlowControlCredit(s)
 		default:
-			// Check if it's a response to a sent command.
-			select {
-			case c.sigSent <- s:
-				continue
-			default:
-			}
 
-			c.sendResponse(
-				SignalCommandReject,
-				s.id(),
-				&CommandReject{
-					Reason: 0x0000, // Command not understood.
-				})
+			c.sigRspChannelsMu.Lock()
+			rxc, ok := c.sigRspChannels[s.id()]
+			if ok {
+				rxc <- s
+				delete(c.sigRspChannels, s.id())
+			}
+			c.sigRspChannelsMu.Unlock()
+
+			if !ok {
+				c.Errorf("rejected signal: id 0x%x, code 0x%x", s.id(), s.code())
+				c.sendResponse(
+					SignalCommandReject,
+					s.id(),
+					&CommandReject{
+						Reason: 0x0000, // Command not understood.
+					})
+			}
 		}
 		s = s[4+s.len():] // advance to next the packet.
 
@@ -244,10 +281,56 @@ func (c *Conn) handleConnectionParameterUpdateRequest(s sigCmd) {
 
 // LECreditBasedConnectionRequest ...
 func (c *Conn) LECreditBasedConnectionRequest(s sigCmd) {
+	c.Debugf("LECreditBasedConnectionRequest")
 	// TODO:
 }
 
 // LEFlowControlCredit ...
 func (c *Conn) LEFlowControlCredit(s sigCmd) {
-	// TODO:
+
+	var in LEFlowControlCredit
+	if err := in.Unmarshal(s.data()); err != nil {
+		return
+	}
+
+	c.Debugf("LEFlowControlCredit: cid %v, credit %v", in.CID, in.Credits)
+	if err := c.coc.IncrementCredits(in.CID, in.Credits); err != nil {
+		c.Errorf("cocCredits/Increment %v, %v: %v", in.CID, in.Credits, err)
+		return
+	}
+}
+
+func (c *Conn) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConnection, error) {
+	localCID, err := c.coc.NextSourceCID()
+	if err != nil {
+		return nil, err
+	}
+
+	out := &LECreditBasedConnectionRequest{
+		SourceCID: localCID,
+		LEPSM:     psm,
+
+		// TODO: all of these we will just ignore for now...
+		MTU:            64,
+		MPS:            64,
+		InitialCredits: 2,
+	}
+
+	in := &LECreditBasedConnectionResponse{}
+	if err := c.Signal(out, in); err != nil {
+		return nil, err
+	}
+
+	if in.Result != 0 {
+		return nil, fmt.Errorf("LECreditBasedConnectionResponse result code 0x%x", in.Result)
+	}
+
+	conn, err := c.coc.OpenChannel(localCID, in.DestinationCID, in.InitialCreditsCID, in.MTU, in.MPS)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Infof("coc localCID %v, remoteCID %v, credits %v OK", localCID, in.DestinationCID, in.InitialCreditsCID)
+
+	return conn, nil
 }

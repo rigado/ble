@@ -12,7 +12,44 @@
                                         "Data": "[]byte"
                                 }
                         ],
+                        "Type": "Response"
+                },
+                {
+                        "Name": "L2CAP Connection Request",
+                        "Spec": "Vol 3, Part A, 4.2",
+                        "Code": "0x02",
+                        "Fields": [
+                                {
+                                        "PSM": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                }
+                        ],
                         "Type": "Request"
+                },
+                {
+                        "Name": "L2CAP Connection Response",
+                        "Spec": "Vol 3, Part A, 4.3",
+                        "Code": "0x03",
+                        "Fields": [
+                                {
+                                        "Destination CID": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                },
+                                {
+                                        "MTU": "uint16"
+                                },
+                                {
+                                        "Result": "uint16"
+                                },
+                                {
+                                        "Status": "uint16"
+                                }
+                        ],
+                        "Type": "Response"
                 },
                 {
                         "Name": "Disconnect Request",
@@ -132,6 +169,52 @@
                                 }
                         ],
                         "Type": "Request"
+                },
+                {
+                        "Name": "L2CAP Credit Based Connection Request",
+                        "Spec": "Vol 3, Part A, 4.25",
+                        "Code": "0x17",
+                        "Fields": [
+                                {
+                                        "SPSM": "uint16"
+                                },
+                                {
+                                        "MTU": "uint16"
+                                },
+                                {
+                                        "MPS": "uint16"
+                                },
+                                {
+                                        "Initial Credits": "uint16"
+                                },
+                                {
+                                        "Source CID": "uint16"
+                                }
+                        ],
+                        "Type": "Request"
+                },
+                {
+                        "Name": "L2CAP Credit Based Connection Response",
+                        "Spec": "Vol 3, Part A, 4.26",
+                        "Code": "0x18",
+                        "Fields": [
+                                {
+                                        "MTU": "uint16"
+                                },
+                                {
+                                        "MPS": "uint16"
+                                },
+                                {
+                                        "Initial Credits CID": "uint16"
+                                },
+                                {
+                                        "Result": "uint16"
+                                },
+                                {
+                                        "Destination CID": "uint16"
+                                }
+                        ],
+                        "Type": "Response"
                 }
         ]
 }
