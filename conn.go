@@ -49,4 +49,13 @@ type Conn interface {
 	Pair(AuthData, time.Duration) error
 
 	StartEncryption(change chan EncryptionChangedInfo) error
+
+	OpenLECreditBasedConnection(psm uint16) (LECreditBasedConnection, error)
+}
+
+type LECreditBasedConnection interface {
+	Send(bb []byte) error
+	Subscribe() (<-chan []byte, error)
+	Unsubscribe() error
+	Close() error
 }

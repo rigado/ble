@@ -579,7 +579,9 @@ func (h *HCI) handleEvt(b []byte) error {
 		}
 		return nil
 	}
-	if code == evt.VendorEventCode {
+	//fixme
+	const vendor = 0xff
+	if code == vendor {
 		err := h.handleVendorEvent(b[2:])
 		//vendor commands should be reported up the stack
 		h.dispatchError(err)
