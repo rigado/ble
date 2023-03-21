@@ -31,8 +31,8 @@ type cocRxTransaction struct {
 }
 
 type coc struct {
-	nextSrcCID uint16 // 0x0040 to 0xFFFF
-	m          map[uint16]*cocInfo
+	nextSrcCID   uint16 // 0x0040 to 0xFFFF
+	remoteCidLut map[uint16]*cocInfo
 	*Conn
 	sync.RWMutex
 	ble.Logger
@@ -40,10 +40,10 @@ type coc struct {
 
 func NewCoc(c *Conn, l ble.Logger) *coc {
 	return &coc{
-		Conn:       c,
-		m:          make(map[uint16]*cocInfo),
-		Logger:     l,
-		nextSrcCID: minDynamicCID,
+		Conn:         c,
+		remoteCidLut: make(map[uint16]*cocInfo),
+		Logger:       l,
+		nextSrcCID:   minDynamicCID,
 	}
 }
 
@@ -68,7 +68,7 @@ func (c *coc) OpenChannel(localCid, remoteCid, remoteCredits, remoteMtu, remoteM
 	c.Lock()
 	defer c.Unlock()
 
-	if _, ok := c.m[remoteCid]; ok {
+	if _, ok := c.remoteCidLut[remoteCid]; ok {
 		return nil, fmt.Errorf("cid %v already open", remoteCid)
 	}
 
@@ -79,7 +79,7 @@ func (c *coc) OpenChannel(localCid, remoteCid, remoteCredits, remoteMtu, remoteM
 		mps:       remoteMps,
 		credits:   remoteCredits,
 	}
-	c.m[remoteCid] = i
+	c.remoteCidLut[remoteCid] = i
 
 	return c.newCocWrapper(i), nil
 }
@@ -88,7 +88,7 @@ func (c *coc) CloseChannel(cid uint16) error {
 	c.Lock()
 	defer c.Unlock()
 
-	i, ok := c.m[cid]
+	i, ok := c.remoteCidLut[cid]
 	if !ok {
 		return fmt.Errorf("cid %v not found", cid)
 	}
@@ -97,64 +97,67 @@ func (c *coc) CloseChannel(cid uint16) error {
 		close(i.rxChan)
 	}
 
-	delete(c.m, cid)
+	delete(c.remoteCidLut, cid)
 	return nil
 }
 
-func (c *coc) lookupLocalCID(cid uint16) (*cocInfo, error) {
-	for _, v := range c.m {
-		if v.localCID == cid {
+func (c *coc) lookupLocalCID(localCid uint16) (*cocInfo, error) {
+	for _, v := range c.remoteCidLut {
+		if v.localCID == localCid {
 			out := *v
 			return &out, nil
 		}
 	}
-	return nil, fmt.Errorf("%v not found", cid)
+	return nil, fmt.Errorf("%v not found", localCid)
 }
 
-func (c *coc) Subscribe(cid uint16) (<-chan []byte, error) {
+func (c *coc) Subscribe(localCid uint16) (<-chan []byte, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	i, err := c.lookupLocalCID(cid)
+	i, err := c.lookupLocalCID(localCid)
 	if err != nil {
 		return nil, err
 	}
 
 	if i.rxChan != nil {
-		return nil, fmt.Errorf("cid %v has an existing subscriber", cid)
+		return nil, fmt.Errorf("cid %v has an existing subscriber", localCid)
 	}
 
 	i.rxChan = make(chan []byte, cocRxChannelSize)
+	c.remoteCidLut[i.remoteCID] = i
 
 	return i.rxChan, nil
 }
 
-func (c *coc) Unsubscribe(cid uint16) error {
+func (c *coc) Unsubscribe(localCid uint16) error {
 	c.Lock()
 	defer c.Unlock()
 
-	i, err := c.lookupLocalCID(cid)
+	i, err := c.lookupLocalCID(localCid)
 	if err != nil {
 		return err
 	}
 
 	if i.rxChan != nil {
 		close(i.rxChan)
+		i.rxChan = nil
 	}
+	c.remoteCidLut[i.remoteCID] = i
 
 	return nil
 }
 
-func (c *coc) Info(cid uint16) (*cocInfo, error) {
+func (c *coc) Info(remoteCid uint16) (*cocInfo, error) {
 	c.RLock()
 	defer c.RUnlock()
 
-	if v, ok := c.m[cid]; ok {
+	if v, ok := c.remoteCidLut[remoteCid]; ok {
 		out := *v
 		return &out, nil
 	}
 
-	return nil, fmt.Errorf("cid %v not found", cid)
+	return nil, fmt.Errorf("cid %v not found", remoteCid)
 }
 
 func (c *coc) IncrementCredits(cid, credits uint16) error {
@@ -171,7 +174,7 @@ func (c *coc) DecrementCredits(cid, credits uint16) error {
 }
 
 func (c *coc) unsafeModifyCredits(cid, credits uint16, add bool) error {
-	v, ok := c.m[cid]
+	v, ok := c.remoteCidLut[cid]
 	if !ok {
 		return fmt.Errorf("cid %v not found", cid)
 	}
@@ -203,12 +206,16 @@ func (c *coc) recieve(cid uint16, data []byte) error {
 		return err
 	}
 
+	// todo: maybe this should be at the top?
+	defer c.returnCredit(cid, 1)
+
 	if i.rxTransaction == nil {
 		n := int(binary.LittleEndian.Uint16(data))
-		c.Infof("creating new rx transaction for %v bytes", n)
+		c.Debugf("creating new rx transaction for %v bytes", n)
 		i.rxTransaction = &cocRxTransaction{
-			start: time.Now(),
-			buf:   bytes.NewBuffer(make([]byte, n)),
+			start:  time.Now(),
+			buf:    new(bytes.Buffer),
+			rxSize: n,
 		}
 
 		in = data[2:] // advance the index past the u16 length
@@ -227,34 +234,40 @@ func (c *coc) recieve(cid uint16, data []byte) error {
 	c.Debugf("rx %v bytes on cid %v [%x]", len(in), cid, in)
 
 	// are we done?
-	if b.Len() == b.Cap() {
-		if i.rxChan != nil {
-			c.Debugf("dispatching completed rx of %v bytes to subscriber", b.Len())
+	if b.Len() >= i.rxTransaction.rxSize {
+		// consider the txn done
+		defer func() { i.rxTransaction = nil }()
+
+		switch {
+		case b.Len() > i.rxTransaction.rxSize:
+			c.Warnf("rx overflow continuing anyways, have %v, want %v bytes", b.Len(), i.rxTransaction.rxSize)
+			fallthrough
+		case i.rxChan != nil:
 			select {
 			case i.rxChan <- b.Bytes():
+				c.Debugf("sent %v bytes to subscriber", b.Len())
 				// ok
 			case <-time.After(cocRxSendTimeout):
-				c.Errorf("rx result channel timeout")
+				return fmt.Errorf("subscriber channel send timeout")
 			}
 
-		} else {
-			c.Warnf("cid %v has no subscriber, discarding completed rx [%x]", cid, b.Len(), b.Bytes())
-		}
+		default:
+			c.Warnf("cid %v has no subscriber, discarding completed rx [%x]", cid, b.Bytes())
+		} // switch
 
-		// delete it
-		i.rxTransaction = nil
-	}
-
-	// give the credit back to the remote
-	sig := &LEFlowControlCredit{
-		CID:     cid,
-		Credits: 1,
-	}
-	if err := c.Conn.Signal(sig, nil); err != nil {
-		return err
-	}
+	} // if
 
 	return nil
+}
+
+func (c *coc) returnCredit(localcid, credits uint16) error {
+	// todo: does this have ALWAYS happen? like if there is an error
+	// give the credit back to the remote
+	sig := &LEFlowControlCredit{
+		CID:     localcid,
+		Credits: 1,
+	}
+	return c.Conn.Signal(sig, nil)
 }
 
 func (c *coc) send(cid uint16, data []byte) error {
