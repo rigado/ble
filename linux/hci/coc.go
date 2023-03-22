@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	cocRxSendTimeout = time.Second * 5 //arbitrary
-	cocRxChannelSize = 8
-	minDynamicCID    = 0x40
-	maxDynamicCID    = 0xffff
+	rxChannelSendTimeout = time.Second * 5 //arbitrary
+	txCreditDelay        = time.Millisecond * 500
+	cocRxChannelSize     = 8
+	minDynamicCID        = 0x40
+	maxDynamicCID        = 0xffff
 )
 
 type cocInfo struct {
@@ -64,7 +65,42 @@ func (c *coc) NextSourceCID() (uint16, error) {
 
 }
 
-func (c *coc) OpenChannel(localCid, remoteCid, remoteCredits, remoteMtu, remoteMps uint16) (ble.LECreditBasedConnection, error) {
+func (c *coc) Open(psm uint16) (ble.LECreditBasedConnection, error) {
+	localCID, err := c.NextSourceCID()
+	if err != nil {
+		return nil, err
+	}
+
+	out := &LECreditBasedConnectionRequest{
+		SourceCID: localCID,
+		LEPSM:     psm,
+
+		// TODO: all of these we will just ignore for now...
+		MTU:            64,
+		MPS:            64,
+		InitialCredits: 2,
+	}
+
+	in := &LECreditBasedConnectionResponse{}
+	if err := c.Signal(out, in); err != nil {
+		return nil, err
+	}
+
+	if in.Result != 0 {
+		return nil, fmt.Errorf("cocOpen/rsp result code 0x%x", in.Result)
+	}
+
+	conn, err := c.addChannel(localCID, in.DestinationCID, in.InitialCreditsCID, in.MTU, in.MPS)
+	if err != nil {
+		return nil, err
+	}
+
+	c.Infof("cocOpen localCID %v, remoteCID %v, credits %v OK", localCID, in.DestinationCID, in.InitialCreditsCID)
+
+	return conn, nil
+}
+
+func (c *coc) addChannel(localCid, remoteCid, remoteCredits, remoteMtu, remoteMps uint16) (ble.LECreditBasedConnection, error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -247,7 +283,7 @@ func (c *coc) recieve(cid uint16, data []byte) error {
 			case i.rxChan <- b.Bytes():
 				c.Debugf("sent %v bytes to subscriber", b.Len())
 				// ok
-			case <-time.After(cocRxSendTimeout):
+			case <-time.After(rxChannelSendTimeout):
 				return fmt.Errorf("subscriber channel send timeout")
 			}
 
@@ -261,7 +297,6 @@ func (c *coc) recieve(cid uint16, data []byte) error {
 }
 
 func (c *coc) returnCredit(localcid, credits uint16) error {
-	// todo: does this have ALWAYS happen? like if there is an error
 	// give the credit back to the remote
 	sig := &LEFlowControlCredit{
 		CID:     localcid,
@@ -276,9 +311,9 @@ func (c *coc) send(cid uint16, data []byte) error {
 		return err
 	}
 
-	// MTU is the max SDU size the rx side can take
-	if int(i.mtu) < len(data) {
-		return fmt.Errorf("cid %v MTU exceeded, have %v bytes, want <= %v ", cid, len(data), i.mtu)
+	// slice into mps-2 chunks
+	if i.mps <= 2 {
+		return fmt.Errorf("invalid mps %v for remote cid %v", i.mps, cid)
 	}
 
 	c.Debugf("attempting to send %v bytes on cid %v", len(data), cid)
@@ -290,34 +325,29 @@ func (c *coc) send(cid uint16, data []byte) error {
 	// greater than the peer device's MTU for the channel. All subsequent K-frames
 	// that are part of the same SDU shall not contain the L2CAP SDU Length field.
 
-	first := true
 	br := bytes.NewReader(data)
 	sent := 0
 	for br.Len() > 0 {
-		readSz := i.mps
-		if first {
-			readSz = i.mps - 2
-		}
-		bb := make([]byte, readSz)
-
+		bb := make([]byte, i.mps-2)
 		n, err := br.Read(bb)
 		if err != nil {
 			return err
 		}
 
 		// try and get a credit
-		gotCredit := false
+		ok := false
 		for i := 0; i < 10; i++ {
 			err := c.DecrementCredits(cid, 1)
 			c.Debugf("decrementCredit: attempt: %v, cid %v, credits %v, err: %v", i, cid, 1, err)
 			if err == nil {
-				gotCredit = true
+				ok = true
 				break
 			}
 			// wait and try again
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(txCreditDelay)
 		}
-		if !gotCredit {
+
+		if !ok {
 			return fmt.Errorf("unable to get credit for cid %v", cid)
 		}
 
@@ -332,18 +362,16 @@ func (c *coc) send(cid uint16, data []byte) error {
 			return err
 		}
 
-		// sdu length (total input payload sz)
-		if first {
-			if err := binary.Write(buf, binary.LittleEndian, uint16(len(data))); err != nil {
-				return err
-			}
-			first = false
+		// sdu length (how many payload bytes)
+		if err := binary.Write(buf, binary.LittleEndian, uint16(len(data))); err != nil {
+			return err
 		}
 
 		// information payload
 		if err := binary.Write(buf, binary.LittleEndian, bb[:n]); err != nil {
 			return err
 		}
+
 		txbb := buf.Bytes()
 		// send it
 		if _, err := c.writePDU(txbb); err != nil {
@@ -351,7 +379,7 @@ func (c *coc) send(cid uint16, data []byte) error {
 		}
 
 		sent += n
-		c.Infof("Sent %v/%v bytes", sent, len(data))
+		c.Debugf("sent [%x], progress %v/%v bytes", sent, len(data))
 	}
 
 	return nil
@@ -380,4 +408,13 @@ func (w *cocWrapper) Unsubscribe() error {
 
 func (w *cocWrapper) Close() error {
 	return w.coc.CloseChannel(w.remoteCID)
+}
+
+func (w *cocWrapper) Info() ble.LECreditBasedConnectionInfo {
+	return ble.LECreditBasedConnectionInfo{
+		RemoteCID: w.remoteCID,
+		LocalCID:  w.localCID,
+		MTU:       w.mtu,
+		MPS:       w.mps,
+	}
 }
