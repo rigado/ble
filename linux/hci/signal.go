@@ -301,36 +301,5 @@ func (c *Conn) LEFlowControlCredit(s sigCmd) {
 }
 
 func (c *Conn) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConnection, error) {
-	localCID, err := c.coc.NextSourceCID()
-	if err != nil {
-		return nil, err
-	}
-
-	out := &LECreditBasedConnectionRequest{
-		SourceCID: localCID,
-		LEPSM:     psm,
-
-		// TODO: all of these we will just ignore for now...
-		MTU:            64,
-		MPS:            64,
-		InitialCredits: 2,
-	}
-
-	in := &LECreditBasedConnectionResponse{}
-	if err := c.Signal(out, in); err != nil {
-		return nil, err
-	}
-
-	if in.Result != 0 {
-		return nil, fmt.Errorf("LECreditBasedConnectionResponse result code 0x%x", in.Result)
-	}
-
-	conn, err := c.coc.OpenChannel(localCID, in.DestinationCID, in.InitialCreditsCID, in.MTU, in.MPS)
-	if err != nil {
-		return nil, err
-	}
-
-	c.Infof("coc localCID %v, remoteCID %v, credits %v OK", localCID, in.DestinationCID, in.InitialCreditsCID)
-
-	return conn, nil
+	return c.coc.Open(psm)
 }

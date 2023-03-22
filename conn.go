@@ -58,4 +58,10 @@ type LECreditBasedConnection interface {
 	Subscribe() (<-chan []byte, error)
 	Unsubscribe() error
 	Close() error
+	Info() LECreditBasedConnectionInfo
+}
+
+type LECreditBasedConnectionInfo struct {
+	LocalCID, RemoteCID uint16
+	MTU, MPS            uint16
 }
