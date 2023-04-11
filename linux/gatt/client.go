@@ -473,3 +473,7 @@ func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
 func (p *Client) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 	return p.conn.StartEncryption(ch)
 }
+
+func (p *Client) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConnection, error) {
+	return p.conn.OpenLECreditBasedConnection(psm)
+}
