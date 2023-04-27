@@ -51,6 +51,7 @@ type Conn interface {
 	StartEncryption(change chan EncryptionChangedInfo) error
 
 	OpenLECreditBasedConnection(psm uint16) (LECreditBasedConnection, error)
+	ConnectionHandle() uint8
 }
 
 type LECreditBasedConnection interface {

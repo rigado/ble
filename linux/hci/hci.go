@@ -797,7 +797,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	pa := e.PeerAddress()
 	addr := hex.EncodeToString(sliceops.SwapBuf(pa[:]))
-	c := newConn(h, e, addr)
+	c := newConn(h, e, addr, e.ConnectionHandle())
 	h.muConns.Lock()
 	h.Debugf("connectionComplete: handle %04x, addr %v, lecc evt %X", e.ConnectionHandle(), addr, b)
 	h.conns[e.ConnectionHandle()] = c

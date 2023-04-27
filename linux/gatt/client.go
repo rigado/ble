@@ -477,3 +477,7 @@ func (p *Client) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 func (p *Client) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConnection, error) {
 	return p.conn.OpenLECreditBasedConnection(psm)
 }
+
+func (p *Client) ConnectionHandle() uint8 {
+	return p.conn.ConnectionHandle()
+}

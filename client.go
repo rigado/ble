@@ -81,4 +81,5 @@ type Client interface {
 	StartEncryption(c chan EncryptionChangedInfo) error
 
 	OpenLECreditBasedConnection(psm uint16) (LECreditBasedConnection, error)
+	ConnectionHandle() uint8
 }

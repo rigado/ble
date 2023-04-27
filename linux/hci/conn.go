@@ -78,6 +78,7 @@ type Conn struct {
 	sigRspChannels   map[uint8]chan sigCmd
 	sigRspChannelsMu sync.Mutex
 
+	handle uint16
 	ble.Logger
 }
 
@@ -85,7 +86,7 @@ type Encrypter interface {
 	Encrypt() error
 }
 
-func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
+func newConn(h *HCI, param evt.LEConnectionComplete, mac string, handle uint16) *Conn {
 	c := &Conn{
 		hci:   h,
 		ctx:   context.Background(),
@@ -107,6 +108,7 @@ func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
 		chDone:         make(chan struct{}),
 		Logger:         h.Logger.ChildLogger(map[string]interface{}{"l2cap": mac}),
 		sigRspChannels: make(map[uint8]chan sigCmd),
+		handle:         handle,
 	}
 	c.coc = NewCoc(c, c.Logger.ChildLogger(map[string]interface{}{"l2capCoc": mac}))
 
@@ -562,6 +564,10 @@ func (c *Conn) TxMTU() int { return c.txMTU }
 
 // SetTxMTU sets the MTU which the remote device is capable of accepting.
 func (c *Conn) SetTxMTU(mtu int) { c.txMTU = mtu }
+
+func (c *Conn) ConnectionHandle() uint8 {
+	return uint8(c.handle & 0xff)
+}
 
 // pkt implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB
