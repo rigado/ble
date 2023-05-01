@@ -481,3 +481,7 @@ func (p *Client) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConne
 func (p *Client) ConnectionHandle() uint8 {
 	return p.conn.ConnectionHandle()
 }
+
+func (p *Client) SetConnectionParameters(minInterval, maxInterval, latency, timeout, minCeLength, maxCeLength uint16) error {
+	return fmt.Errorf("not implemented") //todo!!!!
+}
