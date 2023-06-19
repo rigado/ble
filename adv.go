@@ -65,3 +65,14 @@ type ServiceData struct {
 	UUID UUID
 	Data []byte
 }
+
+type AdvertisingParameters struct {
+	AdvertisingIntervalMin  uint16
+	AdvertisingIntervalMax  uint16
+	AdvertisingType         uint8
+	OwnAddressType          uint8
+	DirectAddressType       uint8
+	DirectAddress           [6]byte
+	AdvertisingChannelMap   uint8
+	AdvertisingFilterPolicy uint8
+}

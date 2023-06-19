@@ -1,6 +1,8 @@
 package ble
 
-import "context"
+import (
+	"context"
+)
 
 // Device ...
 type Device interface {
@@ -36,6 +38,11 @@ type Device interface {
 
 	// AdvertiseIBeacon advertises iBeacon with specified parameters.
 	AdvertiseIBeacon(ctx context.Context, u UUID, major, minor uint16, pwr int8) error
+
+	// Instructs the radio to advertise a payload and scan response in a non-blocking manner
+	AdvertiseRaw(ad, sr []byte, params AdvertisingParameters) error
+
+	StopAdvertising() error
 
 	// Scan starts scanning. Duplicated advertisements will be filtered out if allowDup is set to false, async handling
 	Scan(ctx context.Context, allowDup bool, h AdvHandler) error

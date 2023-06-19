@@ -43,13 +43,15 @@ func (h *HCI) EnableSecurity(bm interface{}) error {
 // SetScanParams overrides default scanning parameters.
 func (h *HCI) SetScanParams(param cmd.LESetScanParameters) error {
 	h.params.scanParams = param
-	return nil
+
+	return h.Send(&h.params.scanParams, nil)
 }
 
 // SetAdvParams overrides default advertising parameters.
 func (h *HCI) SetAdvParams(param cmd.LESetAdvertisingParameters) error {
 	h.params.advParams = param
-	return nil
+
+	return h.Send(&h.params.advParams, nil)
 }
 
 // SetPeripheralRole is not supported
