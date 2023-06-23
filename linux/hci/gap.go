@@ -269,6 +269,11 @@ func (h *HCI) cancelDial(passthrough error) (ble.Client, error) {
 
 // Advertise starts advertising.
 func (h *HCI) Advertise() error {
+	//send the current advertising parameters first
+	if err := h.Send(&h.params.advParams, nil); err != nil {
+		return err
+	}
+
 	h.params.advEnable.AdvertisingEnable = 1
 	return h.Send(&h.params.advEnable, nil)
 }
