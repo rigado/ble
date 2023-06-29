@@ -3,6 +3,7 @@ package linux
 import (
 	"context"
 	"fmt"
+	"github.com/rigado/ble/linux/hci/cmd"
 	"io"
 
 	smp2 "github.com/rigado/ble/linux/hci/smp"
@@ -172,6 +173,39 @@ func (d *Device) AdvertiseIBeacon(ctx context.Context, u ble.UUID, major, minor 
 	<-ctx.Done()
 	d.HCI.StopAdvertising()
 	return ctx.Err()
+}
+
+func (d *Device) AdvertiseRaw(ad, sr []byte, params ble.AdvertisingParameters) error {
+	//set the params
+	p := cmd.LESetAdvertisingParameters{
+		AdvertisingIntervalMin:  params.AdvertisingIntervalMin,
+		AdvertisingIntervalMax:  params.AdvertisingIntervalMax,
+		AdvertisingType:         params.AdvertisingType,
+		OwnAddressType:          params.OwnAddressType,
+		DirectAddressType:       params.DirectAddressType,
+		DirectAddress:           params.DirectAddress,
+		AdvertisingChannelMap:   params.AdvertisingChannelMap,
+		AdvertisingFilterPolicy: params.AdvertisingFilterPolicy,
+	}
+	if err := d.HCI.SetAdvParams(p); err != nil {
+		return err
+	}
+
+	//set the advertisement data
+	if err := d.HCI.SetAdvertisement(ad, sr); err != nil {
+		return err
+	}
+
+	//start advertising
+	if err := d.HCI.Advertise(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *Device) StopAdvertising() error {
+	return d.HCI.StopAdvertising()
 }
 
 func (d *Device) Scan(ctx context.Context, allowDup bool, h ble.AdvHandler) error {
