@@ -579,7 +579,9 @@ func (h *HCI) handleEvt(b []byte) error {
 		}
 		return nil
 	}
-	if code == evt.VendorEventCode {
+	//fixme
+	const vendor = 0xff
+	if code == vendor {
 		err := h.handleVendorEvent(b[2:])
 		//vendor commands should be reported up the stack
 		h.dispatchError(err)
@@ -795,7 +797,7 @@ func (h *HCI) handleLEConnectionComplete(b []byte) error {
 
 	pa := e.PeerAddress()
 	addr := hex.EncodeToString(sliceops.SwapBuf(pa[:]))
-	c := newConn(h, e, addr)
+	c := newConn(h, e, addr, e.ConnectionHandle())
 	h.muConns.Lock()
 	h.Debugf("connectionComplete: handle %04x, addr %v, lecc evt %X", e.ConnectionHandle(), addr, b)
 	h.conns[e.ConnectionHandle()] = c

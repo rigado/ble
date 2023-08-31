@@ -473,3 +473,15 @@ func (p *Client) Pair(authData ble.AuthData, to time.Duration) error {
 func (p *Client) StartEncryption(ch chan ble.EncryptionChangedInfo) error {
 	return p.conn.StartEncryption(ch)
 }
+
+func (p *Client) OpenLECreditBasedConnection(psm uint16) (ble.LECreditBasedConnection, error) {
+	return p.conn.OpenLECreditBasedConnection(psm)
+}
+
+func (p *Client) ConnectionHandle() uint8 {
+	return p.conn.ConnectionHandle()
+}
+
+func (p *Client) SetConnectionParameters(minInterval, maxInterval, latency, timeout, minCeLength, maxCeLength uint16) error {
+	return fmt.Errorf("not implemented") //todo!!!!
+}

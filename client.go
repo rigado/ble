@@ -79,4 +79,8 @@ type Client interface {
 	Pair(AuthData, time.Duration) error
 
 	StartEncryption(c chan EncryptionChangedInfo) error
+
+	OpenLECreditBasedConnection(psm uint16) (LECreditBasedConnection, error)
+	ConnectionHandle() uint8
+	SetConnectionParameters(minInterval, maxInterval, latency, timeout, minCeLength, maxCeLength uint16) error
 }

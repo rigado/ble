@@ -18,16 +18,65 @@ type CommandReject struct {
 func (s CommandReject) Code() int { return 0x01 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *CommandReject) Marshal() ([]byte, error) {
+func (s *CommandReject) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
 func (s *CommandReject) Unmarshal(b []byte) error {
+	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
+}
+
+// SignalL2CAPConnectionRequest is the code of L2CAP Connection Request signaling packet.
+const SignalL2CAPConnectionRequest = 0x02
+
+// L2CAPConnectionRequest implements L2CAP Connection Request (0x02) [Vol 3, Part A, 4.2].
+type L2CAPConnectionRequest struct {
+	PSM       uint16
+	SourceCID uint16
+}
+
+// Code returns the event code of the command.
+func (s L2CAPConnectionRequest) Code() int { return 0x02 }
+
+// Marshal serializes the command parameters into binary form.
+func (s *L2CAPConnectionRequest) Marshal() []byte {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
+}
+
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (s *L2CAPConnectionRequest) Unmarshal(b []byte) error {
+	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
+}
+
+// SignalL2CAPConnectionResponse is the code of L2CAP Connection Response signaling packet.
+const SignalL2CAPConnectionResponse = 0x03
+
+// L2CAPConnectionResponse implements L2CAP Connection Response (0x03) [Vol 3, Part A, 4.3].
+type L2CAPConnectionResponse struct {
+	DestinationCID uint16
+	SourceCID      uint16
+	MTU            uint16
+	Result         uint16
+	Status         uint16
+}
+
+// Code returns the event code of the command.
+func (s L2CAPConnectionResponse) Code() int { return 0x03 }
+
+// Marshal serializes the command parameters into binary form.
+func (s *L2CAPConnectionResponse) Marshal() []byte {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
+}
+
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (s *L2CAPConnectionResponse) Unmarshal(b []byte) error {
 	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
 }
 
@@ -44,12 +93,10 @@ type DisconnectRequest struct {
 func (s DisconnectRequest) Code() int { return 0x06 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *DisconnectRequest) Marshal() ([]byte, error) {
+func (s *DisconnectRequest) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -70,12 +117,10 @@ type DisconnectResponse struct {
 func (s DisconnectResponse) Code() int { return 0x07 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *DisconnectResponse) Marshal() ([]byte, error) {
+func (s *DisconnectResponse) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -98,12 +143,10 @@ type ConnectionParameterUpdateRequest struct {
 func (s ConnectionParameterUpdateRequest) Code() int { return 0x12 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *ConnectionParameterUpdateRequest) Marshal() ([]byte, error) {
+func (s *ConnectionParameterUpdateRequest) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -123,12 +166,10 @@ type ConnectionParameterUpdateResponse struct {
 func (s ConnectionParameterUpdateResponse) Code() int { return 0x13 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *ConnectionParameterUpdateResponse) Marshal() ([]byte, error) {
+func (s *ConnectionParameterUpdateResponse) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -152,12 +193,10 @@ type LECreditBasedConnectionRequest struct {
 func (s LECreditBasedConnectionRequest) Code() int { return 0x14 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *LECreditBasedConnectionRequest) Marshal() ([]byte, error) {
+func (s *LECreditBasedConnectionRequest) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -181,12 +220,10 @@ type LECreditBasedConnectionResponse struct {
 func (s LECreditBasedConnectionResponse) Code() int { return 0x15 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *LECreditBasedConnectionResponse) Marshal() ([]byte, error) {
+func (s *LECreditBasedConnectionResponse) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
@@ -207,15 +244,67 @@ type LEFlowControlCredit struct {
 func (s LEFlowControlCredit) Code() int { return 0x16 }
 
 // Marshal serializes the command parameters into binary form.
-func (s *LEFlowControlCredit) Marshal() ([]byte, error) {
+func (s *LEFlowControlCredit) Marshal() []byte {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := binary.Write(buf, binary.LittleEndian, s); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
 }
 
 // Unmarshal de-serializes the binary data and stores the result in the receiver.
 func (s *LEFlowControlCredit) Unmarshal(b []byte) error {
+	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
+}
+
+// SignalL2CAPCreditBasedConnectionRequest is the code of L2CAP Credit Based Connection Request signaling packet.
+const SignalL2CAPCreditBasedConnectionRequest = 0x17
+
+// L2CAPCreditBasedConnectionRequest implements L2CAP Credit Based Connection Request (0x17) [Vol 3, Part A, 4.25].
+type L2CAPCreditBasedConnectionRequest struct {
+	SPSM           uint16
+	MTU            uint16
+	MPS            uint16
+	InitialCredits uint16
+	SourceCID      uint16
+}
+
+// Code returns the event code of the command.
+func (s L2CAPCreditBasedConnectionRequest) Code() int { return 0x17 }
+
+// Marshal serializes the command parameters into binary form.
+func (s *L2CAPCreditBasedConnectionRequest) Marshal() []byte {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
+}
+
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (s *L2CAPCreditBasedConnectionRequest) Unmarshal(b []byte) error {
+	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
+}
+
+// SignalL2CAPCreditBasedConnectionResponse is the code of L2CAP Credit Based Connection Response signaling packet.
+const SignalL2CAPCreditBasedConnectionResponse = 0x18
+
+// L2CAPCreditBasedConnectionResponse implements L2CAP Credit Based Connection Response (0x18) [Vol 3, Part A, 4.26].
+type L2CAPCreditBasedConnectionResponse struct {
+	MTU               uint16
+	MPS               uint16
+	InitialCreditsCID uint16
+	Result            uint16
+	DestinationCID    uint16
+}
+
+// Code returns the event code of the command.
+func (s L2CAPCreditBasedConnectionResponse) Code() int { return 0x18 }
+
+// Marshal serializes the command parameters into binary form.
+func (s *L2CAPCreditBasedConnectionResponse) Marshal() []byte {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	binary.Write(buf, binary.LittleEndian, s)
+	return buf.Bytes()
+}
+
+// Unmarshal de-serializes the binary data and stores the result in the receiver.
+func (s *L2CAPCreditBasedConnectionResponse) Unmarshal(b []byte) error {
 	return binary.Read(bytes.NewBuffer(b), binary.LittleEndian, s)
 }

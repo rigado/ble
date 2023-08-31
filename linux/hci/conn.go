@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -72,6 +73,12 @@ type Conn struct {
 	smp        SmpManager
 	encInfo    ble.EncryptionChangedInfo
 	encChanged chan ble.EncryptionChangedInfo
+
+	coc              *coc
+	sigRspChannels   map[uint8]chan sigCmd
+	sigRspChannelsMu sync.Mutex
+
+	handle uint16
 	ble.Logger
 }
 
@@ -79,7 +86,7 @@ type Encrypter interface {
 	Encrypt() error
 }
 
-func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
+func newConn(h *HCI, param evt.LEConnectionComplete, mac string, handle uint16) *Conn {
 	c := &Conn{
 		hci:   h,
 		ctx:   context.Background(),
@@ -98,9 +105,12 @@ func newConn(h *HCI, param evt.LEConnectionComplete, mac string) *Conn {
 
 		txBuffer: NewClient(h.pool),
 
-		chDone: make(chan struct{}),
-		Logger: h.Logger.ChildLogger(map[string]interface{}{"l2cap": mac}),
+		chDone:         make(chan struct{}),
+		Logger:         h.Logger.ChildLogger(map[string]interface{}{"l2cap": mac}),
+		sigRspChannels: make(map[uint8]chan sigCmd),
+		handle:         handle,
 	}
+	c.coc = NewCoc(c, c.Logger.ChildLogger(map[string]interface{}{"l2capCoc": mac}))
 
 	if c.hci.smpEnabled {
 		c.smp = c.hci.smp.Create(defaultSmpConfig, c.Logger)
@@ -421,17 +431,22 @@ func (c *Conn) recombine() error {
 		p = append(p, pdu(pkt.data())...)
 	}
 
-	// TODO: support dynamic or assigned channels for LE-Frames.
-	switch p.cid() {
-	case cidLEAtt:
+	cid := p.cid()
+	switch {
+	case cid == cidLEAtt:
 		c.chInPDU <- p
-	case cidLESignal:
+	case cid == cidLESignal:
 		_ = c.handleSignal(p)
-	case CidSMP:
+	case cid == CidSMP:
 		if c.smp == nil {
 			c.Errorf("recombine: smp nil")
 		} else if err := c.smp.Handle(p); err != nil {
 			c.Errorf("recombine: smp.Handle - %v", err)
+		}
+	case cid >= minDynamicCID && cid <= maxDynamicCID:
+		if err := c.handleIncomingCoc(p); err != nil {
+			c.Errorf("dynamicCID %v: %v", cid, err)
+			// hangup?
 		}
 
 	default:
@@ -549,6 +564,10 @@ func (c *Conn) TxMTU() int { return c.txMTU }
 
 // SetTxMTU sets the MTU which the remote device is capable of accepting.
 func (c *Conn) SetTxMTU(mtu int) { c.txMTU = mtu }
+
+func (c *Conn) ConnectionHandle() uint8 {
+	return uint8(c.handle & 0xff)
+}
 
 // pkt implements HCI ACL Data Packet [Vol 2, Part E, 5.4.2]
 // Packet boundary flags , bit[5:6] of handle field's MSB
