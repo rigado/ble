@@ -151,7 +151,7 @@ func onLegacyRandom(t *transport) ([]byte, error) {
 	//calculate STK
 	var k []byte
 	if t.pairing.pairingType == Passkey {
-		k = getLegacyParingTK(t.pairing.authData.Passkey)
+		k = getLegacyParingTK(t.pairing.authData.GetPasskey())
 	} else {
 		k = getLegacyParingTK(0)
 	}
@@ -314,8 +314,8 @@ func continuePassKeyPairing(t *transport) {
 	t.send(out)
 }
 
-//Core spec v5.0 Vol 3, Part H, 2.3.5.1
-//Tables 2.6, 2.7, and 2.8
+// Core spec v5.0 Vol 3, Part H, 2.3.5.1
+// Tables 2.6, 2.7, and 2.8
 var ioCapsTableSC = [][]int{
 	{JustWorks, JustWorks, Passkey, JustWorks, Passkey},
 	{JustWorks, NumericComp, Passkey, JustWorks, NumericComp},

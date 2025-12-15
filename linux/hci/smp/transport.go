@@ -153,7 +153,7 @@ func (t *transport) sendDHKeyCheck() error {
 	rb := make([]byte, 16)
 	if t.pairing.pairingType == Passkey {
 		keyBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(keyBytes, uint32(t.pairing.authData.Passkey))
+		binary.BigEndian.PutUint32(keyBytes, uint32(t.pairing.authData.GetPasskey()))
 		rb[12] = keyBytes[0]
 		rb[13] = keyBytes[1]
 		rb[14] = keyBytes[2]
@@ -198,7 +198,7 @@ func (t *transport) sendMConfirm() error {
 
 	k := make([]byte, 16)
 	if t.pairing.pairingType == Passkey {
-		k = getLegacyParingTK(t.pairing.authData.Passkey)
+		k = getLegacyParingTK(t.pairing.authData.GetPasskey())
 	}
 
 	c1, err := smpC1(k, r, preq, pres,

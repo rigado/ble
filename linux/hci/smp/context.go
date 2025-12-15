@@ -89,7 +89,7 @@ func (p *pairingContext) checkPasskeyConfirm() error {
 	kax := MarshalPublicKeyX(p.scECDHKeys.public)
 	nb := p.remoteRandom
 	i := p.passKeyIteration
-	key := p.authData.Passkey
+	key := p.authData.GetPasskey()
 
 	//this gets the bit of the passkey for the current iteration
 	z := 0x80 | (byte)((key&(1<<uint(i)))>>uint(i))
@@ -114,7 +114,7 @@ func (p *pairingContext) checkPasskeyConfirm() error {
 	return nil
 }
 
-//todo: key should be set at the beginning
+// todo: key should be set at the beginning
 func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 	kbx := MarshalPublicKeyX(p.scRemotePubKey)
 	kax := MarshalPublicKeyX(p.scECDHKeys.public)
@@ -125,7 +125,7 @@ func (p *pairingContext) generatePassKeyConfirm() ([]byte, []byte) {
 	}
 
 	i := p.passKeyIteration
-	z := 0x80 | (byte)((p.authData.Passkey&(1<<uint(i)))>>uint(i))
+	z := 0x80 | (byte)((p.authData.GetPasskey()&(1<<uint(i)))>>uint(i))
 
 	calcConf, err := smpF4(kax, kbx, nai, z)
 	if err != nil {
@@ -176,7 +176,7 @@ func (p *pairingContext) checkDHKeyCheck() error {
 	ra := make([]byte, 16)
 	if p.pairingType == Passkey {
 		keyBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(keyBytes, uint32(p.authData.Passkey))
+		binary.BigEndian.PutUint32(keyBytes, uint32(p.authData.GetPasskey()))
 		ra[12] = keyBytes[0]
 		ra[13] = keyBytes[1]
 		ra[14] = keyBytes[2]
@@ -230,7 +230,7 @@ func (p *pairingContext) checkLegacyConfirm() error {
 
 	k := make([]byte, 16)
 	if p.pairingType == Passkey {
-		k = getLegacyParingTK(p.authData.Passkey)
+		k = getLegacyParingTK(p.authData.GetPasskey())
 	}
 	c1, err := smpC1(k, sRand, preq, pres,
 		p.localAddrType,
